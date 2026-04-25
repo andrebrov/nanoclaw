@@ -1,0 +1,50 @@
+name: Notify Telegram on AI PR
+
+# Triggered when an AI-fix PR opens (or moves out of draft). DMs Andrei via
+# the MythicalClaw bot so he knows there's something to review without
+# having to babysit the Actions tab.
+#
+# Setup needed once:
+#   - Repo secret: TELEGRAM_BOT_TOKEN  (the bot token from .env)
+#
+# Branch-name heuristic: anthropic/claude-code-action opens PRs from
+# branches starting with `claude/` (or `claude-code/`). If the action
+# changes that convention, update the `if:` filter.
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, reopened]
+
+jobs:
+  notify:
+    if: |
+      startsWith(github.head_ref, 'claude/') ||
+      startsWith(github.head_ref, 'claude-code/') ||
+      contains(github.event.pull_request.labels.*.name, 'ai-fix')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Telegram notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: '368370798'
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ISSUE_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ]; then
+            echo "TELEGRAM_BOT_TOKEN secret not set — skipping notification"
+            echo "Add it at: https://github.com/${{ github.repository }}/settings/secrets/actions/new"
+            exit 0
+          fi
+          MESSAGE="✅ AI PR ready: #${PR_NUMBER} — ${PR_TITLE}
+          ${PR_URL}
+
+          Review, then merge. Droplet will sync within 60s and restart."
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MESSAGE}" \
+            --data-urlencode "disable_web_page_preview=false" \
+            | head -c 200
+          echo
