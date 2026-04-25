@@ -104,6 +104,26 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
   let state: SqliteStateAdapter;
   let setupConfig: ChannelSetup;
   let gatewayAbort: AbortController | null = null;
+  // Per-platformId guard so we emit onMetadata at most once per chat per
+  // process lifetime. The host's onMetadata handler is idempotent (no-ops
+  // when fields already match), but skipping the lookup on hot paths is
+  // cheap insurance.
+  const metadataEmitted = new Set<string>();
+
+  /**
+   * Emit metadata for a thread on first sight. Lets the host update the
+   * messaging_groups row's `is_group` and `name` when the chat-sdk reveals
+   * those — without this, auto-created rows stay stuck at the
+   * default `is_group=0`, which makes mention-sticky engage_mode treat
+   * group chats as DMs and refuse to engage on non-mention follow-up
+   * replies (see router.ts:evaluateEngage 'mention-sticky' branch).
+   */
+  function maybeEmitMetadata(thread: { id: string; isDM?: boolean }): void {
+    const platformId = adapter.channelIdFromThreadId(thread.id);
+    if (metadataEmitted.has(platformId)) return;
+    metadataEmitted.add(platformId);
+    setupConfig.onMetadata(platformId, undefined, thread.isDM === false);
+  }
 
   async function messageToInbound(message: ChatMessage, isMention: boolean): Promise<InboundMessage> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,12 +214,14 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // engaged. Carry the SDK's `message.isMention` through so mention-mode
       // wirings still fire on in-thread mentions.
       chat.onSubscribedMessage(async (thread, message) => {
+        maybeEmitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, message.isMention === true));
       });
 
       // @mention in an unsubscribed thread — SDK-confirmed bot mention.
       chat.onNewMention(async (thread, message) => {
+        maybeEmitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true));
       });
@@ -209,6 +231,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // inside a DM). Router collapses DM sub-threads to one session via
       // is_group=0 short-circuit.
       chat.onDirectMessage(async (thread, message) => {
+        maybeEmitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
         log.info('Inbound DM received', {
           adapter: adapter.name,
@@ -230,6 +253,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       // so forwarding every one is cheap enough to not need a bridge-side
       // flood gate.
       chat.onNewMessage(/./, async (thread, message) => {
+        maybeEmitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
         await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, false));
       });

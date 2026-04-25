@@ -11,6 +11,7 @@ import { migrateGroupsToClaudeLocal } from './claude-md-compose.js';
 import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
+import { getMessagingGroupByPlatform, updateMessagingGroup } from './db/messaging-groups.js';
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
 import { startHostSweep, stopHostSweep } from './host-sweep.js';
 import { routeInbound } from './router.js';
@@ -103,12 +104,32 @@ async function main(): Promise<void> {
         });
       },
       onMetadata(platformId, name, isGroup) {
-        log.info('Channel metadata discovered', {
-          channelType: adapter.channelType,
-          platformId,
-          name,
-          isGroup,
-        });
+        // Update the messaging_groups row's `name` and `is_group` once the
+        // adapter discovers them. Without this the auto-create path in
+        // router.ts uses defaults (name=null, is_group=0), and downstream
+        // engage logic — notably mention-sticky — refuses to engage on
+        // non-mention follow-up replies because mg.is_group=0 means "DM,
+        // sticky doesn't apply". The chat-sdk bridge emits this on first
+        // sight of each thread; if no row exists yet, it's a no-op and the
+        // following onInbound will auto-create with default 0 (next
+        // metadata emission self-heals it).
+        const existing = getMessagingGroupByPlatform(adapter.channelType, platformId);
+        if (!existing) return;
+        const updates: { name?: string; is_group?: number } = {};
+        if (name !== undefined && existing.name !== name) updates.name = name;
+        if (isGroup !== undefined) {
+          const next = isGroup ? 1 : 0;
+          if (existing.is_group !== next) updates.is_group = next;
+        }
+        if (Object.keys(updates).length > 0) {
+          updateMessagingGroup(existing.id, updates);
+          log.info('Messaging group metadata updated', {
+            id: existing.id,
+            channelType: adapter.channelType,
+            platformId,
+            updates,
+          });
+        }
       },
       onAction(questionId, selectedOption, userId) {
         dispatchResponse({
