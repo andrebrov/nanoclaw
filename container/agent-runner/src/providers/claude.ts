@@ -312,6 +312,7 @@ export class ClaudeProvider implements AgentProvider {
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'compact_boundary') {
           const meta = (message as { compact_metadata?: { pre_tokens?: number } }).compact_metadata;
           const detail = meta?.pre_tokens ? ` (${meta.pre_tokens.toLocaleString()} tokens compacted)` : '';
+          yield { type: 'progress', message: `Context compacted${detail}.` };
           // Distinct event type from `result` so the poll-loop can
           // (a) NOT mark the inbound batch completed (the user's prompt
           //     hasn't actually been answered yet),

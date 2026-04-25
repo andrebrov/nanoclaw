@@ -4,7 +4,9 @@
  *
  * Used by Discord, Slack, and other Chat SDK-supported platforms.
  */
+import fs from 'fs';
 import http from 'http';
+import path from 'path';
 
 import {
   Chat,
@@ -146,6 +148,12 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
           try {
             const buffer = await att.fetchData();
             entry.data = buffer.toString('base64');
+            const ext = att.mimeType?.split('/')[1] ?? att.name?.split('.').pop() ?? 'bin';
+            const filename = `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
+            const imagesDir = '/workspace/agent/images';
+            fs.mkdirSync(imagesDir, { recursive: true });
+            fs.writeFileSync(path.join(imagesDir, filename), buffer);
+            entry.localPath = `agent/images/${filename}`;
           } catch (err) {
             log.warn('Failed to download attachment', { type: att.type, err });
           }
