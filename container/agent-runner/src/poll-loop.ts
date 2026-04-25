@@ -160,7 +160,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     const skippedSet = new Set(skipped);
     const processingIds = ids.filter((id) => !commandIds.includes(id) && !skippedSet.has(id));
     try {
-      const result = await processQuery(query, routing, processingIds);
+      const result = await processQuery(query, routing, processingIds, prompt);
       if (result.continuation && result.continuation !== continuation) {
         continuation = result.continuation;
         setStoredSessionId(continuation);
@@ -238,6 +238,7 @@ async function processQuery(
   query: AgentQuery,
   routing: RoutingContext,
   initialBatchIds: string[],
+  prompt: string,
 ): Promise<QueryResult> {
   let queryContinuation: string | undefined;
   let done = false;
@@ -300,6 +301,31 @@ async function processQuery(
         if (event.text) {
           dispatchResultText(event.text, routing);
         }
+      } else if (event.type === 'compaction') {
+        // Mid-turn auto-compaction. Claude Code SDK ends the current Query
+        // as a side effect of compaction; if we did nothing, the user's
+        // prompt would be lost (no further `result` events come, and the
+        // active-poll only fires when *new* inbound messages arrive). Two
+        // actions:
+        //   1. Notify the user that compaction happened (cosmetic, but
+        //      explains the delay).
+        //   2. Re-push the same prompt so the agent actually answers.
+        // Do NOT markCompleted — the inbound batch hasn't been answered
+        // yet. It gets marked only when a real `result` comes through
+        // post-resubmit.
+        log(`Compaction event: ${event.message} — re-submitting prompt to make agent answer`);
+        if (routing.channelType && routing.platformId) {
+          writeMessageOut({
+            id: generateId(),
+            in_reply_to: routing.inReplyTo,
+            kind: 'chat',
+            platform_id: routing.platformId,
+            channel_type: routing.channelType,
+            thread_id: routing.threadId,
+            content: JSON.stringify({ text: event.message }),
+          });
+        }
+        query.push(prompt);
       }
     }
   } finally {
@@ -323,6 +349,9 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
       break;
     case 'progress':
       log(`Progress: ${event.message}`);
+      break;
+    case 'compaction':
+      log(`Compaction: ${event.message}`);
       break;
   }
 }
