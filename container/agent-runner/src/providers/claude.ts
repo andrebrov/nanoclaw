@@ -312,7 +312,12 @@ export class ClaudeProvider implements AgentProvider {
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'compact_boundary') {
           const meta = (message as { compact_metadata?: { pre_tokens?: number } }).compact_metadata;
           const detail = meta?.pre_tokens ? ` (${meta.pre_tokens.toLocaleString()} tokens compacted)` : '';
-          yield { type: 'result', text: `Context compacted${detail}.` };
+          // Distinct event type from `result` so the poll-loop can
+          // (a) NOT mark the inbound batch completed (the user's prompt
+          //     hasn't actually been answered yet),
+          // (b) re-submit the prompt to make the agent actually answer
+          //     post-compaction (Claude Code SDK does not auto-resume).
+          yield { type: 'compaction', message: `Context compacted${detail}.` };
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'task_notification') {
           const tn = message as { summary?: string };
           yield { type: 'progress', message: tn.summary || 'Task notification' };

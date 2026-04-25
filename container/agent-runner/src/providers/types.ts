@@ -75,6 +75,14 @@ export type ProviderEvent =
   | { type: 'error'; message: string; retryable: boolean; classification?: string }
   | { type: 'progress'; message: string }
   /**
+   * Mid-turn context compaction happened. The SDK ended the current
+   * Query as a side effect; the user's prompt was NOT answered. The
+   * poll-loop must (a) inform the user, (b) re-submit the same prompt
+   * so the agent actually answers, AND must NOT mark the inbound batch
+   * completed yet — the turn isn't done.
+   */
+  | { type: 'compaction'; message: string }
+  /**
    * Liveness signal. Providers MUST yield this on every underlying SDK
    * event (tool call, thinking, partial message, anything) so the
    * poll-loop's idle timer stays honest during long tool runs.
