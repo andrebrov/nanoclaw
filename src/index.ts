@@ -64,6 +64,9 @@ async function main(): Promise<void> {
   runMigrations(db);
   log.info('Central DB ready', { path: dbPath });
 
+  const { initMessageStore } = await import('./message-store.js');
+  initMessageStore();
+
   // 1b. One-time filesystem cutover — idempotent, no-op after first run.
   migrateGroupsToClaudeLocal();
 

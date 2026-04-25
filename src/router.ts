@@ -29,6 +29,7 @@ import {
 import { findSessionForAgent } from './db/sessions.js';
 import { startTypingRefresh } from './modules/typing/index.js';
 import { log } from './log.js';
+import { indexMessage } from './message-store.js';
 import { resolveSession, writeSessionMessage, writeOutboundDirect } from './session-manager.js';
 import { wakeContainer } from './container-runner.js';
 import { getSession } from './db/sessions.js';
@@ -442,6 +443,23 @@ async function deliverToAgent(
     wake,
     created,
     agentGroupName: agentGroup.name,
+  });
+
+  const parsedForIndex = safeParseContent(event.message.content);
+  indexMessage({
+    messaging_group_id: mg.id,
+    channel_type: event.channelType,
+    platform_id: event.platformId,
+    thread_id: event.threadId,
+    direction: 'in',
+    kind: event.message.kind,
+    sender_user_id: userId,
+    sender_name: parsedForIndex.sender ?? null,
+    text: parsedForIndex.text ?? null,
+    content_json: event.message.content,
+    platform_msg_id: event.message.id,
+    session_id: session.id,
+    agent_group_id: agent.agent_group_id,
   });
 
   if (wake) {

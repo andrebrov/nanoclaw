@@ -1,0 +1,47 @@
+name: AI fix from issue
+
+# Triggered when an issue is labeled `ai-fix`. Runs the Anthropic Claude Code
+# Action to read the issue body, make changes on a fresh branch, and open a
+# PR back to main. The PR is then gated by the existing ci.yml workflow.
+#
+# Setup needed once:
+#   - Repo secret: ANTHROPIC_API_KEY  (Settings → Secrets and variables → Actions)
+#   - Issue label: `ai-fix`            (gh label create ai-fix --color FBCA04 ...)
+#
+# To trigger from chat: agent calls `gh-issue` skill (or POSTs to GitHub API)
+# with `{labels: ["ai-fix"]}`. Action picks it up within ~30 seconds.
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  ai-fix:
+    if: github.event.label.name == 'ai-fix'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code on the issue
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The action infers issue context from github.event automatically
+          # and opens a PR linked back to this issue when changes are made.
+          # Custom instructions: stay narrow, follow project conventions
+          # (see CLAUDE.md), don't touch unrelated files.
+          prompt: |
+            You are working on the NanoClaw repository. Read the issue body
+            and implement the smallest correct change. Follow CLAUDE.md and
+            CONTRIBUTING.md conventions. Run `pnpm install --frozen-lockfile`
+            and `pnpm run build` before opening the PR; if either fails, fix
+            the underlying issue rather than skipping. Keep the diff focused
+            on what the issue asks for — no drive-by refactors. Reference
+            the issue number in the PR title (e.g. "fix: <description> (#N)").

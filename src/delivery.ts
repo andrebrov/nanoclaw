@@ -22,6 +22,7 @@ import {
 } from './db/session-db.js';
 import { log } from './log.js';
 import { normalizeOptions } from './channels/ask-question.js';
+import { indexMessage } from './message-store.js';
 import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './session-manager.js';
 import { pauseTypingRefreshAfterDelivery, setTypingAdapter } from './modules/typing/index.js';
 import type { OutboundFile } from './channels/adapter.js';
@@ -364,6 +365,30 @@ async function deliverMessage(
     platformId: msg.platform_id,
     platformMsgId,
     fileCount: files?.length,
+  });
+
+  let outText: string | null = null;
+  try {
+    const parsed = JSON.parse(msg.content);
+    outText = (parsed?.text as string) ?? (parsed?.markdown as string) ?? null;
+  } catch {
+    /* non-JSON content (rare); fall through with null text */
+  }
+  const mgRow = getMessagingGroupByPlatform(msg.channel_type, msg.platform_id);
+  indexMessage({
+    messaging_group_id: mgRow?.id ?? null,
+    channel_type: msg.channel_type,
+    platform_id: msg.platform_id,
+    thread_id: msg.thread_id ?? null,
+    direction: 'out',
+    kind: msg.kind,
+    sender_user_id: null,
+    sender_name: null,
+    text: outText,
+    content_json: msg.content,
+    platform_msg_id: platformMsgId ?? null,
+    session_id: session.id,
+    agent_group_id: session.agent_group_id,
   });
 
   clearOutbox(session.agent_group_id, session.id, msg.id);

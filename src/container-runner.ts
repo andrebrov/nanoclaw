@@ -27,7 +27,15 @@ import {
   type ProviderContainerContribution,
   type VolumeMount,
 } from './providers/provider-container-registry.js';
-import { markContainerRunning, markContainerStopped, sessionDir, writeSessionRouting } from './session-manager.js';
+import { messageDbPath } from './message-store.js';
+import { writeSessionSecrets } from './container-secrets.js';
+import {
+  heartbeatPath,
+  markContainerRunning,
+  markContainerStopped,
+  sessionDir,
+  writeSessionRouting,
+} from './session-manager.js';
 import type { AgentGroup, Session } from './types.js';
 
 const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
@@ -119,6 +127,19 @@ async function spawnContainer(session: Session): Promise<void> {
     contribution,
     agentIdentifier,
   );
+
+  // Remove any stale .heartbeat from a prior container instance. The host
+  // sweep's absolute-ceiling check uses heartbeat mtime as liveness; if a
+  // prior container was killed/crashed, its heartbeat persists on disk and
+  // the sweep will compute age > ceiling the moment the new container is
+  // listed as running, kill-137 it before it can write its first heartbeat,
+  // and retry-storm forever. Deleting here restores the "fresh spawn ⇒ no
+  // heartbeat file" invariant that host-sweep.ts:79–86 relies on.
+  try {
+    fs.unlinkSync(heartbeatPath(agentGroup.id, session.id));
+  } catch {
+    /* already absent — fine */
+  }
 
   log.info('Spawning container', { sessionId: session.id, agentGroup: agentGroup.name, containerName });
 
@@ -252,6 +273,24 @@ function buildMounts(
   const sharedClaudeMd = path.join(process.cwd(), 'container', 'CLAUDE.md');
   if (fs.existsSync(sharedClaudeMd)) {
     mounts.push({ hostPath: sharedClaudeMd, containerPath: '/app/CLAUDE.md', readonly: true });
+  }
+
+  // Cross-session message index — read-only. Single writer is the host
+  // (src/message-store.ts); containers query it for context recovery
+  // ("what did this user say last week?", "did we discuss X already?").
+  // Only mount if the host has initialized the file at least once;
+  // first-spawn-before-first-message is fine — no mount, agent skips it.
+  if (fs.existsSync(messageDbPath)) {
+    mounts.push({ hostPath: messageDbPath, containerPath: '/workspace/messages.db', readonly: true });
+  }
+
+  // Per-session secret files for v1-style skill scripts (composio-tool,
+  // instantly-tool, phantombuster-tool). v2 stopped writing these when it
+  // moved to OneCLI Vault; without them every Composio-mediated skill
+  // exits with "credentials not available" before the OneCLI proxy ever
+  // sees the request. See container-secrets.ts for rationale.
+  for (const m of writeSessionSecrets(sessDir)) {
+    mounts.push(m);
   }
 
   // Per-group .claude-shared at /home/node/.claude (Claude state, settings,
@@ -391,6 +430,15 @@ async function buildContainerArgs(
   if (providerContribution.env) {
     for (const [key, value] of Object.entries(providerContribution.env)) {
       args.push('-e', `${key}=${value}`);
+    }
+  }
+
+  // Passthrough: non-secret config env vars the skills expect (Composio IDs,
+  // URLs, Meta app config). Secrets flow via OneCLI, not here.
+  for (const key of Object.keys(process.env)) {
+    if (/^(COMPOSIO_|CLAY_WEBHOOK_URL|GHOST_API_URL|META_|GRANOLA_)/.test(key)) {
+      const v = process.env[key];
+      if (v) args.push('-e', `${key}=${v}`);
     }
   }
 
