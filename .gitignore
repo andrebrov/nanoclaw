@@ -39,3 +39,27 @@ groups/*
 .nanoclaw/
 
 agents-sdk-docs
+
+# Personal Claude Code / Tessl / agent state — not for trunk
+.agents/
+.tessl/
+.github/skills/
+.claude/skills/tessl__*
+
+# container/skills — track only trunk skills + locally-added trunk-eligible
+# ones. Personal/v1-migrated workflow skills (ad-analyzer, agency-prospector,
+# brainstorming, etc.) stay local — they're per-install workflow content,
+# not nanoclaw source.
+container/skills/*
+!container/skills/agent-browser/
+!container/skills/frontend-engineer/
+!container/skills/gh-issue/
+!container/skills/self-customize/
+!container/skills/slack-formatting/
+!container/skills/vercel-cli/
+!container/skills/welcome/
+
+# One-off / local scripts
+scripts/.granola-auth-state.json
+scripts/migrate-finsi-wire.ts
+scripts/show-wiring.ts
