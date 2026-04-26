@@ -320,20 +320,20 @@ export function validateMount(mount: AdditionalMount): MountValidationResult {
  *
  * @param mounts - mounts from container.json
  * @param groupName - display name used in log messages
- * @param groupFolder - folder name; non-"main" groups are forced read-only when
- *   the allowlist has nonMainReadOnly (true by default)
+ * @param isTrusted - true for main group or isAdmin groups; others are forced read-only
+ *   when the allowlist has nonMainReadOnly (true by default)
  */
 export function validateAdditionalMounts(
   mounts: AdditionalMount[],
   groupName: string,
-  groupFolder: string,
+  isTrusted: boolean,
 ): Array<{
   hostPath: string;
   containerPath: string;
   readonly: boolean;
 }> {
   const allowlist = loadMountAllowlist();
-  const forceReadonly = groupFolder !== 'main' && (allowlist === null || allowlist.nonMainReadOnly !== false);
+  const forceReadonly = !isTrusted && (allowlist === null || allowlist.nonMainReadOnly !== false);
 
   const validatedMounts: Array<{
     hostPath: string;
@@ -348,9 +348,8 @@ export function validateAdditionalMounts(
       const effectiveReadonly = forceReadonly ? true : result.effectiveReadonly!;
 
       if (forceReadonly && !result.effectiveReadonly) {
-        log.info('Mount forced to read-only — non-main group', {
+        log.info('Mount forced to read-only — non-main/non-admin group', {
           group: groupName,
-          folder: groupFolder,
           hostPath: result.realHostPath,
         });
       }
