@@ -10,11 +10,15 @@
  * Self-messages are always allowed (used for system notes injected back into
  * an agent's own session, e.g. post-approval follow-up prompts).
  *
+ * Broadcast: `platform_id === '__broadcast__'` fans out to all agent groups
+ * except the sender. The `broadcast` destination is injected as a synthetic
+ * row into every agent's inbound.db projection by write-destinations.ts.
+ *
  * Core delivery.ts dispatches into this via a dynamic import guarded by a
  * `channel_type === 'agent'` check. When the module is absent the check in
  * core throws with a "module not installed" message so retry → mark failed.
  */
-import { getAgentGroup } from '../../db/agent-groups.js';
+import { getAllAgentGroups, getAgentGroup } from '../../db/agent-groups.js';
 import { getSession } from '../../db/sessions.js';
 import { wakeContainer } from '../../container-runner.js';
 import { log } from '../../log.js';
@@ -28,11 +32,39 @@ export interface RoutableAgentMessage {
   content: string;
 }
 
+/** Sentinel used by the synthetic broadcast destination row. */
+export const BROADCAST_SENTINEL = '__broadcast__';
+
+async function deliverToAgent(targetAgentGroupId: string, sourceAgentGroupId: string, content: string): Promise<void> {
+  const { session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared');
+  writeSessionMessage(targetAgentGroupId, targetSession.id, {
+    id: `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    kind: 'chat',
+    timestamp: new Date().toISOString(),
+    platformId: sourceAgentGroupId,
+    channelType: 'agent',
+    threadId: null,
+    content,
+  });
+  const fresh = getSession(targetSession.id);
+  if (fresh) await wakeContainer(fresh);
+}
+
 export async function routeAgentMessage(msg: RoutableAgentMessage, session: Session): Promise<void> {
   const targetAgentGroupId = msg.platform_id;
   if (!targetAgentGroupId) {
     throw new Error(`agent-to-agent message ${msg.id} is missing a target agent group id`);
   }
+
+  // Broadcast: fan out to every agent group except the sender.
+  if (targetAgentGroupId === BROADCAST_SENTINEL) {
+    const all = getAllAgentGroups();
+    const peers = all.filter((ag) => ag.id !== session.agent_group_id);
+    log.info('Agent broadcast', { from: session.agent_group_id, peers: peers.map((p) => p.id) });
+    await Promise.all(peers.map((ag) => deliverToAgent(ag.id, session.agent_group_id, msg.content)));
+    return;
+  }
+
   if (
     targetAgentGroupId !== session.agent_group_id &&
     !hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)
@@ -44,21 +76,9 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
   if (!getAgentGroup(targetAgentGroupId)) {
     throw new Error(`target agent group ${targetAgentGroupId} not found for message ${msg.id}`);
   }
-  const { session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared');
-  writeSessionMessage(targetAgentGroupId, targetSession.id, {
-    id: `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    kind: 'chat',
-    timestamp: new Date().toISOString(),
-    platformId: session.agent_group_id,
-    channelType: 'agent',
-    threadId: null,
-    content: msg.content,
-  });
+  await deliverToAgent(targetAgentGroupId, session.agent_group_id, msg.content);
   log.info('Agent message routed', {
     from: session.agent_group_id,
     to: targetAgentGroupId,
-    targetSession: targetSession.id,
   });
-  const fresh = getSession(targetSession.id);
-  if (fresh) await wakeContainer(fresh);
 }

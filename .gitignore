@@ -58,6 +58,7 @@ container/skills/*
 !container/skills/slack-formatting/
 !container/skills/vercel-cli/
 !container/skills/welcome/
+!container/skills/agent-mesh/
 
 # One-off / local scripts
 scripts/.granola-auth-state.json
