@@ -1,6 +1,6 @@
 ---
 name: agent-mesh
-description: Share learnings across agents using /workspace/global/skills-discovered.md, and send messages to all agents at once with the broadcast destination.
+description: Share learnings across agents using /workspace/global/skills-discovered.md, send messages to all agents with broadcast, or hand off to the primary DM agent with the main destination.
 ---
 
 # Agent Mesh — Shared Memory and Broadcast
@@ -41,11 +41,13 @@ Keep broadcasts short — every active agent receives and processes them.
 
 ## Cross-Channel Handoff
 
-To hand off a conversation to another agent (e.g., moving from a group chat to DM), use `send_message` with that agent's name as the destination. The target agent receives the message in its agent-shared session and can pick up the context from your message content.
+The `main` destination is always available — no operator wiring required. It routes to the oldest agent group (the one the user set up first), which is typically their primary DM agent. Use it to hand off a conversation from a group chat to the user's DM.
 
 Example:
 ```
 send_message({ to: 'main', text: 'User wants to continue in DM. Context: [summary]' })
 ```
 
-The `main` agent must have been wired as a destination by the operator. If the destination isn't listed, ask the user to have an admin wire it up via /manage-channels.
+The target agent receives the message in its agent-shared session and can pick up the context from your message content.
+
+To hand off to a specific named agent other than main, use that agent's destination name (configured by the operator via /manage-channels).

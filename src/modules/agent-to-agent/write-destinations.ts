@@ -61,6 +61,18 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
     agent_group_id: '__broadcast__',
   });
 
+  // Synthetic main destination — always injected so any agent can reach the
+  // user's primary DM agent (oldest group by created_at) without operator
+  // wiring. Routed by agent-route.ts using the '__main__' sentinel id.
+  resolved.push({
+    name: 'main',
+    display_name: 'Main Agent',
+    type: 'agent',
+    channel_type: null,
+    platform_id: null,
+    agent_group_id: '__main__',
+  });
+
   const db = openInboundDb(agentGroupId, sessionId);
   try {
     replaceDestinations(db, resolved);
