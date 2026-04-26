@@ -307,6 +307,18 @@ function buildMounts(
     mounts.push({ hostPath: skillsSrc, containerPath: '/app/skills', readonly: true });
   }
 
+  // Tessl tiles — installed at ./.tessl/tiles/<author>/<tile>/ on the
+  // host (vendored mode, see tessl.json). Mount RO so agents can use
+  // installed tiles like uinaf/verify, uinaf/review, github-ops, etc.
+  // Skills inside tiles are discovered via syncTesslTileSymlinks below,
+  // which projects them as `tessl__<skill>` symlinks alongside the
+  // trunk skills in .claude-shared/skills/.
+  const tesslTilesDir = path.join(projectRoot, '.tessl', 'tiles');
+  if (fs.existsSync(tesslTilesDir)) {
+    mounts.push({ hostPath: tesslTilesDir, containerPath: '/app/tessl-tiles', readonly: true });
+    syncTesslTileSymlinks(claudeDir, tesslTilesDir);
+  }
+
   // Additional mounts from container config
   if (containerConfig.additionalMounts && containerConfig.additionalMounts.length > 0) {
     const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name);
@@ -379,6 +391,92 @@ function syncSkillSymlinks(claudeDir: string, containerConfig: import('./contain
     }
     if (!exists) {
       fs.symlinkSync(`/app/skills/${skill}`, linkPath);
+    }
+  }
+}
+
+/**
+ * Project Tessl tiles into the agent's `.claude-shared/skills/` directory
+ * as `tessl__<skill>` symlinks, mirroring how syncSkillSymlinks handles the
+ * trunk skills. Two tile shapes are supported:
+ *
+ *   1. Single-skill tile — `<author>/<tile>/SKILL.md` at the tile root.
+ *      → symlinked as `tessl__<tile-name>`.
+ *   2. Multi-skill tile — `<author>/<tile>/skills/<skill>/SKILL.md`.
+ *      → each `<skill>` symlinked as `tessl__<skill>`.
+ *
+ * Symlink targets use the container path (`/app/tessl-tiles/...`) since
+ * Claude Code resolves them inside the container. The host path on disk
+ * doesn't need to match — only the symlink string does.
+ *
+ * Idempotent: stale `tessl__*` symlinks for tiles no longer installed are
+ * pruned each spawn. Trunk skills (without the `tessl__` prefix) are left
+ * alone — that's `syncSkillSymlinks`'s domain.
+ */
+function syncTesslTileSymlinks(claudeDir: string, tesslTilesDir: string): void {
+  const skillsDir = path.join(claudeDir, 'skills');
+  if (!fs.existsSync(skillsDir)) {
+    fs.mkdirSync(skillsDir, { recursive: true });
+  }
+
+  // Discover desired tessl skills: walk <author>/<tile>/ for either
+  // SKILL.md (single) or skills/*/SKILL.md (multi).
+  const desired = new Map<string, string>(); // linkName → containerTargetPath
+  if (fs.existsSync(tesslTilesDir)) {
+    for (const author of fs.readdirSync(tesslTilesDir)) {
+      const authorDir = path.join(tesslTilesDir, author);
+      if (!fs.statSync(authorDir).isDirectory()) continue;
+      for (const tile of fs.readdirSync(authorDir)) {
+        const tileDir = path.join(authorDir, tile);
+        if (!fs.statSync(tileDir).isDirectory()) continue;
+        const rootSkill = path.join(tileDir, 'SKILL.md');
+        const skillsSubdir = path.join(tileDir, 'skills');
+        if (fs.existsSync(rootSkill)) {
+          desired.set(`tessl__${tile}`, `/app/tessl-tiles/${author}/${tile}`);
+        } else if (fs.existsSync(skillsSubdir) && fs.statSync(skillsSubdir).isDirectory()) {
+          for (const sub of fs.readdirSync(skillsSubdir)) {
+            const subDir = path.join(skillsSubdir, sub);
+            if (!fs.statSync(subDir).isDirectory()) continue;
+            if (!fs.existsSync(path.join(subDir, 'SKILL.md'))) continue;
+            desired.set(`tessl__${sub}`, `/app/tessl-tiles/${author}/${tile}/skills/${sub}`);
+          }
+        }
+      }
+    }
+  }
+
+  // Prune stale tessl__ symlinks
+  for (const entry of fs.readdirSync(skillsDir)) {
+    if (!entry.startsWith('tessl__')) continue;
+    const entryPath = path.join(skillsDir, entry);
+    let isSymlink = false;
+    try {
+      isSymlink = fs.lstatSync(entryPath).isSymbolicLink();
+    } catch {
+      continue;
+    }
+    if (isSymlink && !desired.has(entry)) {
+      fs.unlinkSync(entryPath);
+    }
+  }
+
+  // Create symlinks for desired tessl skills
+  for (const [linkName, target] of desired) {
+    const linkPath = path.join(skillsDir, linkName);
+    let exists = false;
+    try {
+      const stat = fs.lstatSync(linkPath);
+      exists = stat.isSymbolicLink();
+      if (exists && fs.readlinkSync(linkPath) !== target) {
+        // Target changed (tile upgraded or moved) — refresh the symlink
+        fs.unlinkSync(linkPath);
+        exists = false;
+      }
+    } catch {
+      /* missing — fall through to creation */
+    }
+    if (!exists) {
+      fs.symlinkSync(target, linkPath);
     }
   }
 }
