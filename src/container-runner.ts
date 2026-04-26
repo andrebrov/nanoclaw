@@ -533,8 +533,17 @@ async function buildContainerArgs(
 
   // Passthrough: non-secret config env vars the skills expect (Composio IDs,
   // URLs, Meta app config). Secrets flow via OneCLI, not here.
+  //
+  // ANTHROPIC_API_KEY exception: the agent-runner SDK gets credentials via
+  // the OneCLI proxy at outbound-HTTPS time, but subprocesses spawned by
+  // the agent (claude CLI invoked from Bash, Task tool sub-agents, skill
+  // scripts shelling out to `claude`) check `process.env.ANTHROPIC_API_KEY`
+  // *before* making any HTTPS call. Without it they fail immediately with
+  // "Not logged in · Please run /login", regardless of proxy config. So
+  // ANTHROPIC_API_KEY rides along too — same key the vault holds, just
+  // also visible inside the container's env.
   for (const key of Object.keys(process.env)) {
-    if (/^(COMPOSIO_|CLAY_WEBHOOK_URL|GHOST_API_URL|META_|GRANOLA_)/.test(key)) {
+    if (/^(ANTHROPIC_API_KEY|COMPOSIO_|CLAY_WEBHOOK_URL|GHOST_API_URL|META_|GRANOLA_)/.test(key)) {
       const v = process.env[key];
       if (v) args.push('-e', `${key}=${v}`);
     }
