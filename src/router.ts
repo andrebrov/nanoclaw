@@ -143,12 +143,24 @@ function safeParseContent(raw: string): { text?: string; sender?: string; sender
  * Creates messaging group + session if they don't exist yet.
  */
 export async function routeInbound(event: InboundEvent): Promise<void> {
-  // 0. Apply the adapter's thread policy. Non-threaded adapters (Telegram,
-  //    WhatsApp, iMessage, email) collapse threads to the channel.
+  // Adapter's thread policy. For non-threaded adapters (Telegram,
+  // WhatsApp, iMessage, email) we collapse threads at SESSION-RESOLUTION
+  // time (one session per group, regardless of topic) but PRESERVE
+  // event.threadId on the inbound row so outbound replies route back
+  // to the same topic.
+  //
+  // Previously this stripped event.threadId globally — which made all
+  // group messages collapse correctly into one session, but all replies
+  // landed in the chat root instead of the topic the user wrote in.
+  // Telegram users in forum-mode supergroups saw the agent answering
+  // in the general channel even when the conversation was in a topic.
+  //
+  // The session-resolution shim below uses `sessionThreadId = null` for
+  // non-threaded adapters so existing sessions (created with thread_id
+  // null) keep matching; messages_in.thread_id keeps the real value so
+  // poll-loop's extractRouting picks it up for outbound delivery.
   const adapter = getChannelAdapter(event.channelType);
-  if (adapter && !adapter.supportsThreads) {
-    event = { ...event, threadId: null };
-  }
+  const sessionThreadId = adapter && !adapter.supportsThreads ? null : event.threadId;
 
   const isMention = event.message.isMention === true;
 
@@ -261,7 +273,7 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
     const agentGroup = getAgentGroup(agent.agent_group_id);
     if (!agentGroup) continue;
 
-    const engages = evaluateEngage(agent, messageText, isMention, mg, event.threadId);
+    const engages = evaluateEngage(agent, messageText, isMention, mg, sessionThreadId);
 
     const accessOk = engages && (!accessGate || accessGate(event, userId, mg, agent.agent_group_id).allowed);
     const scopeOk = engages && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
@@ -388,7 +400,17 @@ async function deliverToAgent(
     effectiveSessionMode = 'per-thread';
   }
 
-  const { session, created } = resolveSession(agent.agent_group_id, mg.id, event.threadId, effectiveSessionMode);
+  // Session resolution uses sessionThreadId — null for non-threaded
+  // adapters so all topics in a group collapse to one session. The
+  // outbound row keeps the real event.threadId via writeSessionMessage
+  // below so replies route back to the originating topic.
+  const sessionThreadIdForResolve = adapterSupportsThreads ? event.threadId : null;
+  const { session, created } = resolveSession(
+    agent.agent_group_id,
+    mg.id,
+    sessionThreadIdForResolve,
+    effectiveSessionMode,
+  );
 
   // The inbound row's (channel_type, platform_id, thread_id) is the address
   // the agent's reply will be delivered to. Normally it mirrors the source
