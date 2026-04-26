@@ -381,7 +381,7 @@ function buildMounts(
 
   // Additional mounts from container config
   if (containerConfig.additionalMounts && containerConfig.additionalMounts.length > 0) {
-    const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name);
+    const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name, agentGroup.folder);
     mounts.push(...validated);
   }
 

@@ -21,6 +21,8 @@ export interface AdditionalMount {
 export interface MountAllowlist {
   allowedRoots: AllowedRoot[];
   blockedPatterns: string[];
+  /** When true (default), non-main agent groups are always given read-only mounts. */
+  nonMainReadOnly?: boolean;
 }
 
 export interface AllowedRoot {
@@ -97,6 +99,11 @@ export function loadMountAllowlist(): MountAllowlist | null {
     // Merge with default blocked patterns
     const mergedBlockedPatterns = [...new Set([...DEFAULT_BLOCKED_PATTERNS, ...allowlist.blockedPatterns])];
     allowlist.blockedPatterns = mergedBlockedPatterns;
+
+    // Default nonMainReadOnly to true when absent
+    if (allowlist.nonMainReadOnly === undefined) {
+      allowlist.nonMainReadOnly = true;
+    }
 
     cachedAllowlist = allowlist;
     log.info('Mount allowlist loaded successfully', {
@@ -310,15 +317,24 @@ export function validateMount(mount: AdditionalMount): MountValidationResult {
  * Validate all additional mounts for a group.
  * Returns array of validated mounts (only those that passed validation).
  * Logs warnings for rejected mounts.
+ *
+ * @param mounts - mounts from container.json
+ * @param groupName - display name used in log messages
+ * @param groupFolder - folder name; non-"main" groups are forced read-only when
+ *   the allowlist has nonMainReadOnly (true by default)
  */
 export function validateAdditionalMounts(
   mounts: AdditionalMount[],
   groupName: string,
+  groupFolder: string,
 ): Array<{
   hostPath: string;
   containerPath: string;
   readonly: boolean;
 }> {
+  const allowlist = loadMountAllowlist();
+  const forceReadonly = groupFolder !== 'main' && (allowlist === null || allowlist.nonMainReadOnly !== false);
+
   const validatedMounts: Array<{
     hostPath: string;
     containerPath: string;
@@ -329,17 +345,27 @@ export function validateAdditionalMounts(
     const result = validateMount(mount);
 
     if (result.allowed) {
+      const effectiveReadonly = forceReadonly ? true : result.effectiveReadonly!;
+
+      if (forceReadonly && !result.effectiveReadonly) {
+        log.info('Mount forced to read-only — non-main group', {
+          group: groupName,
+          folder: groupFolder,
+          hostPath: result.realHostPath,
+        });
+      }
+
       validatedMounts.push({
         hostPath: result.realHostPath!,
         containerPath: `/workspace/extra/${result.resolvedContainerPath}`,
-        readonly: result.effectiveReadonly!,
+        readonly: effectiveReadonly,
       });
 
       log.debug('Mount validated successfully', {
         group: groupName,
         hostPath: result.realHostPath,
         containerPath: result.resolvedContainerPath,
-        readonly: result.effectiveReadonly,
+        readonly: effectiveReadonly,
         reason: result.reason,
       });
     } else {
