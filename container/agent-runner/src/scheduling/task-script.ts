@@ -7,6 +7,9 @@ import { touchHeartbeat } from '../db/connection.js';
 const SCRIPT_TIMEOUT_MS = 30_000;
 const SCRIPT_MAX_BUFFER = 1024 * 1024;
 
+// Only alphanumeric, underscore, and dash — prevents path traversal via taskId.
+const VALID_REQUEST_ID_RE = /^[A-Za-z0-9_-]+$/;
+
 export interface ScriptResult {
   wakeAgent: boolean;
   data?: unknown;
@@ -17,6 +20,10 @@ function log(msg: string): void {
 }
 
 export async function runScript(script: string, taskId: string): Promise<ScriptResult | null> {
+  if (!VALID_REQUEST_ID_RE.test(taskId)) {
+    log(`task id contains invalid characters — skipping script execution`);
+    return null;
+  }
   const scriptPath = path.join('/tmp', `task-script-${taskId}.sh`);
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
 
