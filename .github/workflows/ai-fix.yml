@@ -38,6 +38,18 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # bypassPermissions: this is a sandboxed CI runner with no
+          # privileged secrets beyond the auto-issued GITHUB_TOKEN; the
+          # default permission mode blocks Bash invocations like
+          # `pnpm install`, `pnpm run build`, and `git commit` that the
+          # prompt below asks for. Without bypassing, we observed
+          # permission_denials_count=21 over 37 turns and zero PRs — the
+          # action ran in circles and exited "successfully" with no diff.
+          # Allowed-tools is also set explicitly as a belt-and-suspenders
+          # in case the action interprets bypassPermissions strictly.
+          claude_args: >-
+            --permission-mode bypassPermissions
+            --allowed-tools "Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Task,TodoWrite"
           # The action infers issue context from github.event automatically
           # and opens a PR linked back to this issue when changes are made.
           # Custom instructions: stay narrow, follow project conventions
