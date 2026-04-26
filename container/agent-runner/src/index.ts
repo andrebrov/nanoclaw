@@ -53,6 +53,31 @@ async function main(): Promise<void> {
   // memory lives in /workspace/agent/CLAUDE.local.md (auto-loaded).
   const instructions = buildSystemPromptAddendum(config.assistantName || undefined);
 
+  // Session reentry: if a threshold-nuke checkpoint exists, inject it into
+  // the system prompt so the agent can restore context from the last session.
+  // The checkpoint is written by the previous container before exit (## Reasoning)
+  // and optionally augmented by the host orchestrator (## Facts).
+  // Only read checkpoints — never delete them here. The agent will update the
+  // file itself during the session; the host rotates to previous.md at nuke time.
+  let checkpointAddendum = '';
+  const checkpointPath = path.join(CWD, '.checkpoints', 'default.md');
+  if (fs.existsSync(checkpointPath)) {
+    try {
+      const checkpoint = fs.readFileSync(checkpointPath, 'utf-8').trim();
+      if (checkpoint) {
+        log(`Session checkpoint found — injecting into system context`);
+        checkpointAddendum =
+          `\n\n<session-checkpoint>\n` +
+          `The previous session ended because the context window was approaching its limit. ` +
+          `The following checkpoint was saved. Resume naturally from this context:\n\n` +
+          `${checkpoint}\n` +
+          `</session-checkpoint>`;
+      }
+    } catch (err) {
+      log(`Failed to read checkpoint: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   // Discover additional directories mounted at /workspace/extra/*
   const additionalDirectories: string[] = [];
   const extraBase = '/workspace/extra';
@@ -96,7 +121,7 @@ async function main(): Promise<void> {
   await runPollLoop({
     provider,
     cwd: CWD,
-    systemContext: { instructions },
+    systemContext: { instructions: instructions + checkpointAddendum },
   });
 }
 
