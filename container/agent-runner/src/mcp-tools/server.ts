@@ -32,7 +32,11 @@ export function registerTools(tools: McpToolDefinition[]): void {
   }
 }
 
-export async function startMcpServer(): Promise<void> {
+/**
+ * Create and configure the MCP server with all registered tools, without
+ * connecting to a transport. Useful for testing with an in-memory transport.
+ */
+export function createMcpServer(): Server {
   const server = new Server({ name: 'nanoclaw', version: '2.0.0' }, { capabilities: { tools: {} } });
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -48,6 +52,11 @@ export async function startMcpServer(): Promise<void> {
     return tool.handler(args ?? {});
   });
 
+  return server;
+}
+
+export async function startMcpServer(): Promise<void> {
+  const server = createMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);
   log(`MCP server started with ${allTools.length} tools: ${allTools.map((t) => t.tool.name).join(', ')}`);
