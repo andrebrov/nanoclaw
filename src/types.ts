@@ -104,6 +104,8 @@ export interface Session {
   agent_group_id: string;
   messaging_group_id: string | null;
   thread_id: string | null;
+  /** Which slot this session belongs to: 'default' (user messages) or 'maintenance' (scheduled tasks). */
+  session_name: string;
   agent_provider: string | null;
   status: 'active' | 'closed';
   container_status: 'running' | 'idle' | 'stopped';

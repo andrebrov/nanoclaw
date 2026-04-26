@@ -1,4 +1,5 @@
 import type { PendingApproval, PendingQuestion, Session } from '../types.js';
+import { DEFAULT_SESSION_NAME } from '../config.js';
 import { getDb } from './connection.js';
 
 // ── Sessions ──
@@ -6,8 +7,8 @@ import { getDb } from './connection.js';
 export function createSession(session: Session): void {
   getDb()
     .prepare(
-      `INSERT INTO sessions (id, agent_group_id, messaging_group_id, thread_id, agent_provider, status, container_status, last_active, created_at)
-       VALUES (@id, @agent_group_id, @messaging_group_id, @thread_id, @agent_provider, @status, @container_status, @last_active, @created_at)`,
+      `INSERT INTO sessions (id, agent_group_id, messaging_group_id, thread_id, session_name, agent_provider, status, container_status, last_active, created_at)
+       VALUES (@id, @agent_group_id, @messaging_group_id, @thread_id, @session_name, @agent_provider, @status, @container_status, @last_active, @created_at)`,
     )
     .run(session);
 }
@@ -37,26 +38,32 @@ export function findSessionForAgent(
   agentGroupId: string,
   messagingGroupId: string,
   threadId: string | null,
+  sessionName: string = DEFAULT_SESSION_NAME,
 ): Session | undefined {
   if (threadId) {
     return getDb()
       .prepare(
-        "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id = ? AND status = 'active'",
+        "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id = ? AND session_name = ? AND status = 'active'",
       )
-      .get(agentGroupId, messagingGroupId, threadId) as Session | undefined;
+      .get(agentGroupId, messagingGroupId, threadId, sessionName) as Session | undefined;
   }
   return getDb()
     .prepare(
-      "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NULL AND status = 'active'",
+      "SELECT * FROM sessions WHERE agent_group_id = ? AND messaging_group_id = ? AND thread_id IS NULL AND session_name = ? AND status = 'active'",
     )
-    .get(agentGroupId, messagingGroupId) as Session | undefined;
+    .get(agentGroupId, messagingGroupId, sessionName) as Session | undefined;
 }
 
 /** Find an active session scoped to an agent group (ignoring messaging group). */
-export function findSessionByAgentGroup(agentGroupId: string): Session | undefined {
+export function findSessionByAgentGroup(
+  agentGroupId: string,
+  sessionName: string = DEFAULT_SESSION_NAME,
+): Session | undefined {
   return getDb()
-    .prepare("SELECT * FROM sessions WHERE agent_group_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1")
-    .get(agentGroupId) as Session | undefined;
+    .prepare(
+      "SELECT * FROM sessions WHERE agent_group_id = ? AND session_name = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1",
+    )
+    .get(agentGroupId, sessionName) as Session | undefined;
 }
 
 export function getSessionsByAgentGroup(agentGroupId: string): Session[] {
