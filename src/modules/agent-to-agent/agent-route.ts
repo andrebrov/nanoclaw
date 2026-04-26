@@ -2,10 +2,11 @@
  * Agent-to-agent message routing.
  *
  * Outbound messages with `channel_type === 'agent'` target another agent
- * group rather than a channel. Permission is enforced via `agent_destinations` —
- * the source agent must have a row for the target. Content is copied verbatim;
- * the target's formatter looks up the source agent in its own local map to
- * display a name.
+ * group rather than a channel. All agent groups are synthetically available
+ * as destinations (write-destinations.ts injects peers by normalized name),
+ * so the routing check only verifies the target still exists. Content is
+ * copied verbatim; the target's formatter looks up the source agent in its
+ * own local map to display a name.
  *
  * Self-messages are always allowed (used for system notes injected back into
  * an agent's own session, e.g. post-approval follow-up prompts).
@@ -24,7 +25,6 @@ import { wakeContainer } from '../../container-runner.js';
 import { log } from '../../log.js';
 import { resolveSession, writeSessionMessage } from '../../session-manager.js';
 import type { Session } from '../../types.js';
-import { hasDestination } from './db/agent-destinations.js';
 
 export interface RoutableAgentMessage {
   id: string;
@@ -85,14 +85,10 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
     return;
   }
 
-  if (
-    targetAgentGroupId !== session.agent_group_id &&
-    !hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)
-  ) {
-    throw new Error(
-      `unauthorized agent-to-agent: ${session.agent_group_id} has no destination for ${targetAgentGroupId}`,
-    );
-  }
+  // All agent groups are synthetically available as peer destinations (auto-
+  // injected by write-destinations.ts for cross-channel handoff, PR #32). The
+  // earlier `hasDestination` auth check is now redundant — every peer is
+  // implicitly authorized — so we just verify the target still exists.
   if (!getAgentGroup(targetAgentGroupId)) {
     throw new Error(`target agent group ${targetAgentGroupId} not found for message ${msg.id}`);
   }
