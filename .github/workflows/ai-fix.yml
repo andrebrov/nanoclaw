@@ -79,12 +79,14 @@ jobs:
               4. Make the smallest correct edit. No drive-by refactors.
               5. `pnpm install --frozen-lockfile && pnpm run build`. Fix
                  underlying errors, don't skip.
-              6. `git add -A && git commit -m "fix: <short> (#<N>)" -m
+              6. `pnpm run format` — Prettier. CI gates on `format:check`,
+                 so unformatted code = failed PR. Never skip this.
+              7. `git add -A && git commit -m "fix: <short> (#<N>)" -m
                  "<body>"` — Conventional Commits, reference issue.
-              7. `git push -u origin claude/issue-<N>-<short-slug>`
-              8. `gh pr create --base main --title "fix: <short> (#<N>)"
+              8. `git push -u origin claude/issue-<N>-<short-slug>`
+              9. `gh pr create --base main --title "fix: <short> (#<N>)"
                  --body "Closes #<N>. <details>" --draft=false`
-              9. `gh issue comment <N> --body "PR opened: <url>"` so the
+              10. `gh issue comment <N> --body "PR opened: <url>"` so the
                  issue tracks the fix.
 
             If after honest investigation you conclude the change is
