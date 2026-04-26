@@ -47,6 +47,12 @@ export interface ContainerConfig {
   agentGroupId?: string;
   /** Max messages per prompt. Falls back to code default if unset. */
   maxMessagesPerPrompt?: number;
+  /**
+   * Grant this container admin observability: mounts host logs + session dirs
+   * read-only at /workspace/host-logs/ and enables the chat_status MCP tool.
+   * Only set on designated admin agent groups.
+   */
+  isAdmin?: boolean;
 }
 
 function emptyConfig(): ContainerConfig {
@@ -87,6 +93,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       assistantName: raw.assistantName,
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
+      isAdmin: raw.isAdmin,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);
