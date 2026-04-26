@@ -297,6 +297,45 @@ function buildMounts(
   // skill symlinks)
   mounts.push({ hostPath: claudeDir, containerPath: '/home/node/.claude', readonly: false });
 
+  // /home/node/.claude.json — Claude CLI's config file lives at HOME root,
+  // NOT inside the .claude/ subdir. Without this mount it's container-local
+  // and lost on every restart, which makes claude write a fresh
+  // `{"firstStartTime":"..."}` placeholder on init that fails to authenticate
+  // through the SDK invocation path. Result: every run returns "Not logged
+  // in · Please run /login" as the response. The file is 0o600 + RW; claude
+  // updates it (cached features, growth-book flags, session refs) and the
+  // changes persist across spawns. Restore from `.claude-shared/backups/`
+  // if missing — claude rotates good copies there before writing a new one.
+  const claudeConfigPath = path.join(DATA_DIR, 'v2-sessions', agentGroup.id, 'claude-config.json');
+  if (!fs.existsSync(claudeConfigPath)) {
+    const backupsDir = path.join(claudeDir, 'backups');
+    if (fs.existsSync(backupsDir)) {
+      const candidates = fs
+        .readdirSync(backupsDir)
+        .filter((n) => n.startsWith('.claude.json.backup.'))
+        .map((n) => ({ name: n, path: path.join(backupsDir, n), size: fs.statSync(path.join(backupsDir, n)).size }))
+        // Pick the largest backup — small ones (~50 bytes) are placeholder
+        // states from failed inits; the real config is multi-KB.
+        .sort((a, b) => b.size - a.size);
+      if (candidates.length > 0 && candidates[0].size > 1000) {
+        fs.copyFileSync(candidates[0].path, claudeConfigPath);
+        fs.chmodSync(claudeConfigPath, 0o600);
+        log.info('Restored .claude.json from backup', {
+          agentGroup: agentGroup.name,
+          source: candidates[0].name,
+          size: candidates[0].size,
+        });
+      } else {
+        // No usable backup — touch an empty file so the bind-mount works;
+        // claude will populate it on first start.
+        fs.writeFileSync(claudeConfigPath, '{}', { mode: 0o600 });
+      }
+    } else {
+      fs.writeFileSync(claudeConfigPath, '{}', { mode: 0o600 });
+    }
+  }
+  mounts.push({ hostPath: claudeConfigPath, containerPath: '/home/node/.claude.json', readonly: false });
+
   // Shared agent-runner source — read-only, same code for all groups.
   const agentRunnerSrc = path.join(projectRoot, 'container', 'agent-runner', 'src');
   mounts.push({ hostPath: agentRunnerSrc, containerPath: '/app/src', readonly: true });
