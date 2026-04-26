@@ -98,11 +98,28 @@ async function main(): Promise<void> {
   const mcpServerPath = path.join(__dirname, 'mcp-tools', 'index.ts');
 
   // Build MCP servers config: nanoclaw built-in + any from container.json
+  //
+  // env passthrough: the SDK spawns each MCP server as a child process with
+  // *exactly* the env we pass — no implicit inheritance from the agent-runner
+  // process. With env: {}, the spawned bun has no PATH, no HOME, no node_modules
+  // visibility, and no session DB paths, so it dies on startup and the SDK
+  // silently treats the server as unavailable. The visible symptom is
+  // "No such tool available: mcp__nanoclaw__add_reaction" when the agent
+  // tries to call a registered tool.
+  //
+  // We forward the full process.env (filtering only undefined entries to keep
+  // the type Record<string, string>). This is fine: the MCP server is the
+  // same code path that the agent-runner already runs in — same trust
+  // boundary, same secrets posture.
+  const childEnv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined) childEnv[k] = v;
+  }
   const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }> = {
     nanoclaw: {
       command: 'bun',
       args: ['run', mcpServerPath],
-      env: {},
+      env: childEnv,
     },
   };
 
