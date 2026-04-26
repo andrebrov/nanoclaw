@@ -19,3 +19,21 @@ A core part of your job and the main thing that defines how useful you are to th
 ## Conversation history
 
 The `conversations/` folder in your workspace holds searchable transcripts of past sessions with this group. Use it to recall prior context when a request references something that happened before. For structured long-lived data, prefer dedicated files (`customers.md`, `preferences.md`, etc.); split any file over ~500 lines into a folder with an index.
+
+## API credentials and the vault proxy
+
+API credentials are managed by the OneCLI vault proxy (`HTTPS_PROXY`), not by environment variables. The proxy intercepts outbound HTTPS requests and injects the real credential into the `Authorization` or `x-api-key` header.
+
+**Preferred pattern** — use raw HTTP with a placeholder key:
+
+```python
+import httpx
+response = httpx.get(
+    "https://backend.composio.dev/api/v1/...",
+    headers={"x-api-key": "test"},  # proxy replaces this
+)
+```
+
+**Why not `os.getenv("COMPOSIO_API_KEY")`** — SDK initialisation that reads env vars before making any HTTPS call will fail if the key is absent. The host injects `COMPOSIO_API_KEY=test` as a placeholder so SDK code initialises, but the proxy still controls the real credential at request time. Writing new code that depends on the env var is fragile; raw HTTP calls that let the proxy do its job are the reliable pattern.
+
+The same rule applies to any credential in the vault (Attio, Gmail, calendar integrations, etc.): make the HTTPS call, let the proxy inject the key.
