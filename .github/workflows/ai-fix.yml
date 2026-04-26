@@ -23,6 +23,11 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
+      # claude-code-action authenticates via OIDC; without id-token: write
+      # the step exits 1 with "Could not fetch an OIDC token". GitHub's
+      # default permissions block id-token, so we have to opt in explicitly
+      # per workflow (granting it here is repo-scoped, not org-wide).
+      id-token: write
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
