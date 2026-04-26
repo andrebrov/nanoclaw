@@ -221,13 +221,69 @@ function createPreCompactHook(assistantName?: string): HookCallback {
   };
 }
 
-// ── Provider ──
+// ── Context threshold detection ──
 
 /**
- * Claude Code auto-compacts context at this window (tokens). Kept here so
- * the generic bootstrap doesn't need to know about Claude-specific env vars.
+ * Set a large window so SDK auto-compact never fires at normal usage.
+ * Threshold-based nuke (below) replaces SDK compaction with deterministic
+ * checkpointing and clean container restart.
  */
-const CLAUDE_CODE_AUTO_COMPACT_WINDOW = '165000';
+const CLAUDE_CODE_AUTO_COMPACT_WINDOW = '9000000';
+
+/**
+ * Context window size from env (Opus 4.7[1m] uses 1M, Sonnet 4.6 uses 200K).
+ * The orchestrator sets CLAUDE_CODE_MAX_CONTEXT_WINDOW at spawn time.
+ */
+const CONTEXT_WINDOW_TOKENS = parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10);
+
+/**
+ * Warn when context reaches 70% (or leaves 50K headroom if smaller).
+ * At warn: agent is still coherent enough to write a useful checkpoint.
+ */
+const THRESHOLD_WARN_TOKENS = Math.max(
+  Math.floor(CONTEXT_WINDOW_TOKENS * 0.70),
+  CONTEXT_WINDOW_TOKENS - 50000,
+);
+
+/**
+ * Nuke when context reaches 80% (or leaves 25K headroom if smaller).
+ * At nuke: container exits with code 75 so host can restart with checkpoint.
+ */
+const THRESHOLD_NUKE_TOKENS = Math.max(
+  Math.floor(CONTEXT_WINDOW_TOKENS * 0.80),
+  CONTEXT_WINDOW_TOKENS - 25000,
+);
+
+/**
+ * Claude Code SDK stores sessions at /home/node/.claude/projects/<slug>/<id>.jsonl
+ * where slug = cwd path with leading slash removed and interior slashes → dashes.
+ * For cwd=/workspace/agent this is '-workspace-agent'.
+ */
+const CLAUDE_PROJECT_SLUG = '-workspace-agent';
+
+/**
+ * Read the most recent cumulative input token count from the session transcript.
+ * Returns 0 if the file is missing or has no usage data.
+ */
+function readLatestTokens(transcriptPath: string): number {
+  try {
+    const content = fs.readFileSync(transcriptPath, 'utf-8');
+    const lines = content.trimEnd().split('\n');
+    // Scan from end — the last assistant message has the highest token count.
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      try {
+        const entry = JSON.parse(line);
+        const tokens = entry.message?.usage?.input_tokens;
+        if (typeof tokens === 'number' && tokens > 0) return tokens;
+      } catch { /* skip */ }
+    }
+  } catch { /* file not found */ }
+  return 0;
+}
+
+// ── Provider ──
 
 /**
  * Stale-session detection. Matches Claude Code's error text when a
@@ -293,6 +349,11 @@ export class ClaudeProvider implements AgentProvider {
 
     async function* translateEvents(): AsyncGenerator<ProviderEvent> {
       let messageCount = 0;
+      let sessionId: string | undefined;
+      let transcriptPath: string | undefined;
+      let warnEmitted = false;
+      let nukeEmitted = false;
+
       for await (const message of sdkResult) {
         if (aborted) return;
         messageCount++;
@@ -301,10 +362,30 @@ export class ClaudeProvider implements AgentProvider {
         yield { type: 'activity' };
 
         if (message.type === 'system' && message.subtype === 'init') {
+          sessionId = message.session_id;
+          transcriptPath = `/home/node/.claude/projects/${CLAUDE_PROJECT_SLUG}/${sessionId}.jsonl`;
           yield { type: 'init', continuation: message.session_id };
         } else if (message.type === 'result') {
           const text = 'result' in message ? (message as { result?: string }).result ?? null : null;
           yield { type: 'result', text };
+
+          // Check token threshold after each completed turn.
+          // Only fires when we have a transcript path (after init) and haven't nuked yet.
+          if (transcriptPath && !nukeEmitted) {
+            const tokens = readLatestTokens(transcriptPath);
+            if (tokens > 0) {
+              if (tokens >= THRESHOLD_NUKE_TOKENS) {
+                nukeEmitted = true;
+                warnEmitted = true;
+                log(`Threshold nuke: ${tokens.toLocaleString()} tokens >= ${THRESHOLD_NUKE_TOKENS.toLocaleString()}`);
+                yield { type: 'threshold_nuke', tokens, transcriptPath };
+              } else if (!warnEmitted && tokens >= THRESHOLD_WARN_TOKENS) {
+                warnEmitted = true;
+                log(`Threshold warn: ${tokens.toLocaleString()} tokens >= ${THRESHOLD_WARN_TOKENS.toLocaleString()}`);
+                yield { type: 'threshold_warn', tokens };
+              }
+            }
+          }
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'api_retry') {
           yield { type: 'error', message: 'API retry', retryable: true };
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'rate_limit_event') {
@@ -339,4 +420,4 @@ export class ClaudeProvider implements AgentProvider {
   }
 }
 
-registerProvider('claude', (opts) => new ClaudeProvider(opts));
+registerProvider('claude', () => new ClaudeProvider());
