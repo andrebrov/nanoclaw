@@ -60,24 +60,36 @@ jobs:
             in the conversation context above — read them carefully and
             implement the requested change.
 
-            Mandatory steps, in order:
-              1. Read the issue body. If anything is ambiguous, make the
-                 most reasonable interpretation that produces a working
-                 change — do NOT exit asking for clarification.
-              2. Use Read/Glob/Grep to locate the relevant files. Read
-                 CLAUDE.md and CONTRIBUTING.md before making changes.
-              3. Make the smallest correct edit. No drive-by refactors.
-              4. Run `pnpm install --frozen-lockfile`. If it fails, fix
-                 the underlying lockfile/manifest issue.
-              5. Run `pnpm run build`. If it fails, fix the underlying
-                 type/import error before continuing.
-              6. Commit with a Conventional-Commits-style message that
-                 references the issue number (e.g. "fix: …  (#N)").
-              7. The action handles branch creation + PR open after this
-                 step exits — do NOT run `git push` yourself.
+            The CI runner is Ubuntu, the working tree is checked out at
+            HEAD of `main`, and `gh` CLI is pre-installed and pre-auth'd
+            via `GITHUB_TOKEN` env var.
 
-            You MUST produce a diff. If after honest investigation you
-            conclude the change is genuinely impossible or already
-            implemented, document why in `ISSUE_<N>_NOTES.md` at repo
-            root and commit that file — that's your diff. Silent exits
-            are not an acceptable outcome.
+            Mandatory steps, in order:
+              1. Read the issue body. The issue number is in the env var
+                 `$GITHUB_REF_NAME` is wrong — get it from the issue
+                 title in context, or run
+                 `gh issue list --label ai-fix --state open --json number,title`
+                 to find the most recent.
+              2. Create a fresh branch off main:
+                 `git checkout -b claude/issue-<N>-<short-slug>`
+                 (branch name MUST start with `claude/` so notify-pr.yml
+                 picks it up).
+              3. Use Read/Glob/Grep to locate relevant files. Read
+                 CLAUDE.md and CONTRIBUTING.md before editing.
+              4. Make the smallest correct edit. No drive-by refactors.
+              5. `pnpm install --frozen-lockfile && pnpm run build`. Fix
+                 underlying errors, don't skip.
+              6. `git add -A && git commit -m "fix: <short> (#<N>)" -m
+                 "<body>"` — Conventional Commits, reference issue.
+              7. `git push -u origin claude/issue-<N>-<short-slug>`
+              8. `gh pr create --base main --title "fix: <short> (#<N>)"
+                 --body "Closes #<N>. <details>" --draft=false`
+              9. `gh issue comment <N> --body "PR opened: <url>"` so the
+                 issue tracks the fix.
+
+            If after honest investigation you conclude the change is
+            genuinely impossible or already implemented, do step 6-9
+            with a single-file diff at repo root: `ISSUE_<N>_NOTES.md`
+            documenting why. Silent exits without a branch+PR are NOT
+            an acceptable outcome — the entire purpose of this run is
+            to produce a reviewable PR for issue #<N>.
