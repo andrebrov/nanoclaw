@@ -35,6 +35,14 @@ export interface RoutableAgentMessage {
 /** Sentinel used by the synthetic broadcast destination row. */
 export const BROADCAST_SENTINEL = '__broadcast__';
 
+/**
+ * Sentinel used by the synthetic main destination row. Resolved at routing
+ * time to the oldest agent group (by created_at) — the one the user set up
+ * first. Enables cross-channel handoffs via send_message({ to: 'main' })
+ * without requiring operator wiring.
+ */
+export const MAIN_SENTINEL = '__main__';
+
 async function deliverToAgent(targetAgentGroupId: string, sourceAgentGroupId: string, content: string): Promise<void> {
   const { session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared');
   writeSessionMessage(targetAgentGroupId, targetSession.id, {
@@ -62,6 +70,18 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
     const peers = all.filter((ag) => ag.id !== session.agent_group_id);
     log.info('Agent broadcast', { from: session.agent_group_id, peers: peers.map((p) => p.id) });
     await Promise.all(peers.map((ag) => deliverToAgent(ag.id, session.agent_group_id, msg.content)));
+    return;
+  }
+
+  // Main: route to the oldest agent group (the user's primary DM agent).
+  if (targetAgentGroupId === MAIN_SENTINEL) {
+    const all = getAllAgentGroups();
+    const mainGroup = all.sort((a, b) => a.created_at.localeCompare(b.created_at))[0];
+    if (!mainGroup) {
+      throw new Error(`main routing failed: no agent groups found`);
+    }
+    log.info('Agent main routing', { from: session.agent_group_id, to: mainGroup.id });
+    await deliverToAgent(mainGroup.id, session.agent_group_id, msg.content);
     return;
   }
 
