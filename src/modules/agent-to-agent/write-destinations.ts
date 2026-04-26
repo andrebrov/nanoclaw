@@ -49,6 +49,18 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
     }
   }
 
+  // Synthetic broadcast destination — always injected so any agent can fan
+  // out to all peers via send_message({ to: 'broadcast' }). Routed by
+  // agent-route.ts using the '__broadcast__' sentinel id.
+  resolved.push({
+    name: 'broadcast',
+    display_name: 'All Agents',
+    type: 'agent',
+    channel_type: null,
+    platform_id: null,
+    agent_group_id: '__broadcast__',
+  });
+
   const db = openInboundDb(agentGroupId, sessionId);
   try {
     replaceDestinations(db, resolved);

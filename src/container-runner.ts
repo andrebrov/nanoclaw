@@ -262,11 +262,12 @@ function buildMounts(
     mounts.push({ hostPath: fragmentsDir, containerPath: '/workspace/agent/.claude-fragments', readonly: true });
   }
 
-  // Global memory directory — always read-only.
+  // Global memory directory — read-write so agents can share learnings via
+  // files like skills-discovered.md. All containers write to the same dir;
+  // conflicts are user-space (last write wins per file).
   const globalDir = path.join(GROUPS_DIR, 'global');
-  if (fs.existsSync(globalDir)) {
-    mounts.push({ hostPath: globalDir, containerPath: '/workspace/global', readonly: true });
-  }
+  if (!fs.existsSync(globalDir)) fs.mkdirSync(globalDir, { recursive: true });
+  mounts.push({ hostPath: globalDir, containerPath: '/workspace/global', readonly: false });
 
   // Shared CLAUDE.md — read-only, imported by the composed entry point via
   // the `.claude-shared.md` symlink inside the group dir.
