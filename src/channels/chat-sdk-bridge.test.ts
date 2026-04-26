@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { Adapter } from 'chat';
 
 import { createChatSdkBridge, splitForLimit } from './chat-sdk-bridge.js';
+import type { OutboundMessage } from './adapter.js';
 
 function stubAdapter(partial: Partial<Adapter>): Adapter {
   return { name: 'stub', ...partial } as unknown as Adapter;
@@ -76,5 +77,50 @@ describe('createChatSdkBridge', () => {
       supportsThreads: true,
     });
     expect(typeof bridge.subscribe).toBe('function');
+  });
+});
+
+describe('createChatSdkBridge deliver — reaction', () => {
+  it('calls adapter.addReaction with the emoji and strips :ag-… suffix from messageId', async () => {
+    const addReactionCalls: Array<{ threadId: string; messageId: string; emoji: string }> = [];
+    const bridge = createChatSdkBridge({
+      adapter: stubAdapter({
+        addReaction: vi.fn(async (threadId: string, messageId: string, emoji: string) => {
+          addReactionCalls.push({ threadId, messageId, emoji });
+        }),
+      }),
+      supportsThreads: false,
+    });
+
+    const msg: OutboundMessage = {
+      kind: 'chat',
+      content: { operation: 'reaction', messageId: 'tg-chat-123:42:ag-test-group', emoji: 'thumbs_up' },
+    };
+    await bridge.deliver('tg-chat-123', null, msg);
+
+    expect(addReactionCalls).toHaveLength(1);
+    // :ag-test-group suffix must be stripped before hitting the adapter
+    expect(addReactionCalls[0].messageId).toBe('tg-chat-123:42');
+    expect(addReactionCalls[0].emoji).toBe('thumbs_up');
+    expect(addReactionCalls[0].threadId).toBe('tg-chat-123');
+  });
+
+  it('returns undefined (not retried) even when adapter.addReaction throws', async () => {
+    const bridge = createChatSdkBridge({
+      adapter: stubAdapter({
+        addReaction: vi.fn(async () => {
+          throw new Error('Bad Request: message to react not found');
+        }),
+      }),
+      supportsThreads: false,
+    });
+
+    const msg: OutboundMessage = {
+      kind: 'chat',
+      content: { operation: 'reaction', messageId: 'tg-chat-123:55', emoji: 'heart' },
+    };
+    // Must not throw — reaction failures are non-fatal (see comment in chat-sdk-bridge.ts)
+    const result = await bridge.deliver('tg-chat-123', null, msg);
+    expect(result).toBeUndefined();
   });
 });
