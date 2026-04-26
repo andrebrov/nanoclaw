@@ -305,20 +305,36 @@ async function processQuery(
     // everything. Filtering on thread_id here caused deadlocks when the
     // initial batch and follow-ups had mismatched thread_ids (e.g. a
     // host-generated welcome trigger with null thread vs a Discord DM reply).
-    const newMessages = getPendingMessages().filter((m) => {
-      if (m.kind === 'system') return false;
-      if ((m.kind === 'chat' || m.kind === 'chat-sdk') && isClearCommand(m)) return false;
-      return true;
-    });
-    if (newMessages.length > 0) {
-      const newIds = newMessages.map((m) => m.id);
-      markProcessing(newIds);
+    //
+    // Guard the entire poll body: tests can tear down the session DB while
+    // an interval is still scheduled (Bun fires intervals through the
+    // microtask queue even after `clearInterval`). Without this, a
+    // post-teardown poll throws "SQLiteError: unable to open database
+    // file" inside getPendingMessages → bun:test reports an "Unhandled
+    // error between tests" → CI Container-tests step fails despite all
+    // assertions passing. In production the DB is always open, so the
+    // catch is a pure test-stability guard.
+    try {
+      const newMessages = getPendingMessages().filter((m) => {
+        if (m.kind === 'system') return false;
+        if ((m.kind === 'chat' || m.kind === 'chat-sdk') && isClearCommand(m)) return false;
+        return true;
+      });
+      if (newMessages.length > 0) {
+        const newIds = newMessages.map((m) => m.id);
+        markProcessing(newIds);
 
-      const prompt = formatMessages(newMessages);
-      log(`Pushing ${newMessages.length} follow-up message(s) into active query`);
-      query.push(prompt);
+        const prompt = formatMessages(newMessages);
+        log(`Pushing ${newMessages.length} follow-up message(s) into active query`);
+        query.push(prompt);
 
-      markCompleted(newIds);
+        markCompleted(newIds);
+      }
+    } catch (err) {
+      // Most likely the session DB was closed under us (test teardown).
+      // Production sees this only on session-manager bugs we'd want to
+      // hear about, so log at warn rather than swallowing silently.
+      log(`active-poll error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, ACTIVE_POLL_INTERVAL_MS);
 
