@@ -71,9 +71,13 @@ describe('createPairing', () => {
   });
 
   it('does not collide with active codes', async () => {
+    // Use distinct intents so each pairing stays active in parallel.
+    // (Calling createPairing with the same intent supersedes the previous
+    // one, leaving only one entry in the `active` set — the test would
+    // then be flaky against the 4-digit / 10000-slot space at p≈2%.)
     const codes = new Set<string>();
     for (let i = 0; i < 20; i++) {
-      const r = await createPairing('main');
+      const r = await createPairing({ kind: 'wire-to', folder: `f-${i}` });
       expect(codes.has(r.code)).toBe(false);
       codes.add(r.code);
     }
