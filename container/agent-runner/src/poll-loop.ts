@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+
 import { findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
@@ -234,6 +237,49 @@ interface QueryResult {
   continuation?: string;
 }
 
+/**
+ * Write a checkpoint stub so the host (and next session) know why the
+ * container exited. If the agent already wrote a ## Reasoning section
+ * (from threshold_warn), that content is preserved.
+ * Exit code 75 (EX_TEMPFAIL) tells the host this was a planned nuke,
+ * not a crash — future orchestrator work can trigger Facts writing +
+ * container restart on that code.
+ */
+function writeNukeCheckpoint(tokens: number, transcriptPath: string, cwd: string): void {
+  const checkpointDir = path.join(cwd, '.checkpoints');
+  const checkpointPath = path.join(checkpointDir, 'default.md');
+  try {
+    fs.mkdirSync(checkpointDir, { recursive: true });
+
+    // Rotate existing checkpoint (agent may have written ## Reasoning in it)
+    if (fs.existsSync(checkpointPath)) {
+      fs.copyFileSync(checkpointPath, path.join(checkpointDir, 'previous.md'));
+    }
+
+    // Read existing content so we keep agent's ## Reasoning if present
+    let existing = '';
+    try {
+      existing = fs.readFileSync(checkpointPath, 'utf-8');
+    } catch { /* new file */ }
+
+    const timestamp = new Date().toISOString();
+    const contextPct = Math.round((tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100);
+    const metadata = [
+      `<!-- nuke: ${timestamp} | tokens: ${tokens.toLocaleString()} (${contextPct}%) | transcript: ${transcriptPath} -->`,
+    ].join('\n');
+
+    // Prepend metadata marker; preserve existing reasoning content below
+    const content = existing.trim()
+      ? `${metadata}\n\n${existing.trim()}\n`
+      : `${metadata}\n\n## Reasoning\n\n*Session ended at context threshold. No reasoning checkpoint was written before nuke.*\n`;
+
+    fs.writeFileSync(checkpointPath, content, 'utf-8');
+    log(`Nuke checkpoint written: ${checkpointPath} (${contextPct}% context used)`);
+  } catch (err) {
+    log(`Failed to write nuke checkpoint: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 async function processQuery(
   query: AgentQuery,
   routing: RoutingContext,
@@ -301,30 +347,28 @@ async function processQuery(
         if (event.text) {
           dispatchResultText(event.text, routing);
         }
+      } else if (event.type === 'threshold_warn') {
+        const contextPct = Math.round((event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100);
+        log(`Context threshold warn: ${event.tokens.toLocaleString()} tokens (${contextPct}%)`);
+        // Ask the agent to write a reasoning checkpoint while still coherent.
+        query.push(
+          `<system-reminder>Context window is ${contextPct}% full (${event.tokens.toLocaleString()} tokens). ` +
+          `Please write a brief reasoning checkpoint to /workspace/agent/.checkpoints/default.md ` +
+          `with a ## Reasoning section: current task, key decisions made, important context to preserve. ` +
+          `Be concise — this is used to restore context if the session must restart. ` +
+          `Create the .checkpoints directory if needed.</system-reminder>`,
+        );
+      } else if (event.type === 'threshold_nuke') {
+        const contextPct = Math.round((event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100);
+        log(`Context threshold nuke: ${event.tokens.toLocaleString()} tokens (${contextPct}%) — checkpointing and exiting`);
+        writeNukeCheckpoint(event.tokens, event.transcriptPath, '/workspace/agent');
+        // Exit code 75 (EX_TEMPFAIL): planned nuke, not a crash.
+        // Host orchestrator can watch for this code to trigger Facts writing + restart.
+        process.exit(75);
       } else if (event.type === 'compaction') {
-        // Mid-turn auto-compaction. Claude Code SDK ends the current Query
-        // as a side effect of compaction; if we did nothing, the user's
-        // prompt would be lost (no further `result` events come, and the
-        // active-poll only fires when *new* inbound messages arrive). Two
-        // actions:
-        //   1. Notify the user that compaction happened (cosmetic, but
-        //      explains the delay).
-        //   2. Re-push the same prompt so the agent actually answers.
-        // Do NOT markCompleted — the inbound batch hasn't been answered
-        // yet. It gets marked only when a real `result` comes through
-        // post-resubmit.
-        log(`Compaction event: ${event.message} — re-submitting prompt to make agent answer`);
-        if (routing.channelType && routing.platformId) {
-          writeMessageOut({
-            id: generateId(),
-            in_reply_to: routing.inReplyTo,
-            kind: 'chat',
-            platform_id: routing.platformId,
-            channel_type: routing.channelType,
-            thread_id: routing.threadId,
-            content: JSON.stringify({ text: event.message }),
-          });
-        }
+        // SDK auto-compact fired (window set to 9M so this should not happen
+        // in practice). Re-submit the prompt so the agent actually answers.
+        log(`Compaction event: ${event.message} — re-submitting prompt`);
         query.push(prompt);
       }
     }
@@ -352,6 +396,12 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
       break;
     case 'compaction':
       log(`Compaction: ${event.message}`);
+      break;
+    case 'threshold_warn':
+      log(`Threshold warn: ${event.tokens.toLocaleString()} tokens`);
+      break;
+    case 'threshold_nuke':
+      log(`Threshold nuke: ${event.tokens.toLocaleString()} tokens`);
       break;
   }
 }
