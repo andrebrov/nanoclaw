@@ -5,7 +5,14 @@ import { query as sdkQuery, type HookCallback, type PreCompactHookInput } from '
 
 import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/connection.js';
 import { registerProvider } from './provider-registry.js';
-import type { AgentProvider, AgentQuery, McpServerConfig, ProviderEvent, ProviderOptions, QueryInput } from './types.js';
+import type {
+  AgentProvider,
+  AgentQuery,
+  McpServerConfig,
+  ProviderEvent,
+  ProviderOptions,
+  QueryInput,
+} from './types.js';
 
 function log(msg: string): void {
   console.error(`[claude-provider] ${msg}`);
@@ -115,10 +122,15 @@ function parseTranscript(content: string): ParsedMessage[] {
     try {
       const entry = JSON.parse(line);
       if (entry.type === 'user' && entry.message?.content) {
-        const text = typeof entry.message.content === 'string' ? entry.message.content : entry.message.content.map((c: { text?: string }) => c.text || '').join('');
+        const text =
+          typeof entry.message.content === 'string'
+            ? entry.message.content
+            : entry.message.content.map((c: { text?: string }) => c.text || '').join('');
         if (text) messages.push({ role: 'user', content: text });
       } else if (entry.type === 'assistant' && entry.message?.content) {
-        const textParts = entry.message.content.filter((c: { type: string }) => c.type === 'text').map((c: { text: string }) => c.text);
+        const textParts = entry.message.content
+          .filter((c: { type: string }) => c.type === 'text')
+          .map((c: { text: string }) => c.text);
         const text = textParts.join('');
         if (text) messages.push({ role: 'assistant', content: text });
       }
@@ -131,7 +143,13 @@ function parseTranscript(content: string): ParsedMessage[] {
 
 function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | null, assistantName?: string): string {
   const now = new Date();
-  const dateStr = now.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  const dateStr = now.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
   const lines = [`# ${title || 'Conversation'}`, '', `Archived: ${dateStr}`, '', '---', ''];
   for (const msg of messages) {
     const sender = msg.role === 'user' ? 'User' : assistantName || 'Assistant';
@@ -199,20 +217,29 @@ function createPreCompactHook(assistantName?: string): HookCallback {
       if (fs.existsSync(indexPath)) {
         try {
           const index = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
-          summary = index.entries?.find((e: { sessionId: string; summary?: string }) => e.sessionId === sessionId)?.summary;
+          summary = index.entries?.find(
+            (e: { sessionId: string; summary?: string }) => e.sessionId === sessionId,
+          )?.summary;
         } catch {
           /* ignore */
         }
       }
 
       const name = summary
-        ? summary.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50)
+        ? summary
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 50)
         : `conversation-${new Date().getHours().toString().padStart(2, '0')}${new Date().getMinutes().toString().padStart(2, '0')}`;
 
       const conversationsDir = '/workspace/agent/conversations';
       fs.mkdirSync(conversationsDir, { recursive: true });
       const filename = `${new Date().toISOString().split('T')[0]}-${name}.md`;
-      fs.writeFileSync(path.join(conversationsDir, filename), formatTranscriptMarkdown(messages, summary, assistantName));
+      fs.writeFileSync(
+        path.join(conversationsDir, filename),
+        formatTranscriptMarkdown(messages, summary, assistantName),
+      );
       log(`Archived conversation to ${filename}`);
     } catch (err) {
       log(`Failed to archive transcript: ${err instanceof Error ? err.message : String(err)}`);
@@ -240,19 +267,13 @@ const CONTEXT_WINDOW_TOKENS = parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDO
  * Warn when context reaches 70% (or leaves 50K headroom if smaller).
  * At warn: agent is still coherent enough to write a useful checkpoint.
  */
-const THRESHOLD_WARN_TOKENS = Math.max(
-  Math.floor(CONTEXT_WINDOW_TOKENS * 0.70),
-  CONTEXT_WINDOW_TOKENS - 50000,
-);
+const THRESHOLD_WARN_TOKENS = Math.max(Math.floor(CONTEXT_WINDOW_TOKENS * 0.7), CONTEXT_WINDOW_TOKENS - 50000);
 
 /**
  * Nuke when context reaches 80% (or leaves 25K headroom if smaller).
  * At nuke: container exits with code 75 so host can restart with checkpoint.
  */
-const THRESHOLD_NUKE_TOKENS = Math.max(
-  Math.floor(CONTEXT_WINDOW_TOKENS * 0.80),
-  CONTEXT_WINDOW_TOKENS - 25000,
-);
+const THRESHOLD_NUKE_TOKENS = Math.max(Math.floor(CONTEXT_WINDOW_TOKENS * 0.8), CONTEXT_WINDOW_TOKENS - 25000);
 
 /**
  * Claude Code SDK stores sessions at /home/node/.claude/projects/<slug>/<id>.jsonl
@@ -277,9 +298,13 @@ function readLatestTokens(transcriptPath: string): number {
         const entry = JSON.parse(line);
         const tokens = entry.message?.usage?.input_tokens;
         if (typeof tokens === 'number' && tokens > 0) return tokens;
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
     }
-  } catch { /* file not found */ }
+  } catch {
+    /* file not found */
+  }
   return 0;
 }
 
@@ -342,7 +367,9 @@ export class ClaudeProvider implements AgentProvider {
         additionalDirectories: this.additionalDirectories,
         resume: input.continuation,
         pathToClaudeCodeExecutable: '/pnpm/claude',
-        systemPrompt: instructions ? { type: 'preset' as const, preset: 'claude_code' as const, append: instructions } : undefined,
+        systemPrompt: instructions
+          ? { type: 'preset' as const, preset: 'claude_code' as const, append: instructions }
+          : undefined,
         allowedTools: TOOL_ALLOWLIST,
         disallowedTools: SDK_DISALLOWED_TOOLS,
         env: this.env,
@@ -380,7 +407,7 @@ export class ClaudeProvider implements AgentProvider {
           transcriptPath = `/home/node/.claude/projects/${CLAUDE_PROJECT_SLUG}/${sessionId}.jsonl`;
           yield { type: 'init', continuation: message.session_id };
         } else if (message.type === 'result') {
-          const text = 'result' in message ? (message as { result?: string }).result ?? null : null;
+          const text = 'result' in message ? ((message as { result?: string }).result ?? null) : null;
           yield { type: 'result', text };
 
           // Check token threshold after each completed turn.

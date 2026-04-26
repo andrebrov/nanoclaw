@@ -63,9 +63,9 @@ export function findByRouting(
   const db = getInboundDb();
   const row =
     channelType === 'agent'
-      ? (db
-          .prepare("SELECT * FROM destinations WHERE type = 'agent' AND agent_group_id = ?")
-          .get(platformId) as DestRow | undefined)
+      ? (db.prepare("SELECT * FROM destinations WHERE type = 'agent' AND agent_group_id = ?").get(platformId) as
+          | DestRow
+          | undefined)
       : (db
           .prepare("SELECT * FROM destinations WHERE type = 'channel' AND channel_type = ? AND platform_id = ?")
           .get(channelType, platformId) as DestRow | undefined);
@@ -83,7 +83,13 @@ export function buildSystemPromptAddendum(assistantName?: string): string {
   const sections: string[] = [];
 
   if (assistantName) {
-    sections.push(['# You are ' + assistantName, '', `Your name is **${assistantName}**. Use it when the channel asks who you are, when introducing yourself, and when signing any message that explicitly calls for a signature.`].join('\n'));
+    sections.push(
+      [
+        '# You are ' + assistantName,
+        '',
+        `Your name is **${assistantName}**. Use it when the channel asks who you are, when introducing yourself, and when signing any message that explicitly calls for a signature.`,
+      ].join('\n'),
+    );
   }
 
   sections.push(buildDestinationsSection());

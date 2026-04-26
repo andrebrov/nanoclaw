@@ -6,7 +6,14 @@ import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } 
 import { writeMessageOut } from './db/messages-out.js';
 import { touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
 import { getStoredSessionId, setStoredSessionId, clearStoredSessionId } from './db/session-state.js';
-import { formatMessages, extractRouting, categorizeMessage, isClearCommand, stripInternalTags, type RoutingContext } from './formatter.js';
+import {
+  formatMessages,
+  extractRouting,
+  categorizeMessage,
+  isClearCommand,
+  stripInternalTags,
+  type RoutingContext,
+} from './formatter.js';
 import type { AgentProvider, AgentQuery, ProviderEvent } from './providers/types.js';
 
 const POLL_INTERVAL_MS = 1000;
@@ -260,10 +267,14 @@ function writeNukeCheckpoint(tokens: number, transcriptPath: string, cwd: string
     let existing = '';
     try {
       existing = fs.readFileSync(checkpointPath, 'utf-8');
-    } catch { /* new file */ }
+    } catch {
+      /* new file */
+    }
 
     const timestamp = new Date().toISOString();
-    const contextPct = Math.round((tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100);
+    const contextPct = Math.round(
+      (tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100,
+    );
     const metadata = [
       `<!-- nuke: ${timestamp} | tokens: ${tokens.toLocaleString()} (${contextPct}%) | transcript: ${transcriptPath} -->`,
     ].join('\n');
@@ -364,19 +375,25 @@ async function processQuery(
           dispatchResultText(event.text, routing);
         }
       } else if (event.type === 'threshold_warn') {
-        const contextPct = Math.round((event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100);
+        const contextPct = Math.round(
+          (event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100,
+        );
         log(`Context threshold warn: ${event.tokens.toLocaleString()} tokens (${contextPct}%)`);
         // Ask the agent to write a reasoning checkpoint while still coherent.
         query.push(
           `<system-reminder>Context window is ${contextPct}% full (${event.tokens.toLocaleString()} tokens). ` +
-          `Please write a brief reasoning checkpoint to /workspace/agent/.checkpoints/default.md ` +
-          `with a ## Reasoning section: current task, key decisions made, important context to preserve. ` +
-          `Be concise — this is used to restore context if the session must restart. ` +
-          `Create the .checkpoints directory if needed.</system-reminder>`,
+            `Please write a brief reasoning checkpoint to /workspace/agent/.checkpoints/default.md ` +
+            `with a ## Reasoning section: current task, key decisions made, important context to preserve. ` +
+            `Be concise — this is used to restore context if the session must restart. ` +
+            `Create the .checkpoints directory if needed.</system-reminder>`,
         );
       } else if (event.type === 'threshold_nuke') {
-        const contextPct = Math.round((event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100);
-        log(`Context threshold nuke: ${event.tokens.toLocaleString()} tokens (${contextPct}%) — checkpointing and exiting`);
+        const contextPct = Math.round(
+          (event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100,
+        );
+        log(
+          `Context threshold nuke: ${event.tokens.toLocaleString()} tokens (${contextPct}%) — checkpointing and exiting`,
+        );
         writeNukeCheckpoint(event.tokens, event.transcriptPath, '/workspace/agent');
         // Exit code 75 (EX_TEMPFAIL): planned nuke, not a crash.
         // Host orchestrator can watch for this code to trigger Facts writing + restart.
@@ -405,7 +422,9 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
       log(`Result: ${event.text ? event.text.slice(0, 200) : '(empty)'}`);
       break;
     case 'error':
-      log(`Error: ${event.message} (retryable: ${event.retryable}${event.classification ? `, ${event.classification}` : ''})`);
+      log(
+        `Error: ${event.message} (retryable: ${event.retryable}${event.classification ? `, ${event.classification}` : ''})`,
+      );
       break;
     case 'progress':
       log(`Progress: ${event.message}`);

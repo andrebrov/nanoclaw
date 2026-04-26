@@ -2,12 +2,7 @@ import path from 'path';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  DEFAULT_SESSION_NAME,
-  KNOWN_SESSION_NAMES,
-  MAINTENANCE_SESSION_NAME,
-  resolveIpcResultPath,
-} from './ipc.js';
+import { DEFAULT_SESSION_NAME, KNOWN_SESSION_NAMES, MAINTENANCE_SESSION_NAME, resolveIpcResultPath } from './ipc.js';
 
 const OUTPUT_DIR = '/data/ipc/my-group';
 

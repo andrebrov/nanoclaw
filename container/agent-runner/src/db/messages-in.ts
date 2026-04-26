@@ -135,4 +135,3 @@ export function findQuestionResponse(questionId: string): MessageInRow | undefin
 
   return response;
 }
-
