@@ -9,12 +9,12 @@
  */
 import fs from 'fs';
 
-import { getAgentGroup } from '../../db/agent-groups.js';
+import { getAgentGroup, getAllAgentGroups } from '../../db/agent-groups.js';
 import { getMessagingGroup } from '../../db/messaging-groups.js';
 import { replaceDestinations, type DestinationRow } from '../../db/session-db.js';
 import { log } from '../../log.js';
 import { inboundDbPath, openInboundDb } from '../../session-manager.js';
-import { getDestinations } from './db/agent-destinations.js';
+import { getDestinations, normalizeName } from './db/agent-destinations.js';
 
 export function writeDestinations(agentGroupId: string, sessionId: string): void {
   const dbPath = inboundDbPath(agentGroupId, sessionId);
@@ -72,6 +72,26 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
     platform_id: null,
     agent_group_id: '__main__',
   });
+
+  // Synthetic peer destinations — inject every other agent group so agents
+  // can reach peers by name (e.g. send_message({ to: 'researcher', ... }))
+  // without the operator having to manually wire destinations. Skips any
+  // name already claimed by an explicit destination, broadcast, or main.
+  const usedNames = new Set(resolved.map((r) => r.name));
+  for (const ag of getAllAgentGroups()) {
+    if (ag.id === agentGroupId) continue;
+    const peerName = normalizeName(ag.name);
+    if (usedNames.has(peerName)) continue;
+    usedNames.add(peerName);
+    resolved.push({
+      name: peerName,
+      display_name: ag.name,
+      type: 'agent',
+      channel_type: null,
+      platform_id: null,
+      agent_group_id: ag.id,
+    });
+  }
 
   const db = openInboundDb(agentGroupId, sessionId);
   try {
