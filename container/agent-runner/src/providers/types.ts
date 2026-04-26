@@ -83,6 +83,19 @@ export type ProviderEvent =
    */
   | { type: 'compaction'; message: string }
   /**
+   * Context window approaching threshold. Poll-loop should push a
+   * system-reminder asking the agent to write a reasoning checkpoint.
+   * Fires once per session at ~70% of the context window.
+   */
+  | { type: 'threshold_warn'; tokens: number }
+  /**
+   * Context window at nuke threshold (~80%). Poll-loop must write a
+   * checkpoint sentinel and exit with code 75 (EX_TEMPFAIL) so the
+   * host can restart with the checkpoint injected.
+   * Fires once per session after threshold_warn.
+   */
+  | { type: 'threshold_nuke'; tokens: number; transcriptPath: string }
+  /**
    * Liveness signal. Providers MUST yield this on every underlying SDK
    * event (tool call, thinking, partial message, anything) so the
    * poll-loop's idle timer stays honest during long tool runs.
