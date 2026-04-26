@@ -304,8 +304,22 @@ export class ClaudeProvider implements AgentProvider {
     this.assistantName = options.assistantName;
     this.mcpServers = options.mcpServers ?? {};
     this.additionalDirectories = options.additionalDirectories;
+    // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
+    // Claude Agent SDK does NOT auto-forward process.env to the claude
+    // subprocess — it spawns with a filtered/sanitized env. Symptom when
+    // missing: claude subprocess returns "Not logged in · Please run
+    // /login" as a successful result event, on every push, regardless
+    // of bun process.env or container docker-run env.
+    // We pull from process.env directly here so the values picked up
+    // are whatever the container was started with (host-side passthrough
+    // adds them via -e ANTHROPIC_API_KEY=...).
     this.env = {
       ...(options.env ?? {}),
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+      CLAUDE_CODE_OAUTH_TOKEN: process.env.CLAUDE_CODE_OAUTH_TOKEN,
+      HTTPS_PROXY: process.env.HTTPS_PROXY,
+      https_proxy: process.env.https_proxy,
+      NODE_EXTRA_CA_CERTS: process.env.NODE_EXTRA_CA_CERTS,
       CLAUDE_CODE_AUTO_COMPACT_WINDOW,
     };
   }
