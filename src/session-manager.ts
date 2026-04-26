@@ -15,7 +15,7 @@ import fs from 'fs';
 import path from 'path';
 
 import type { OutboundFile } from './channels/adapter.js';
-import { DATA_DIR } from './config.js';
+import { DATA_DIR, DEFAULT_SESSION_NAME, MAINTENANCE_SESSION_NAME } from './config.js';
 import { getMessagingGroup } from './db/messaging-groups.js';
 import {
   createSession,
@@ -81,16 +81,20 @@ function generateId(): string {
  * - 'per-thread': one session per (messaging group, thread)
  * - 'agent-shared': one session per agent group — all messaging groups
  *   wired with this mode share a single session (e.g. GitHub + Slack)
+ *
+ * sessionName distinguishes the user-facing slot ('default') from the
+ * background task slot ('maintenance'). Defaults to DEFAULT_SESSION_NAME.
  */
 export function resolveSession(
   agentGroupId: string,
   messagingGroupId: string | null,
   threadId: string | null,
   sessionMode: 'shared' | 'per-thread' | 'agent-shared',
+  sessionName: string = DEFAULT_SESSION_NAME,
 ): { session: Session; created: boolean } {
   // agent-shared: single session per agent group, regardless of messaging group
   if (sessionMode === 'agent-shared') {
-    const existing = findSessionByAgentGroup(agentGroupId);
+    const existing = findSessionByAgentGroup(agentGroupId, sessionName);
     if (existing) {
       return { session: existing, created: false };
     }
@@ -98,7 +102,7 @@ export function resolveSession(
     const lookupThreadId = sessionMode === 'shared' ? null : threadId;
     // Scope lookup by agent_group_id so fan-out to multiple agents in the
     // same chat doesn't accidentally deliver to the wrong agent's session.
-    const existing = findSessionForAgent(agentGroupId, messagingGroupId, lookupThreadId);
+    const existing = findSessionForAgent(agentGroupId, messagingGroupId, lookupThreadId, sessionName);
     if (existing) {
       return { session: existing, created: false };
     }
@@ -111,6 +115,7 @@ export function resolveSession(
     agent_group_id: agentGroupId,
     messaging_group_id: messagingGroupId,
     thread_id: lookupThreadId,
+    session_name: sessionName,
     agent_provider: null,
     status: 'active',
     container_status: 'stopped',
@@ -120,9 +125,28 @@ export function resolveSession(
 
   createSession(session);
   initSessionFolder(agentGroupId, id);
-  log.info('Session created', { id, agentGroupId, messagingGroupId, threadId: lookupThreadId, sessionMode });
+  log.info('Session created', {
+    id,
+    agentGroupId,
+    messagingGroupId,
+    threadId: lookupThreadId,
+    sessionMode,
+    sessionName,
+  });
 
   return { session, created: true };
+}
+
+/**
+ * Find or create the maintenance session for an agent group.
+ *
+ * The maintenance session is agent-shared (one per agent group, not tied to
+ * any messaging group) and runs scheduled tasks independently of the
+ * user-facing default session. A hung maintenance task cannot block
+ * interactive responses.
+ */
+export function resolveMaintenanceSession(agentGroupId: string): { session: Session; created: boolean } {
+  return resolveSession(agentGroupId, null, null, 'agent-shared', MAINTENANCE_SESSION_NAME);
 }
 
 /** Create the session folder and initialize both DBs. */
