@@ -381,7 +381,9 @@ function buildMounts(
 
   // Additional mounts from container config
   if (containerConfig.additionalMounts && containerConfig.additionalMounts.length > 0) {
-    const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name);
+    // Only the main group or admin groups may request read-write mounts.
+    const isTrusted = agentGroup.folder === 'main' || !!containerConfig.isAdmin;
+    const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name, isTrusted);
     mounts.push(...validated);
   }
 
