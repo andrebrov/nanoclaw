@@ -113,8 +113,79 @@ export function writeSessionSecrets(sessionDir: string): SecretsMount[] {
     mounts.push({ hostPath: p, containerPath: '/tmp/.phantombuster-credentials', readonly: true });
   }
 
+  // /tmp/.env: dump every non-bookkeeping host .env entry so Python skill
+  // scripts using `load_dotenv()` / `os.getenv()` work out of the box.
+  // This is the v1 contract that broke when v2 moved to OneCLI Vault —
+  // restoring it here keeps existing skills (clay/email_finder.py,
+  // assistant/*, etc.) functional. The OneCLI proxy still handles the
+  // actual credential injection on outbound HTTPS, so values written
+  // here are belt-and-suspenders for HTTPS calls and the only source of
+  // truth for non-HTTPS uses (webhook URLs, Meta SDKs, OAuth flows).
+  //
+  // Excluded keys: NanoClaw infra (TELEGRAM_BOT_TOKEN — already injected
+  // via host adapter, never used inside agent containers), runtime
+  // toggles (TELEGRAM_ONLY, TZ, INSTALL_CJK_FONTS, etc.), the OneCLI
+  // bridge config, ANTHROPIC_API_KEY (Claude SDK gets it from OneCLI),
+  // and the bot pool token list.
+  const dotenvExcludePatterns = [
+    /^TELEGRAM_/, // bot token + per-bot pool — host-side only
+    /^TZ$/,
+    /^TIMEZONE$/,
+    /^NODE_ENV$/,
+    /^LOG_LEVEL$/,
+    /^CONTAINER_(IMAGE|RUNTIME)/,
+    /^GROUPS_DIR$/,
+    /^DATA_DIR$/,
+    /^INSTALL_CJK_FONTS$/,
+    /^ONECLI_(URL|API_KEY)$/, // host's OneCLI auth — agent uses its own agent token
+    /^ANTHROPIC_API_KEY$/, // Claude SDK gets this via OneCLI proxy injection
+    /^ASSISTANT_NAME$/, // host-supplied per agent group
+  ];
+  const fullEnv = readFullDotenv();
+  const dotenvLines: string[] = [];
+  for (const [key, value] of Object.entries(fullEnv)) {
+    if (dotenvExcludePatterns.some((re) => re.test(key))) continue;
+    if (!value) continue;
+    dotenvLines.push(`${key}=${value}`);
+  }
+  if (dotenvLines.length > 0) {
+    const p = path.join(secretsDir, 'env');
+    fs.writeFileSync(p, dotenvLines.join('\n') + '\n', { mode: 0o600 });
+    mounts.push({ hostPath: p, containerPath: '/tmp/.env', readonly: true });
+  }
+
   if (mounts.length > 0) {
     log.debug('Container secrets files written', { sessionDir, count: mounts.length });
   }
   return mounts;
+}
+
+/**
+ * Read every key=value line from the host `.env` (without the keys-list
+ * filter that `readEnvFile` imposes). Used only here for the
+ * `/tmp/.env` dump — host-side processes should keep using
+ * `readEnvFile([allowed-keys])` so the contract stays narrow.
+ */
+function readFullDotenv(): Record<string, string> {
+  const envPath = path.join(process.cwd(), '.env');
+  const result: Record<string, string> = {};
+  let raw: string;
+  try {
+    raw = fs.readFileSync(envPath, 'utf-8');
+  } catch {
+    return result;
+  }
+  for (const line of raw.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx <= 0) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    let value = trimmed.slice(eqIdx + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
 }
