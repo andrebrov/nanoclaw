@@ -359,6 +359,26 @@ function buildMounts(
     syncTesslTileSymlinks(claudeDir, tesslTilesDir);
   }
 
+  // Admin-only observability mounts — read-only. Grant privileged agent groups
+  // visibility into host state: orchestrator logs, central DB, and session dirs.
+  // These are NOT mounted for untrusted/trusted/regular groups.
+  if (containerConfig.isAdmin) {
+    const logsDir = path.join(projectRoot, 'logs');
+    if (fs.existsSync(logsDir)) {
+      mounts.push({ hostPath: logsDir, containerPath: '/workspace/host-logs/logs', readonly: true });
+    }
+    // Central DB — read-only snapshot for chat_status queries.
+    const centralDb = path.join(DATA_DIR, 'v2.db');
+    if (fs.existsSync(centralDb)) {
+      mounts.push({ hostPath: centralDb, containerPath: '/workspace/host-logs/v2.db', readonly: true });
+    }
+    // Sessions dir — heartbeat files and session sub-dirs for liveness checks.
+    const sessionsDir = path.join(DATA_DIR, 'v2-sessions');
+    if (fs.existsSync(sessionsDir)) {
+      mounts.push({ hostPath: sessionsDir, containerPath: '/workspace/host-logs/sessions', readonly: true });
+    }
+  }
+
   // Additional mounts from container config
   if (containerConfig.additionalMounts && containerConfig.additionalMounts.length > 0) {
     const validated = validateAdditionalMounts(containerConfig.additionalMounts, agentGroup.name);

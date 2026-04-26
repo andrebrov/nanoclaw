@@ -16,6 +16,8 @@ export interface RunnerConfig {
   agentGroupId: string;
   maxMessagesPerPrompt: number;
   mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>;
+  /** True when the host granted admin observability (host-logs mounts + chat_status tool). */
+  isAdmin: boolean;
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
@@ -43,6 +45,7 @@ export function loadConfig(): RunnerConfig {
     agentGroupId: (raw.agentGroupId as string) || '',
     maxMessagesPerPrompt: (raw.maxMessagesPerPrompt as number) || DEFAULT_MAX_MESSAGES,
     mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
+    isAdmin: (raw.isAdmin as boolean) === true,
   };
 
   return _config;
