@@ -1,0 +1,24 @@
+{
+  "name": "nanoclaw",
+  "mode": "vendored",
+  "dependencies": {
+    "uinaf/verify": {
+      "version": "0.1.6"
+    },
+    "uinaf/review": {
+      "version": "0.1.8"
+    },
+    "tessl-labs/spec-driven-development": {
+      "version": "2.0.1"
+    },
+    "coding-agent-helpers/skeptic-verifier": {
+      "version": "0.1.2"
+    },
+    "tdg-personal/github-ops": {
+      "version": "0.1.0"
+    },
+    "tessl-labs/jest-testing": {
+      "version": "0.1.5"
+    }
+  }
+}
