@@ -588,6 +588,16 @@ async function buildContainerArgs(
     }
   }
 
+  // COMPOSIO_API_KEY placeholder — the Composio SDK reads this env var at
+  // init time and fails if absent. When the host .env has no COMPOSIO_API_KEY
+  // (because the real key lives in OneCLI vault), inject a dummy value so the
+  // SDK initialises. The OneCLI proxy intercepts outbound requests to
+  // backend.composio.dev and overwrites the x-api-key header with the vault
+  // credential, so any non-empty placeholder works.
+  if (!process.env['COMPOSIO_API_KEY']) {
+    args.push('-e', 'COMPOSIO_API_KEY=test');
+  }
+
   // OneCLI gateway — injects HTTPS_PROXY + certs so container API calls
   // are routed through the agent vault for credential injection.
   try {
