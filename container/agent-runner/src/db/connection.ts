@@ -177,6 +177,12 @@ export function initTestSessionDb(): { inbound: Database; outbound: Database } {
       platform_id     TEXT,
       agent_group_id  TEXT
     );
+    CREATE TABLE session_routing (
+      id           INTEGER PRIMARY KEY CHECK (id = 1),
+      channel_type TEXT,
+      platform_id  TEXT,
+      thread_id    TEXT
+    );
   `);
 
   _outbound = new Database(':memory:');

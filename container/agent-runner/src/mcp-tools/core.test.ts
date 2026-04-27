@@ -9,7 +9,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
 import { closeSessionDb, getInboundDb, getOutboundDb, initTestSessionDb } from '../db/connection.js';
 import { getUndeliveredMessages } from '../db/messages-out.js';
-import { addReaction, editMessage } from './core.js';
+import { clearTurnReplyTo, setTurnReplyTo } from '../db/session-state.js';
+import { addReaction, editMessage, sendMessage } from './core.js';
 
 beforeEach(() => {
   initTestSessionDb();
@@ -154,5 +155,70 @@ describe('edit_message', () => {
     const content = JSON.parse(out[0].content);
     expect(content.messageId).toBe('tg-chat-123:77');
     expect(content.text).toBe('Updated text');
+  });
+});
+
+describe('send_message default inReplyTo', () => {
+  function seedSessionRouting(channelType = 'telegram', platformId = 'tg-chat-123'): void {
+    getInboundDb()
+      .prepare(
+        `INSERT OR REPLACE INTO session_routing (id, channel_type, platform_id, thread_id)
+         VALUES (1, ?, ?, NULL)`,
+      )
+      .run(channelType, platformId);
+  }
+
+  it('uses turn reply-to when no explicit inReplyTo and no to', async () => {
+    seedSessionRouting();
+    setTurnReplyTo('tg-chat-123:42:ag-test');
+
+    const result = await sendMessage.handler({ text: 'Hello' });
+
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].in_reply_to).toBe('tg-chat-123:42:ag-test');
+  });
+
+  it('uses null when no turn reply-to is set', async () => {
+    seedSessionRouting();
+    clearTurnReplyTo();
+
+    const result = await sendMessage.handler({ text: 'Hello' });
+
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].in_reply_to).toBeNull();
+  });
+
+  it('does not use turn reply-to when explicit to is provided', async () => {
+    getInboundDb()
+      .prepare(
+        `INSERT INTO destinations (name, type, channel_type, platform_id)
+         VALUES ('work', 'channel', 'telegram', 'tg-chat-456')`,
+      )
+      .run();
+    setTurnReplyTo('tg-chat-123:42:ag-test');
+
+    const result = await sendMessage.handler({ to: 'work', text: 'Hello' });
+
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].in_reply_to).toBeNull();
+  });
+
+  it('explicit inReplyTo overrides turn reply-to', async () => {
+    seedSessionRouting();
+    seedInbound(2, 'tg-chat-123:42:ag-test');
+    setTurnReplyTo('tg-chat-123:99:ag-test');
+
+    const result = await sendMessage.handler({ text: 'Reply', inReplyTo: 2 });
+
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].in_reply_to).toBe('tg-chat-123:42:ag-test');
   });
 });
