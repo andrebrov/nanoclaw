@@ -13,7 +13,7 @@ import { upsertUser } from '../modules/permissions/db/users.js';
 import { createChatSdkBridge, type ReplyContext } from './chat-sdk-bridge.js';
 import { sanitizeTelegramLegacyMarkdown } from './telegram-markdown-sanitize.js';
 import { registerChannelAdapter } from './channel-registry.js';
-import type { ChannelAdapter, ChannelSetup, InboundMessage } from './adapter.js';
+import type { ChannelAdapter, ChannelSetup, InboundMessage, OutboundMessage } from './adapter.js';
 import { tryConsume } from './telegram-pairing.js';
 
 /**
@@ -237,6 +237,70 @@ registerChannelAdapter('telegram', {
           onInbound: createPairingInterceptor(botUsernamePromise, hostConfig.onInbound, token),
         };
         return withRetry(() => bridge.setup(intercepted), 'bridge.setup');
+      },
+      async deliver(
+        platformId: string,
+        threadId: string | null,
+        message: OutboundMessage,
+      ): Promise<string | undefined> {
+        const content = message.content as Record<string, unknown>;
+        const replyToId = message.replyToId;
+
+        // For normal text messages with a reply target, inject reply_to_message_id
+        // via direct Bot API call. The Chat SDK's postMessage doesn't expose this
+        // parameter, so we bypass it for this case only.
+        if (
+          replyToId &&
+          !content.operation &&
+          content.type !== 'ask_question' &&
+          (typeof content.text === 'string' || typeof content.markdown === 'string')
+        ) {
+          const telegramMsgId = parseInt(replyToId.split(':')[1] ?? '', 10);
+          if (telegramMsgId > 0) {
+            // tid mirrors what the bridge would use: thread_id if set (forum topics),
+            // otherwise platformId. Parse chatId (and optional topicId) from it.
+            const tid = threadId ?? platformId;
+            const tidParts = tid.replace(/^telegram:/, '').split(':');
+            const chatId = tidParts[0];
+            const messageThreadId = tidParts[1] ? parseInt(tidParts[1], 10) : undefined;
+
+            const rawText = (content.markdown as string) || (content.text as string);
+            const text = sanitizeTelegramLegacyMarkdown(rawText);
+            try {
+              const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: chatId,
+                  ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+                  text,
+                  parse_mode: 'Markdown',
+                  reply_to_message_id: telegramMsgId,
+                  allow_sending_without_reply: true,
+                }),
+              });
+              if (res.ok) {
+                const json = (await res.json()) as {
+                  result?: { message_id?: number; chat?: { id?: number | string } };
+                };
+                if (json.result?.message_id) {
+                  const resultChatId = json.result.chat?.id ?? chatId;
+                  return `${resultChatId}:${json.result.message_id}`;
+                }
+                return undefined;
+              }
+              const errBody = await res.text().catch(() => '');
+              log.warn('Telegram reply send failed, falling back to normal send', {
+                status: res.status,
+                body: errBody,
+              });
+            } catch (err) {
+              log.warn('Telegram reply send error, falling back to normal send', { err });
+            }
+          }
+        }
+
+        return bridge.deliver(platformId, threadId, message);
       },
     };
     return wrapped;
