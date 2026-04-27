@@ -123,24 +123,35 @@ export const sendMessage: McpToolDefinition = {
     const text = args.text as string;
     if (!text) return err('text is required');
 
-    const routing = resolveRouting(args.to as string | undefined);
+    let routing = resolveRouting(args.to as string | undefined);
     if ('error' in routing) return err(routing.error);
 
-    // Optional thread override: agent wants to reply in a specific message's
-    // thread (forum topic / Discord thread). Look up that message's thread_id
-    // and override routing.thread_id for this send. Falls back to a hard
-    // error if the seq doesn't exist — better than silently posting to the
-    // wrong thread.
-    let threadId = routing.thread_id;
+    // Optional reply target: agent wants to reply to a specific message
+    // (forum topic / Discord thread / DM). When `inReplyTo` is set, it
+    // OVERRIDES the entire destination — channel_type, platform_id, AND
+    // thread_id — so the reply lands wherever the referenced message
+    // lives, regardless of what `to` (or session_routing) was inferred to.
+    // This is the intuitive contract: "reply to message #N" means "go to
+    // where #N is", not "use the session's default chat with #N's
+    // thread_id grafted on top". The earlier partial override (thread_id
+    // only) caused replies to fly to the DM with a group's topic id —
+    // mismatched routing, dropped delivery.
     let inReplyToId: string | null = null;
     if (args.inReplyTo !== undefined && args.inReplyTo !== null) {
-      const seq = Number(args.inReplyTo);
-      if (!seq || seq <= 0) return err('inReplyTo must be a positive integer message seq');
-      const refRouting = getRoutingBySeq(seq);
-      if (!refRouting) return err(`inReplyTo: message #${seq} not found`);
-      threadId = refRouting.thread_id;
-      const refPlatformId = getMessageIdBySeq(seq);
-      if (refPlatformId) inReplyToId = refPlatformId;
+      const refSeq = Number(args.inReplyTo);
+      if (!refSeq || refSeq <= 0) return err('inReplyTo must be a positive integer message seq');
+      const refRouting = getRoutingBySeq(refSeq);
+      if (!refRouting || !refRouting.channel_type || !refRouting.platform_id) {
+        return err(`inReplyTo: message #${refSeq} not found or has no routing`);
+      }
+      routing = {
+        channel_type: refRouting.channel_type,
+        platform_id: refRouting.platform_id,
+        thread_id: refRouting.thread_id,
+        resolvedName: `(reply to #${refSeq})`,
+      };
+      const refPlatformMsgId = getMessageIdBySeq(refSeq);
+      if (refPlatformMsgId) inReplyToId = refPlatformMsgId;
     }
 
     const id = generateId();
@@ -150,7 +161,7 @@ export const sendMessage: McpToolDefinition = {
       kind: 'chat',
       platform_id: routing.platform_id,
       channel_type: routing.channel_type,
-      thread_id: threadId,
+      thread_id: routing.thread_id,
       content: JSON.stringify({ text }),
     });
 
@@ -246,6 +257,72 @@ export const editMessage: McpToolDefinition = {
   },
 };
 
+/**
+ * Map Slack/GitHub-style emoji names to the Unicode characters that
+ * platform reaction APIs actually expect. Telegram in particular returns
+ * `Bad Request: REACTION_INVALID` for `"white_check_mark"`, `"thumbs_up"`,
+ * etc. — it wants the literal `✅`, `👍`. Agents have been trained to use
+ * the Slack-style names, so the tool accepts both and we normalize here.
+ *
+ * Pass-through any value already starting with a non-ASCII character —
+ * if you give us `"👍"` we don't second-guess it.
+ */
+const EMOJI_NAME_MAP: Record<string, string> = {
+  thumbs_up: '👍',
+  '+1': '👍',
+  thumbs_down: '👎',
+  '-1': '👎',
+  heart: '❤',
+  red_heart: '❤',
+  fire: '🔥',
+  white_check_mark: '✅',
+  check: '✅',
+  check_mark: '✅',
+  done: '✅',
+  ok: '✅',
+  x: '❌',
+  cross: '❌',
+  no_entry: '⛔',
+  warning: '⚠',
+  eyes: '👀',
+  thinking: '🤔',
+  thinking_face: '🤔',
+  rocket: '🚀',
+  star: '⭐',
+  party: '🎉',
+  tada: '🎉',
+  clap: '👏',
+  pray: '🙏',
+  hundred: '💯',
+  '100': '💯',
+  poop: '💩',
+  laugh: '😂',
+  joy: '😂',
+  cry: '😢',
+  sob: '😭',
+  rage: '😡',
+  angry: '😡',
+  confused: '😕',
+  smile: '🙂',
+  wave: '👋',
+  point_up: '☝',
+  point_down: '👇',
+  zap: '⚡',
+  cool: '😎',
+  shrug: '🤷',
+};
+
+function normalizeEmoji(raw: string): string {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  // Strip surrounding `:` if Slack-style (e.g. ":thumbs_up:")
+  const stripped = trimmed.replace(/^:|:$/g, '');
+  // Already a Unicode emoji (high codepoint) — pass through.
+  if (stripped.codePointAt(0)! > 0x7f) return stripped;
+  const lower = stripped.toLowerCase().replace(/[\s-]+/g, '_');
+  return EMOJI_NAME_MAP[lower] ?? stripped;
+}
+
 export const addReaction: McpToolDefinition = {
   tool: {
     name: 'add_reaction',
@@ -254,15 +331,21 @@ export const addReaction: McpToolDefinition = {
       type: 'object' as const,
       properties: {
         messageId: { type: 'integer', description: 'Message ID (the numeric id shown in messages)' },
-        emoji: { type: 'string', description: 'Emoji name (e.g., thumbs_up, heart, check)' },
+        emoji: {
+          type: 'string',
+          description:
+            'Emoji to react with. Accepts Slack-style names (`thumbs_up`, `white_check_mark`, `fire`) ' +
+            'OR the literal Unicode character (`👍`, `✅`, `🔥`). Slack-style names are normalized ' +
+            "because Telegram's reaction API only accepts Unicode.",
+        },
       },
       required: ['messageId', 'emoji'],
     },
   },
   async handler(args) {
     const seq = Number(args.messageId);
-    const emoji = args.emoji as string;
-    if (!seq || !emoji) return err('messageId and emoji are required');
+    const rawEmoji = args.emoji as string;
+    if (!seq || !rawEmoji) return err('messageId and emoji are required');
 
     const platformId = getMessageIdBySeq(seq);
     if (!platformId) return err(`Message #${seq} not found`);
@@ -271,6 +354,8 @@ export const addReaction: McpToolDefinition = {
     if (!routing || !routing.channel_type || !routing.platform_id) {
       return err(`Cannot determine destination for message #${seq}`);
     }
+
+    const emoji = normalizeEmoji(rawEmoji);
 
     const id = generateId();
     writeMessageOut({
@@ -282,7 +367,7 @@ export const addReaction: McpToolDefinition = {
       content: JSON.stringify({ operation: 'reaction', messageId: platformId, emoji }),
     });
 
-    log(`add_reaction: #${seq} → ${emoji} on ${platformId}`);
+    log(`add_reaction: #${seq} → ${rawEmoji}${rawEmoji === emoji ? '' : ` (→ ${emoji})`} on ${platformId}`);
     return ok(`Reaction queued for #${seq}`);
   },
 };
