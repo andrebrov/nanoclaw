@@ -10,7 +10,7 @@
  *   3. One writer per file — DELETE-mode journal-unlink isn't atomic across
  *      the mount; concurrent writers corrupt the DB.
  */
-import type Database from 'better-sqlite3';
+import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 
@@ -307,6 +307,18 @@ export function openOutboundDb(agentGroupId: string, sessionId: string): Databas
  * Write a message directly to a session's outbound DB so the host delivery
  * loop picks it up. Used by the command gate to send denial responses
  * without waking a container.
+ *
+ * Two things to be careful about here:
+ *
+ *   1. The host's normal `openOutboundDb` is read-only (the container is
+ *      the canonical writer). For this helper we open RW directly so we
+ *      can INSERT. SQLite serializes the cross-mount file lock against any
+ *      concurrent container writer; busy_timeout=5000 covers contention.
+ *
+ *   2. seq is a global namespace across messages_in + messages_out. Host
+ *      writes use even seq, container writes odd. We read both tables under
+ *      a BEGIN IMMEDIATE on outbound so the seq we pick can't collide with
+ *      a concurrent writeMessageOut on the container side.
  */
 export function writeOutboundDirect(
   agentGroupId: string,
@@ -320,14 +332,31 @@ export function writeOutboundDirect(
     content: string;
   },
 ): void {
-  const db = openOutboundDb(agentGroupId, sessionId);
+  const outDb = new Database(outboundDbPath(agentGroupId, sessionId));
+  outDb.pragma('journal_mode = DELETE');
+  outDb.pragma('busy_timeout = 5000');
+  const inDb = openInboundDb(agentGroupId, sessionId);
   try {
-    db.prepare(
-      `INSERT OR IGNORE INTO messages_out (id, seq, timestamp, kind, platform_id, channel_type, thread_id, content)
-       VALUES (?, (SELECT COALESCE(MAX(seq), 0) + 2 FROM messages_out), datetime('now'), ?, ?, ?, ?, ?)`,
-    ).run(message.id, message.kind, message.platformId, message.channelType, message.threadId, message.content);
+    outDb.exec('BEGIN IMMEDIATE');
+    try {
+      const maxOut = (outDb.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM messages_out').get() as { m: number }).m;
+      const maxIn = (inDb.prepare('SELECT COALESCE(MAX(seq), 0) AS m FROM messages_in').get() as { m: number }).m;
+      const max = Math.max(maxOut, maxIn);
+      const nextSeq = max % 2 === 0 ? max + 2 : max + 1; // next even (host-owned)
+      outDb
+        .prepare(
+          `INSERT OR IGNORE INTO messages_out (id, seq, timestamp, kind, platform_id, channel_type, thread_id, content)
+           VALUES (?, ?, datetime('now'), ?, ?, ?, ?, ?)`,
+        )
+        .run(message.id, nextSeq, message.kind, message.platformId, message.channelType, message.threadId, message.content);
+      outDb.exec('COMMIT');
+    } catch (err) {
+      outDb.exec('ROLLBACK');
+      throw err;
+    }
   } finally {
-    db.close();
+    outDb.close();
+    inDb.close();
   }
 }
 
