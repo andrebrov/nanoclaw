@@ -148,12 +148,16 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
           try {
             const buffer = await att.fetchData();
             entry.data = buffer.toString('base64');
-            const ext = att.mimeType?.split('/')[1] ?? att.name?.split('.').pop() ?? 'bin';
-            const filename = `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.${ext}`;
-            const imagesDir = '/workspace/agent/images';
-            fs.mkdirSync(imagesDir, { recursive: true });
-            fs.writeFileSync(path.join(imagesDir, filename), buffer);
-            entry.localPath = `agent/images/${filename}`;
+            // Note: earlier we also wrote attachments to /workspace/agent/images/
+            // and set `entry.localPath`, but that's a container path written
+            // from host code — `EACCES: permission denied, mkdir
+            // '/workspace/agent/images'` was the result on every download.
+            // The base64 in `entry.data` is what the agent actually uses for
+            // image content blocks, so the disk-write was both broken and
+            // unnecessary. Removed here. If a per-session attachment path is
+            // wanted later, write into <sessionDir>/inbox/<msgId>/ via
+            // session-manager.ts (host-writable, container-mounted at
+            // /workspace/inbox/) — not the agent's workspace dir.
           } catch (err) {
             log.warn('Failed to download attachment', { type: att.type, err });
           }
