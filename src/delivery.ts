@@ -30,10 +30,25 @@ import type { Session } from './types.js';
 
 const ACTIVE_POLL_MS = 1000;
 const SWEEP_POLL_MS = 60_000;
-const MAX_DELIVERY_ATTEMPTS = 3;
+const MAX_DELIVERY_ATTEMPTS = 6;
 
-/** Track delivery attempt counts. Resets on process restart (gives failed messages a fresh chance). */
-const deliveryAttempts = new Map<string, number>();
+/**
+ * Per-message retry state. Resets on process restart (gives failed messages
+ * a fresh chance). Backoff schedule on attempt N: 5s, 15s, 45s, 120s, 300s,
+ * then permanent fail at attempt 6. Without backoff, the active 1s poll
+ * burned through MAX_DELIVERY_ATTEMPTS in ~3 seconds, so any transient
+ * channel blip longer than that lost messages permanently.
+ */
+interface RetryState {
+  attempts: number;
+  nextRetryAt: number;
+}
+const deliveryRetries = new Map<string, RetryState>();
+
+function nextBackoffMs(attemptsSoFar: number): number {
+  const schedule = [5_000, 15_000, 45_000, 120_000, 300_000];
+  return schedule[Math.min(attemptsSoFar - 1, schedule.length - 1)];
+}
 
 /**
  * Sessions whose outbound queue is currently being drained.
@@ -167,13 +182,18 @@ async function drainSession(session: Session): Promise<void> {
   const agentGroup = getAgentGroup(session.agent_group_id);
   if (!agentGroup) return;
 
-  let outDb: Database.Database;
-  let inDb: Database.Database;
+  let outDb: Database.Database | null = null;
+  let inDb: Database.Database | null = null;
   try {
     outDb = openOutboundDb(agentGroup.id, session.id);
     inDb = openInboundDb(agentGroup.id, session.id);
   } catch {
-    return; // DBs might not exist yet
+    // DBs might not exist yet, or one opened and the other failed.
+    // Close whichever did open so the file descriptor doesn't leak across
+    // long-running poll cycles.
+    outDb?.close();
+    inDb?.close();
+    return;
   }
 
   try {
@@ -189,11 +209,17 @@ async function drainSession(session: Session): Promise<void> {
     // Ensure platform_message_id column exists (migration for existing sessions)
     migrateDeliveredTable(inDb);
 
+    const now = Date.now();
     for (const msg of undelivered) {
+      // Skip messages still in their backoff window — the next poll tick
+      // will pick them up once nextRetryAt has elapsed.
+      const retry = deliveryRetries.get(msg.id);
+      if (retry && now < retry.nextRetryAt) continue;
+
       try {
         const platformMsgId = await deliverMessage(msg, session, inDb);
         markDelivered(inDb, msg.id, platformMsgId ?? null);
-        deliveryAttempts.delete(msg.id);
+        deliveryRetries.delete(msg.id);
 
         // Pause the typing indicator after a real user-facing message
         // lands on the user's screen, so the client has time to visually
@@ -205,8 +231,7 @@ async function drainSession(session: Session): Promise<void> {
           pauseTypingRefreshAfterDelivery(session.id);
         }
       } catch (err) {
-        const attempts = (deliveryAttempts.get(msg.id) ?? 0) + 1;
-        deliveryAttempts.set(msg.id, attempts);
+        const attempts = (retry?.attempts ?? 0) + 1;
         if (attempts >= MAX_DELIVERY_ATTEMPTS) {
           log.error('Message delivery failed permanently, giving up', {
             messageId: msg.id,
@@ -215,13 +240,16 @@ async function drainSession(session: Session): Promise<void> {
             err,
           });
           markDeliveryFailed(inDb, msg.id);
-          deliveryAttempts.delete(msg.id);
+          deliveryRetries.delete(msg.id);
         } else {
+          const backoff = nextBackoffMs(attempts);
+          deliveryRetries.set(msg.id, { attempts, nextRetryAt: Date.now() + backoff });
           log.warn('Message delivery failed, will retry', {
             messageId: msg.id,
             sessionId: session.id,
             attempt: attempts,
             maxAttempts: MAX_DELIVERY_ATTEMPTS,
+            retryInMs: backoff,
             err,
           });
         }
