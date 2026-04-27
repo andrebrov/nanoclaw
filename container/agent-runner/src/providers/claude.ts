@@ -329,6 +329,9 @@ export class ClaudeProvider implements AgentProvider {
     this.assistantName = options.assistantName;
     this.mcpServers = options.mcpServers ?? {};
     this.additionalDirectories = options.additionalDirectories;
+    log(
+      `MCP servers configured: ${Object.keys(this.mcpServers).length} [${Object.keys(this.mcpServers).join(', ')}]`,
+    );
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude
     // subprocess — it spawns with a filtered/sanitized env. Symptom when
