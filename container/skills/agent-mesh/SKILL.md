@@ -1,15 +1,15 @@
 ---
 name: agent-mesh
-description: Share learnings across agents using /workspace/global/skills-discovered.md, send messages to all agents with broadcast, or hand off to the primary DM agent with the main destination.
+description: Share learnings across agents using write_shared_memory and /workspace/global/skills-discovered.md, send messages to all agents with broadcast, or hand off to the primary DM agent with the main destination.
 ---
 
 # Agent Mesh — Shared Memory and Broadcast
 
-You have access to a shared memory file at `/workspace/global/skills-discovered.md` that all agents read and write. Use it to publish discoveries so other agents don't repeat the same research or mistakes.
+The shared pool at `/workspace/global/` is readable by all agents. Use `write_shared_memory` to publish discoveries so other agents don't repeat the same research or mistakes. The canonical shared file for agent learnings is `skills-discovered.md`.
 
 ## Shared Knowledge: /workspace/global/skills-discovered.md
 
-Check this file at the start of a turn when you're about to solve a problem that another agent might already have figured out. After you discover something useful (a working API call, a correct parameter name, an effective pattern), append it.
+Check this file at the start of a turn when you're about to solve a problem that another agent might already have figured out. After you discover something useful (a working API call, a correct parameter name, an effective pattern), append it using `write_shared_memory`.
 
 **Format — one entry per discovery:**
 
@@ -30,6 +30,16 @@ How: [optional — the exact call/pattern/fix that works]
 - After discovering a working API action name, OAuth scope, or request format that wasn't obvious
 - After correcting a mistake that another agent could easily repeat
 - Keep entries short — this is a shared file, not a notebook
+
+**How to write:**
+
+```
+write_shared_memory({
+  filename: "skills-discovered.md",
+  content: "\n## [title] — 2026-01-15\nAgent: MyAgent\nWhat: ...\n",
+  mode: "append"
+})
+```
 
 ## Broadcasting to All Agents
 
