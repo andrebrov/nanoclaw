@@ -1,0 +1,11 @@
+{
+  "name": "finsi/agent-mesh",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Share learnings across agents using write_shared_memory and /workspace/global/skills-discovered.md, send messages to all agents with broadcast, or hand off to the primary DM agent with the main destination.",
+  "skills": {
+    "agent-mesh": {
+      "path": "SKILL.md"
+    }
+  }
+}

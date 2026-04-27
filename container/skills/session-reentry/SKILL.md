@@ -1,3 +1,8 @@
+---
+name: session-reentry
+description: "Documentation for the automatic session-reentry mechanism that injects the previous session checkpoint into a fresh container start. Reference-only — the agent does not invoke this manually; the agent-runner reads /workspace/agent/.checkpoints/default.md before any user message and surfaces it as a <session-checkpoint> system block. Use this skill when explaining or debugging how cross-session context survives container restarts."
+---
+
 # Session Reentry
 
 **Trigger:** `/session-reentry`

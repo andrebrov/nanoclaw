@@ -1,0 +1,11 @@
+{
+  "name": "finsi/vercel-cli",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Deploy apps to Vercel. Use when asked to deploy, ship, or publish a web application, or manage Vercel projects, domains, and environment variables.",
+  "skills": {
+    "vercel-cli": {
+      "path": "SKILL.md"
+    }
+  }
+}

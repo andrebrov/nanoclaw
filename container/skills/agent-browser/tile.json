@@ -1,0 +1,11 @@
+{
+  "name": "finsi/agent-browser",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Browse the web for any task — research topics, read articles, interact with web apps, fill forms, take screenshots, extract data, and test web pages. Use whenever a browser would be useful, not just when the user explicitly asks.",
+  "skills": {
+    "agent-browser": {
+      "path": "SKILL.md"
+    }
+  }
+}

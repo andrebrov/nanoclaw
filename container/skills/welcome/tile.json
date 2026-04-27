@@ -1,0 +1,11 @@
+{
+  "name": "finsi/welcome",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Introduce yourself to a newly connected channel. Triggered automatically when a channel is first wired. Send a friendly greeting and brief overview of what you can do.",
+  "skills": {
+    "welcome": {
+      "path": "SKILL.md"
+    }
+  }
+}
