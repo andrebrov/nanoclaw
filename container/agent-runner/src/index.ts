@@ -128,10 +128,6 @@ async function main(): Promise<void> {
     log(`Additional MCP server: ${name} (${serverConfig.command})`);
   }
 
-  log(
-    `Pre-createProvider mcpServers: ${Object.keys(mcpServers).length} keys [${Object.keys(mcpServers).join(', ')}], provider=${providerName}`,
-  );
-  const provider = createProvider(providerName, {
     assistantName: config.assistantName || undefined,
     mcpServers,
     env: { ...process.env },
