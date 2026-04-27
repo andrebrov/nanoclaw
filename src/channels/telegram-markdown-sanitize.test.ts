@@ -58,6 +58,38 @@ describe('sanitizeTelegramLegacyMarkdown', () => {
     expect(sanitizeTelegramLegacyMarkdown('')).toBe('');
   });
 
+  it('converts <b> tags to legacy *bold* Markdown', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<b>hello</b>')).toBe('*hello*');
+  });
+
+  it('converts <strong> tags to legacy *bold* Markdown', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<strong>hello</strong>')).toBe('*hello*');
+  });
+
+  it('converts <i> tags to legacy _italic_ Markdown', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<i>hello</i>')).toBe('_hello_');
+  });
+
+  it('converts <em> tags to legacy _italic_ Markdown', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<em>hello</em>')).toBe('_hello_');
+  });
+
+  it('handles multiple HTML tags in one message', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<b>bold</b> and <i>italic</i>')).toBe('*bold* and _italic_');
+  });
+
+  it('handles nested HTML tags', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<b><i>both</i></b>')).toBe('*_both_*');
+  });
+
+  it('is case-insensitive for HTML tags', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<B>hello</B>')).toBe('*hello*');
+  });
+
+  it('passes plain text with literal < > & through unchanged', () => {
+    expect(sanitizeTelegramLegacyMarkdown('x < y & z > w')).toBe('x < y & z > w');
+  });
+
   it('replaces dash list bullets with • so the adapter does not re-emit `*` markers', () => {
     expect(sanitizeTelegramLegacyMarkdown('- one\n- two')).toBe('• one\n• two');
   });

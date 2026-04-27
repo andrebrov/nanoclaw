@@ -21,6 +21,17 @@ export function sanitizeTelegramLegacyMarkdown(input: string): string {
     return `${PLACEHOLDER_PREFIX}${codeSegments.length - 1}${PLACEHOLDER_SUFFIX}`;
   });
 
+  // Convert Telegram HTML formatting tags to legacy Markdown equivalents.
+  // The adapter processes text as CommonMark, which treats <b>/<i> as inline
+  // HTML and HTML-escapes them to &lt;b&gt; before sending to the Bot API.
+  // Converting known formatting tags here ensures the adapter sees Markdown
+  // syntax instead of HTML, so <b>hello</b> renders as bold text rather than
+  // literal &lt;b&gt;hello&lt;/b&gt;.
+  text = text.replace(/<b>([\s\S]*?)<\/b>/gi, '*$1*');
+  text = text.replace(/<strong>([\s\S]*?)<\/strong>/gi, '*$1*');
+  text = text.replace(/<i>([\s\S]*?)<\/i>/gi, '_$1_');
+  text = text.replace(/<em>([\s\S]*?)<\/em>/gi, '_$1_');
+
   // The adapter re-parses and re-stringifies markdown before sending, which
   // rewrites `- item` list bullets into `* item` — injecting unbalanced
   // asterisks that Telegram's legacy Markdown parser then rejects. Replace
