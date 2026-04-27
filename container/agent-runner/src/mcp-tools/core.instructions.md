@@ -25,3 +25,5 @@ Use `mcp__nanoclaw__add_reaction({ messageId, emoji })` to react to a specific i
 ### Internal thoughts
 
 Wrap reasoning in `<internal>...</internal>` tags to mark it as scratchpad — logged but not sent.
+
+**Never announce silence.** If a message needs no reply, output nothing. Phrases like "No response needed", "Not for me", "*stays silent*" are messages themselves and will be delivered. Use `<internal>` if you need to reason about whether to respond.
