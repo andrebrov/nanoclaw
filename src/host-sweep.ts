@@ -30,7 +30,8 @@ import type Database from 'better-sqlite3';
 import fs from 'fs';
 
 import { getActiveSessions } from './db/sessions.js';
-import { getAgentGroup } from './db/agent-groups.js';
+import { findSessionByAgentGroup } from './db/sessions.js';
+import { getAgentGroup, getAgentGroupByFolder } from './db/agent-groups.js';
 import {
   countDueMessages,
   getContainerState,
@@ -42,7 +43,7 @@ import {
   type ContainerState,
 } from './db/session-db.js';
 import { log } from './log.js';
-import { openInboundDb, openOutboundDb, inboundDbPath, heartbeatPath } from './session-manager.js';
+import { openInboundDb, openOutboundDb, inboundDbPath, heartbeatPath, writeSessionMessage } from './session-manager.js';
 import { isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
 import type { Session } from './types.js';
 
@@ -56,6 +57,63 @@ export const ABSOLUTE_CEILING_MS = 30 * 60 * 1000;
 export const CLAIM_STUCK_MS = 60 * 1000;
 const MAX_TRIES = 5;
 const BACKOFF_BASE_MS = 5000;
+
+export const MAX_CONSECUTIVE_FAILURES = 5;
+export const CIRCUIT_BREAKER_COOLDOWN_MS = 30 * 60 * 1000;
+
+// Keyed by agent group folder.
+const consecutiveFailures = new Map<string, number>();
+const circuitBreakerUntil = new Map<string, number>();
+
+function isGroupInCooldown(folder: string): boolean {
+  const until = circuitBreakerUntil.get(folder);
+  if (!until) return false;
+  if (Date.now() >= until) {
+    circuitBreakerUntil.delete(folder);
+    consecutiveFailures.delete(folder);
+    return false;
+  }
+  return true;
+}
+
+function recordGroupFailure(folder: string, groupName: string): void {
+  const count = (consecutiveFailures.get(folder) ?? 0) + 1;
+  consecutiveFailures.set(folder, count);
+  if (count >= MAX_CONSECUTIVE_FAILURES && !circuitBreakerUntil.has(folder)) {
+    circuitBreakerUntil.set(folder, Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS);
+    log.warn('Circuit breaker triggered — group entering cooldown', {
+      folder,
+      groupName,
+      failures: count,
+      cooldownMs: CIRCUIT_BREAKER_COOLDOWN_MS,
+    });
+    notifyMainGroup(folder, groupName);
+  }
+}
+
+function resetGroupFailures(folder: string): void {
+  consecutiveFailures.delete(folder);
+}
+
+function notifyMainGroup(failingFolder: string, failingGroupName: string): void {
+  if (failingFolder === 'main') return;
+  const mainGroup = getAgentGroupByFolder('main');
+  if (!mainGroup) return;
+  const session = findSessionByAgentGroup(mainGroup.id);
+  if (!session) return;
+  writeSessionMessage(mainGroup.id, session.id, {
+    id: `cb-notify-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    kind: 'chat',
+    timestamp: new Date().toISOString(),
+    content: JSON.stringify({
+      text: `Circuit breaker triggered for group "${failingGroupName}": ${MAX_CONSECUTIVE_FAILURES} consecutive failures. Cooling down for ${CIRCUIT_BREAKER_COOLDOWN_MS / 60_000} minutes.`,
+    }),
+    trigger: 1,
+  });
+  void wakeContainer(session).catch((err) => {
+    log.warn('Failed to wake main group for circuit breaker notification', { failingFolder, err });
+  });
+}
 
 export type StuckDecision =
   | { action: 'ok' }
@@ -154,31 +212,45 @@ async function sweepSession(session: Session): Promise<void> {
   }
 
   try {
-    // 1. Sync processing_ack → messages_in status
+    // 1. Sync processing_ack → messages_in status (always, even in cooldown).
     if (outDb) {
       syncProcessingAcks(inDb, outDb);
     }
 
+    // 2. Skip kill/reset/wake while circuit breaker cooldown is active.
+    if (isGroupInCooldown(agentGroup.folder)) {
+      log.debug('Group in circuit breaker cooldown — skipping', { folder: agentGroup.folder });
+      return;
+    }
+
     const alive = isContainerRunning(session.id);
+    let hadFailure = false;
 
-    // 2. Crashed-container cleanup: processing rows left behind get retried.
+    // 3. Crashed-container cleanup: processing rows left behind get retried.
     if (!alive && outDb) {
-      resetStuckProcessingRows(inDb, outDb, session, 'container not running');
+      hadFailure = resetStuckProcessingRows(inDb, outDb, session, 'container not running');
     }
 
-    // 3. Running-container SLA: absolute ceiling + per-claim stuck rules.
+    // 4. Running-container SLA: absolute ceiling + per-claim stuck rules.
     if (alive && outDb) {
-      enforceRunningContainerSla(inDb, outDb, session, agentGroup.id);
+      const killed = enforceRunningContainerSla(inDb, outDb, session, agentGroup.id);
+      if (killed) hadFailure = true;
     }
 
-    // 4. Wake a container if new work is due and nothing is running.
+    if (hadFailure) {
+      recordGroupFailure(agentGroup.folder, agentGroup.name);
+    } else {
+      resetGroupFailures(agentGroup.folder);
+    }
+
+    // 5. Wake a container if new work is due, nothing is running, and not in cooldown.
     const dueCount = countDueMessages(inDb);
-    if (dueCount > 0 && !isContainerRunning(session.id)) {
+    if (dueCount > 0 && !isContainerRunning(session.id) && !isGroupInCooldown(agentGroup.folder)) {
       log.info('Waking container for due messages', { sessionId: session.id, count: dueCount });
       await wakeContainer(session);
     }
 
-    // 5. Recurrence fanout for completed recurring tasks.
+    // 6. Recurrence fanout for completed recurring tasks.
     // MODULE-HOOK:scheduling-recurrence:start
     const { handleRecurrence } = await import('./modules/scheduling/recurrence.js');
     await handleRecurrence(inDb, session);
@@ -208,7 +280,7 @@ function enforceRunningContainerSla(
   outDb: Database.Database,
   session: Session,
   agentGroupId: string,
-): void {
+): boolean {
   const decision = decideStuckAction({
     now: Date.now(),
     heartbeatMtimeMs: heartbeatMtimeMs(agentGroupId, session.id),
@@ -216,7 +288,7 @@ function enforceRunningContainerSla(
     claims: getProcessingClaims(outDb),
   });
 
-  if (decision.action === 'ok') return;
+  if (decision.action === 'ok') return false;
 
   if (decision.action === 'kill-ceiling') {
     log.warn('Killing container past absolute ceiling', {
@@ -226,7 +298,7 @@ function enforceRunningContainerSla(
     });
     killContainer(session.id, 'absolute-ceiling');
     resetStuckProcessingRows(inDb, outDb, session, 'absolute-ceiling');
-    return;
+    return true;
   }
 
   log.warn('Killing container — message claimed then silent', {
@@ -237,15 +309,19 @@ function enforceRunningContainerSla(
   });
   killContainer(session.id, 'claim-stuck');
   resetStuckProcessingRows(inDb, outDb, session, 'claim-stuck');
+  return true;
 }
 
+/** Reset stuck processing rows. Returns true if any claims were found and handled. */
 function resetStuckProcessingRows(
   inDb: Database.Database,
   outDb: Database.Database,
   session: Session,
   reason: string,
-): void {
+): boolean {
   const claims = getProcessingClaims(outDb);
+  if (claims.length === 0) return false;
+
   for (const { message_id } of claims) {
     const msg = getMessageForRetry(inDb, message_id, 'pending');
     if (!msg) continue;
@@ -269,4 +345,5 @@ function resetStuckProcessingRows(
       });
     }
   }
+  return true;
 }
