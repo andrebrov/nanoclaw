@@ -3,7 +3,7 @@
  * Spawns agent containers with session folder + agent group folder mounts.
  * The container runs the v2 agent-runner which polls the session DB.
  */
-import { ChildProcess, execSync, spawn } from 'child_process';
+import { ChildProcess, execFileSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -700,11 +700,15 @@ export async function buildAgentGroupImage(agentGroupId: string): Promise<void> 
 
   log.info('Building per-agent-group image', { agentGroupId, imageTag, apt: aptPackages, npm: npmPackages });
 
-  // Write Dockerfile to temp file and build
+  // Write Dockerfile to temp file and build. Use execFileSync (no shell)
+  // to invoke the container runtime — agentGroupId flows through both
+  // imageTag and tmpDockerfile, so a string-interpolated `execSync` would
+  // be shell-injectable if a non-UUID id ever reached here. Pass args as
+  // an array so docker/podman/apple-container see them verbatim.
   const tmpDockerfile = path.join(DATA_DIR, `Dockerfile.${agentGroupId}`);
   fs.writeFileSync(tmpDockerfile, dockerfile);
   try {
-    execSync(`${CONTAINER_RUNTIME_BIN} build -t ${imageTag} -f ${tmpDockerfile} .`, {
+    execFileSync(CONTAINER_RUNTIME_BIN, ['build', '-t', imageTag, '-f', tmpDockerfile, '.'], {
       cwd: DATA_DIR,
       stdio: 'pipe',
       timeout: 300_000,
