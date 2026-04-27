@@ -196,7 +196,15 @@ export const sendFile: McpToolDefinition = {
     if (!fs.existsSync(resolvedPath)) return err(`File not found: ${filePath}`);
 
     const id = generateId();
-    const filename = (args.filename as string) || path.basename(resolvedPath);
+    const rawFilename = (args.filename as string) || path.basename(resolvedPath);
+    // Reject filenames with path components — agent-supplied strings could
+    // include `..` or `/` and escape the outbox dir. basename neutralizes
+    // them deterministically; reject empty results so we don't write to the
+    // outbox dir itself.
+    const filename = path.basename(rawFilename);
+    if (!filename || filename === '.' || filename === '..') {
+      return err(`Invalid filename: ${rawFilename}`);
+    }
 
     const outboxDir = path.join('/workspace/outbox', id);
     fs.mkdirSync(outboxDir, { recursive: true });
@@ -234,12 +242,14 @@ export const editMessage: McpToolDefinition = {
     const text = args.text as string;
     if (!seq || !text) return err('messageId and text are required');
 
-    const platformId = getMessageIdBySeq(seq);
-    if (!platformId) return err(`Message #${seq} not found`);
-
     const routing = getRoutingBySeq(seq);
     if (!routing || !routing.channel_type || !routing.platform_id) {
-      return err(`Cannot determine destination for message #${seq}`);
+      return err(`Message #${seq} not found`);
+    }
+
+    const platformId = getMessageIdBySeq(seq);
+    if (!platformId) {
+      return err(`Message #${seq} hasn't been delivered yet — wait a moment and try again, or it has no platform id to edit.`);
     }
 
     const id = generateId();
@@ -347,12 +357,14 @@ export const addReaction: McpToolDefinition = {
     const rawEmoji = args.emoji as string;
     if (!seq || !rawEmoji) return err('messageId and emoji are required');
 
-    const platformId = getMessageIdBySeq(seq);
-    if (!platformId) return err(`Message #${seq} not found`);
-
     const routing = getRoutingBySeq(seq);
     if (!routing || !routing.channel_type || !routing.platform_id) {
-      return err(`Cannot determine destination for message #${seq}`);
+      return err(`Message #${seq} not found`);
+    }
+
+    const platformId = getMessageIdBySeq(seq);
+    if (!platformId) {
+      return err(`Message #${seq} hasn't been delivered yet — wait a moment and try again, or it has no platform id to react to.`);
     }
 
     const emoji = normalizeEmoji(rawEmoji);

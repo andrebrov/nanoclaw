@@ -100,9 +100,11 @@ export function writeMessageOut(msg: WriteMessageOut): number {
  * For inbound messages, the Chat SDK message ID is already the platform message ID
  * (e.g., "6037840640:42" for Telegram).
  *
- * For outbound messages, the internal ID (msg-xxx) won't work for edits/reactions.
- * Instead, look up the platform_message_id from the delivered table (host writes this
- * after successful delivery).
+ * For outbound messages, the internal ID (msg-xxx) is NOT a platform id and
+ * cannot be used as an edit/reaction target. Returns null until the host
+ * has written a delivered row with platform_message_id, so the caller can
+ * surface a clear "not yet delivered" error rather than shipping a bogus
+ * internal id to the platform adapter.
  */
 export function getMessageIdBySeq(seq: number): string | null {
   const inbound = getInboundDb();
@@ -117,14 +119,11 @@ export function getMessageIdBySeq(seq: number): string | null {
     | undefined;
   if (!outRow) return null;
 
-  // Check if host has stored the platform message ID after delivery
+  // Host stores the platform message id once delivery succeeds.
   const deliveredRow = inbound
     .prepare('SELECT platform_message_id FROM delivered WHERE message_out_id = ?')
     .get(outRow.id) as { platform_message_id: string | null } | undefined;
-  if (deliveredRow?.platform_message_id) return deliveredRow.platform_message_id;
-
-  // Fallback to internal ID (edits/reactions on undelivered messages won't work)
-  return outRow.id;
+  return deliveredRow?.platform_message_id ?? null;
 }
 
 /**
