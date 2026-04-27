@@ -15,7 +15,8 @@
  *     outbox/           ← outbound files
  *     agent/            ← agent group folder (CLAUDE.md, container.json, working files)
  *       container.json  ← per-group config (RO nested mount)
- *     global/           ← shared global memory (RO)
+ *     global/           ← shared pool, all agents (RO; write via write_shared_memory)
+ *     memory/           ← per-agent private memory (RW)
  *   /app/src/           ← shared agent-runner source (RO)
  *   /app/skills/        ← shared skills (RO)
  *   /home/node/.claude/ ← Claude SDK state + skill symlinks (RW)

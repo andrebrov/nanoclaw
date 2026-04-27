@@ -30,6 +30,16 @@ When the user shares any substantive information with you, it must be stored som
 
 A core part of your job and the main thing that defines how useful you are to the user is how well you do in creating these systems for organizing information. These are your systems that help you do your job well. Evolve them over time as needed.
 
+### Memory namespaces
+
+| Path | Scope | Access |
+|------|-------|--------|
+| `/workspace/agent/` | This agent only | Read-write |
+| `/workspace/memory/` | This agent only | Read-write (persists across sessions) |
+| `/workspace/global/` | All agents | Read-only |
+
+Use `/workspace/memory/` for persistent private notes and structured data that should survive across sessions (separate from `CLAUDE.local.md` which is better for short configuration). Use `write_shared_memory` to explicitly publish something to the shared pool readable by all agents.
+
 ## Conversation history
 
 The `conversations/` folder in your workspace holds searchable transcripts of past sessions with this group. Use it to recall prior context when a request references something that happened before. For structured long-lived data, prefer dedicated files (`customers.md`, `preferences.md`, etc.); split any file over ~500 lines into a folder with an index.
