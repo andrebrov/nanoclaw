@@ -115,7 +115,7 @@ async function main(): Promise<void> {
   for (const [k, v] of Object.entries(process.env)) {
     if (v !== undefined) childEnv[k] = v;
   }
-  const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }> = {
+  const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> } | { url: string; type: 'http' | 'sse'; headers?: Record<string, string> }> = {
     nanoclaw: {
       command: 'bun',
       args: ['run', mcpServerPath],
@@ -125,7 +125,8 @@ async function main(): Promise<void> {
 
   for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
     mcpServers[name] = serverConfig;
-    log(`Additional MCP server: ${name} (${serverConfig.command})`);
+    const label = serverConfig.url ? serverConfig.url : serverConfig.command;
+    log(`Additional MCP server: ${name} (${label})`);
   }
 
   const provider = createProvider(providerName, {

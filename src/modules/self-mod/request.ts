@@ -70,22 +70,45 @@ export async function handleAddMcpServer(content: Record<string, unknown>, sessi
     return;
   }
   const serverName = content.name as string;
-  const command = content.command as string;
-  if (!serverName || !command) {
-    notifyAgent(session, 'add_mcp_server failed: name and command are required.');
+  const command = content.command as string | undefined;
+  const url = content.url as string | undefined;
+  if (!serverName || (!command && !url)) {
+    notifyAgent(session, 'add_mcp_server failed: name and either command or url are required.');
     return;
   }
-  await requestApproval({
-    session,
-    agentName: agentGroup.name,
-    action: 'add_mcp_server',
-    payload: {
-      name: serverName,
-      command,
-      args: (content.args as string[]) || [],
-      env: (content.env as Record<string, string>) || {},
-    },
-    title: 'Add MCP Request',
-    question: `Agent "${agentGroup.name}" is attempting to add a new MCP server:\n${serverName} (${command})`,
-  });
+
+  if (url) {
+    const type = (content.type as string) || 'http';
+    if (type !== 'http' && type !== 'sse') {
+      notifyAgent(session, 'add_mcp_server failed: type must be "http" or "sse" for URL-based servers.');
+      return;
+    }
+    await requestApproval({
+      session,
+      agentName: agentGroup.name,
+      action: 'add_mcp_server',
+      payload: {
+        name: serverName,
+        url,
+        type,
+        headers: (content.headers as Record<string, string>) || {},
+      },
+      title: 'Add MCP Request',
+      question: `Agent "${agentGroup.name}" is attempting to add a new remote MCP server:\n${serverName} (${url})`,
+    });
+  } else {
+    await requestApproval({
+      session,
+      agentName: agentGroup.name,
+      action: 'add_mcp_server',
+      payload: {
+        name: serverName,
+        command: command!,
+        args: (content.args as string[]) || [],
+        env: (content.env as Record<string, string>) || {},
+      },
+      title: 'Add MCP Request',
+      question: `Agent "${agentGroup.name}" is attempting to add a new MCP server:\n${serverName} (${command})`,
+    });
+  }
 }

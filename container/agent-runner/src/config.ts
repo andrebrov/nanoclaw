@@ -9,13 +9,17 @@ import fs from 'fs';
 
 const CONFIG_PATH = '/workspace/agent/container.json';
 
+export type McpServerEntry =
+  | { command: string; args: string[]; env: Record<string, string>; url?: never }
+  | { url: string; type: 'http' | 'sse'; headers?: Record<string, string>; command?: never };
+
 export interface RunnerConfig {
   provider: string;
   assistantName: string;
   groupName: string;
   agentGroupId: string;
   maxMessagesPerPrompt: number;
-  mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> }>;
+  mcpServers: Record<string, McpServerEntry>;
   /** True when the host granted admin observability (host-logs mounts + chat_status tool). */
   isAdmin: boolean;
 }
