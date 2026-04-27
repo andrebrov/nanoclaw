@@ -275,8 +275,12 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
 
     const engages = evaluateEngage(agent, messageText, isMention, mg, sessionThreadId);
 
+    // Gate evaluation order matters: gates may have side effects (drop-row
+    // writes, approval cards). We only run them when the engage decision
+    // would otherwise let the message through, to avoid spurious gate work
+    // for agents whose engage_mode already declined.
     const accessOk = engages && (!accessGate || accessGate(event, userId, mg, agent.agent_group_id).allowed);
-    const scopeOk = engages && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
+    const scopeOk = engages && accessOk && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
 
     if (engages && accessOk && scopeOk) {
       await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, true);
@@ -302,11 +306,16 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
           log.warn('adapter.subscribe failed', { channelType: event.channelType, threadId: event.threadId, err });
         });
       }
-    } else if (agent.ignored_message_policy === 'accumulate') {
+    } else if (!engages && agent.ignored_message_policy === 'accumulate') {
+      // Accumulate ONLY when the engage_mode declined — never when access
+      // or scope gates denied. A policy-denied user's message must not
+      // leak into the agent's session context just because some other
+      // agent on the same MG happens to have accumulate set; the access
+      // gate already recorded a dropped_messages row for the refusal.
       await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, false);
       accumulatedCount++;
     } else {
-      log.debug('Message not engaged for agent (drop policy)', {
+      log.debug('Message not delivered to agent', {
         agentGroupId: agent.agent_group_id,
         engage_mode: agent.engage_mode,
         engages,
