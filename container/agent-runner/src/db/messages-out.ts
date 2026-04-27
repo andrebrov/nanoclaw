@@ -145,6 +145,19 @@ export function getRoutingBySeq(
   return outRow ?? null;
 }
 
+/**
+ * Check whether the host has recorded a delivery result for an outbound message.
+ * Returns 'delivered' / 'failed' once the host writes to inbound.db's delivered
+ * table, or null while the row hasn't appeared yet.
+ */
+export function getDeliveryStatus(messageOutId: string): 'delivered' | 'failed' | null {
+  const row = getInboundDb()
+    .prepare('SELECT status FROM delivered WHERE message_out_id = ?')
+    .get(messageOutId) as { status: string } | undefined;
+  if (!row) return null;
+  return row.status === 'failed' ? 'failed' : 'delivered';
+}
+
 /** Get undelivered messages (for host polling — reads from outbound.db). */
 export function getUndeliveredMessages(): MessageOutRow[] {
   return getOutboundDb()

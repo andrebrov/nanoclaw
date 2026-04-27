@@ -231,27 +231,47 @@ async function drainSession(session: Session): Promise<void> {
           pauseTypingRefreshAfterDelivery(session.id);
         }
       } catch (err) {
-        const attempts = (retry?.attempts ?? 0) + 1;
-        if (attempts >= MAX_DELIVERY_ATTEMPTS) {
-          log.error('Message delivery failed permanently, giving up', {
+        // Reactions are cosmetic — fail immediately with no backoff retries so
+        // the container's waitForDelivery() gets a fast answer. The agent can
+        // then surface a clear error to the user rather than waiting on a
+        // series of retries that will also fail (e.g. bot lacking permissions).
+        let isReaction = false;
+        try {
+          isReaction = (JSON.parse(msg.content) as Record<string, unknown>).operation === 'reaction';
+        } catch {
+          /* not JSON or missing operation — treat as non-reaction */
+        }
+        if (isReaction) {
+          log.warn('Reaction delivery failed (not retried)', {
             messageId: msg.id,
             sessionId: session.id,
-            attempts,
-            err,
+            err: err instanceof Error ? err.message : String(err),
           });
           markDeliveryFailed(inDb, msg.id);
           deliveryRetries.delete(msg.id);
         } else {
-          const backoff = nextBackoffMs(attempts);
-          deliveryRetries.set(msg.id, { attempts, nextRetryAt: Date.now() + backoff });
-          log.warn('Message delivery failed, will retry', {
-            messageId: msg.id,
-            sessionId: session.id,
-            attempt: attempts,
-            maxAttempts: MAX_DELIVERY_ATTEMPTS,
-            retryInMs: backoff,
-            err,
-          });
+          const attempts = (retry?.attempts ?? 0) + 1;
+          if (attempts >= MAX_DELIVERY_ATTEMPTS) {
+            log.error('Message delivery failed permanently, giving up', {
+              messageId: msg.id,
+              sessionId: session.id,
+              attempts,
+              err,
+            });
+            markDeliveryFailed(inDb, msg.id);
+            deliveryRetries.delete(msg.id);
+          } else {
+            const backoff = nextBackoffMs(attempts);
+            deliveryRetries.set(msg.id, { attempts, nextRetryAt: Date.now() + backoff });
+            log.warn('Message delivery failed, will retry', {
+              messageId: msg.id,
+              sessionId: session.id,
+              attempt: attempts,
+              maxAttempts: MAX_DELIVERY_ATTEMPTS,
+              retryInMs: backoff,
+              err,
+            });
+          }
         }
       }
     }

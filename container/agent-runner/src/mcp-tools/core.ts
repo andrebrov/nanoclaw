@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { findByName, getAllDestinations } from '../destinations.js';
-import { getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
+import { getDeliveryStatus, getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
 import { registerTools } from './server.js';
 import type { McpToolDefinition } from './types.js';
@@ -35,6 +35,27 @@ function destinationList(): string {
   const all = getAllDestinations();
   if (all.length === 0) return '(none)';
   return all.map((d) => d.name).join(', ');
+}
+
+/**
+ * Poll inbound.db until the host records a delivery result for `messageOutId`,
+ * or until `timeoutMs` elapses.
+ *
+ * The host's active delivery loop runs every ~1 s, so delivery normally
+ * appears within 1–2 s. A 5 s timeout gives reasonable headroom for slow
+ * network round-trips to the platform API while keeping the tool responsive.
+ */
+async function waitForDelivery(
+  messageOutId: string,
+  timeoutMs = 5000,
+): Promise<'delivered' | 'failed' | 'timeout'> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise<void>((r) => setTimeout(r, 250));
+    const status = getDeliveryStatus(messageOutId);
+    if (status !== null) return status;
+  }
+  return 'timeout';
 }
 
 /**
@@ -380,6 +401,14 @@ export const addReaction: McpToolDefinition = {
     });
 
     log(`add_reaction: #${seq} → ${rawEmoji}${rawEmoji === emoji ? '' : ` (→ ${emoji})`} on ${platformId}`);
+
+    const deliveryStatus = await waitForDelivery(id);
+    if (deliveryStatus === 'delivered') {
+      return ok(`Reaction added to message #${seq}`);
+    }
+    if (deliveryStatus === 'failed') {
+      return err(`Reaction delivery failed for #${seq} — the platform rejected it (wrong permissions or unsupported emoji). Check server logs for details.`);
+    }
     return ok(`Reaction queued for #${seq}`);
   },
 };

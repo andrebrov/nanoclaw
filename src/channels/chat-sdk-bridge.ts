@@ -366,32 +366,15 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       }
 
       if (content.operation === 'reaction' && content.messageId && content.emoji) {
-        // Reactions are cosmetic — never block chat replies behind them, and
-        // never let the host's retry loop re-deliver them. Two real failure
-        // modes seen in the wild:
-        //   1. Forum-topic supergroups where the bot lacks the
-        //      "send_messages_to_topics + send_reactions" permission combo,
-        //      so Telegram returns "Bad Request: message to react not found"
-        //      (misleading error code — the message exists; reactions don't).
-        //   2. Inbound message id format includes the host's per-agent suffix
-        //      (`<chatId>:<msgId>:<agentGroupId>`) when emitted from the
-        //      agent-runner; some adapters can't parse the suffix.
-        // Strip a trailing ":ag-..." segment if present, then call addReaction
-        // with the raw `<chatId>:<msgId>` shape the adapter expects. On any
-        // failure, log a warn and return success so delivery.ts marks the
-        // outbound row delivered and stops retrying.
+        // Strip the host's per-agent suffix (`<chatId>:<msgId>:<agentGroupId>`)
+        // before calling addReaction — adapters expect the raw `<chatId>:<msgId>`
+        // shape the platform uses.
+        // Errors propagate to delivery.ts, which marks reactions as failed
+        // immediately (no retry backoff) so the container tool can report the
+        // failure back to the agent.
         const rawId = content.messageId as string;
         const stripped = rawId.replace(/:(ag-[A-Za-z0-9-]+)$/, '');
-        try {
-          await adapter.addReaction(tid, stripped, content.emoji as string);
-        } catch (err) {
-          log.warn('Reaction delivery failed (non-fatal — not retried)', {
-            adapter: adapter.name,
-            messageId: stripped,
-            emoji: content.emoji,
-            err: err instanceof Error ? err.message : String(err),
-          });
-        }
+        await adapter.addReaction(tid, stripped, content.emoji as string);
         return;
       }
 

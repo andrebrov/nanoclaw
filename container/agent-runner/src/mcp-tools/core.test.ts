@@ -2,7 +2,8 @@
  * Regression tests for add_reaction and edit_message MCP tools.
  *
  * Verifies that the tool handlers write correctly-shaped outbound rows so
- * the chat-sdk-bridge can deliver reactions and edits to the platform.
+ * the chat-sdk-bridge can deliver reactions and edits to the platform, and
+ * that add_reaction waits for and reports the actual delivery result.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
@@ -47,14 +48,27 @@ function seedOutbound(seq: number, id: string, platformMsgId: string): void {
     .run(id, platformMsgId);
 }
 
+// Simulate the host marking a reaction as delivered/failed by writing to inbound.db.
+function simulateDelivery(messageOutId: string, status: 'delivered' | 'failed'): void {
+  getInboundDb()
+    .prepare(
+      `INSERT INTO delivered (message_out_id, platform_message_id, status, delivered_at)
+       VALUES (?, NULL, ?, datetime('now'))`,
+    )
+    .run(messageOutId, status);
+}
+
 describe('add_reaction', () => {
-  it('writes an outbound reaction row for an inbound message', async () => {
+  it('writes an outbound reaction row and returns success when host delivers it', async () => {
     // messages_in.id includes the :<agentGroupId> suffix that messageIdForAgent adds.
     seedInbound(2, 'tg-chat-123:42:ag-test-group');
 
-    const result = await addReaction.handler({ messageId: 2, emoji: 'thumbs_up' });
+    // Start the handler — it writes to outbound.db synchronously, then polls
+    // inbound.db for delivery confirmation.
+    const resultPromise = addReaction.handler({ messageId: 2, emoji: 'thumbs_up' });
 
-    expect(result.isError).toBeFalsy();
+    // The outbound row is written synchronously before the first await, so we
+    // can find it immediately and simulate the host delivering it.
     const out = getUndeliveredMessages();
     expect(out).toHaveLength(1);
     const content = JSON.parse(out[0].content);
@@ -65,14 +79,34 @@ describe('add_reaction', () => {
     expect(content.messageId).toBe('tg-chat-123:42:ag-test-group');
     expect(out[0].channel_type).toBe('telegram');
     expect(out[0].platform_id).toBe('tg-chat-123');
+
+    // Simulate the host delivering the reaction.
+    simulateDelivery(out[0].id, 'delivered');
+
+    const result = await resultPromise;
+    expect(result.isError).toBeFalsy();
+    expect((result.content[0] as { text: string }).text).toContain('Reaction added');
+  });
+
+  it('returns an error when the host marks the reaction as failed', async () => {
+    seedInbound(2, 'tg-chat-123:42:ag-test-group');
+
+    const resultPromise = addReaction.handler({ messageId: 2, emoji: 'thumbs_up' });
+
+    // Wait for the outbound row to appear, then simulate a delivery failure.
+    const out = getUndeliveredMessages();
+    simulateDelivery(out[0].id, 'failed');
+
+    const result = await resultPromise;
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('#2');
   });
 
   it('writes an outbound reaction row for an outbound (already-delivered) message', async () => {
     seedOutbound(1, 'out-msg-id', 'tg-chat-123:99');
 
-    const result = await addReaction.handler({ messageId: 1, emoji: 'heart' });
+    const resultPromise = addReaction.handler({ messageId: 1, emoji: 'heart' });
 
-    expect(result.isError).toBeFalsy();
     const out = getUndeliveredMessages().filter((m) => {
       const c = JSON.parse(m.content);
       return c.operation === 'reaction';
@@ -81,6 +115,10 @@ describe('add_reaction', () => {
     const content = JSON.parse(out[0].content);
     expect(content.messageId).toBe('tg-chat-123:99'); // platform ID from delivered table
     expect(content.emoji).toBe('❤');
+
+    simulateDelivery(out[0].id, 'delivered');
+    const result = await resultPromise;
+    expect(result.isError).toBeFalsy();
   });
 
   it('returns an error for an unknown seq', async () => {
