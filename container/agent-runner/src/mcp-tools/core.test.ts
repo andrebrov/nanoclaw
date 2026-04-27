@@ -59,7 +59,7 @@ describe('add_reaction', () => {
     expect(out).toHaveLength(1);
     const content = JSON.parse(out[0].content);
     expect(content.operation).toBe('reaction');
-    expect(content.emoji).toBe('thumbs_up');
+    expect(content.emoji).toBe('👍');
     // The compound ID is forwarded verbatim; the chat-sdk-bridge strips the
     // ":ag-..." suffix before calling adapter.addReaction.
     expect(content.messageId).toBe('tg-chat-123:42:ag-test-group');
@@ -80,7 +80,7 @@ describe('add_reaction', () => {
     expect(out).toHaveLength(1);
     const content = JSON.parse(out[0].content);
     expect(content.messageId).toBe('tg-chat-123:99'); // platform ID from delivered table
-    expect(content.emoji).toBe('heart');
+    expect(content.emoji).toBe('❤');
   });
 
   it('returns an error for an unknown seq', async () => {
