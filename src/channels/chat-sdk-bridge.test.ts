@@ -105,7 +105,7 @@ describe('createChatSdkBridge deliver — reaction', () => {
     expect(addReactionCalls[0].threadId).toBe('tg-chat-123');
   });
 
-  it('returns undefined (not retried) even when adapter.addReaction throws', async () => {
+  it('propagates adapter.addReaction errors to the delivery layer', async () => {
     const bridge = createChatSdkBridge({
       adapter: stubAdapter({
         addReaction: vi.fn(async () => {
@@ -119,8 +119,8 @@ describe('createChatSdkBridge deliver — reaction', () => {
       kind: 'chat',
       content: { operation: 'reaction', messageId: 'tg-chat-123:55', emoji: 'heart' },
     };
-    // Must not throw — reaction failures are non-fatal (see comment in chat-sdk-bridge.ts)
-    const result = await bridge.deliver('tg-chat-123', null, msg);
-    expect(result).toBeUndefined();
+    // Errors must propagate — delivery.ts marks reactions as failed immediately
+    // so the container tool can report the failure back to the agent.
+    await expect(bridge.deliver('tg-chat-123', null, msg)).rejects.toThrow('Bad Request: message to react not found');
   });
 });
