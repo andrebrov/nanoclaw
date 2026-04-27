@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
 import { initTestSessionDb, closeSessionDb, getInboundDb, getOutboundDb } from './db/connection.js';
-import { getPendingMessages, markCompleted } from './db/messages-in.js';
+import { getPendingMessages, markCompleted, markProcessing } from './db/messages-in.js';
 import { getUndeliveredMessages } from './db/messages-out.js';
 import { formatMessages, extractRouting } from './formatter.js';
 import { MockProvider } from './providers/mock.js';
@@ -244,5 +244,44 @@ describe('end-to-end with mock provider', () => {
     expect(outMessages).toHaveLength(1);
     expect(JSON.parse(outMessages[0].content).text).toBe('The answer is 4');
     expect(outMessages[0].in_reply_to).toBe('m1');
+  });
+});
+
+describe('concurrent-access protection (no duplicate processing)', () => {
+  it('messages claimed by processing_ack are invisible to concurrent getPendingMessages', () => {
+    // This is the v2 architectural guarantee that prevents the race condition
+    // described in issue #56: all inbound messages go through a single
+    // agent-runner queue, and processing_ack acts as a distributed lock.
+    insertMessage('m1', 'chat', { sender: 'User', text: 'hello' });
+
+    // m1 is pending and visible to any reader
+    expect(getPendingMessages()).toHaveLength(1);
+
+    // Simulate the poll loop claiming m1 for processing
+    markProcessing(['m1']);
+
+    // A concurrent reader (e.g., a hypothetical check-unanswered scan) must
+    // not see m1 — processing_ack filters it out regardless of its status.
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('completed messages remain invisible after markCompleted', () => {
+    insertMessage('m1', 'chat', { sender: 'User', text: 'hello' });
+
+    markProcessing(['m1']);
+    markCompleted(['m1']);
+
+    expect(getPendingMessages()).toHaveLength(0);
+  });
+
+  it('a new message is visible while an older one is being processed', () => {
+    insertMessage('m1', 'chat', { sender: 'User', text: 'first' });
+    markProcessing(['m1']);
+
+    insertMessage('m2', 'chat', { sender: 'User', text: 'second' });
+
+    const pending = getPendingMessages();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].id).toBe('m2');
   });
 });
