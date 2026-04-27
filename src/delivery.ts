@@ -58,6 +58,7 @@ export interface ChannelDeliveryAdapter {
     kind: string,
     content: string,
     files?: OutboundFile[],
+    replyToId?: string | null,
   ): Promise<string | undefined>;
   setTyping?(channelType: string, platformId: string, threadId: string | null): Promise<void>;
 }
@@ -239,6 +240,7 @@ async function deliverMessage(
     platform_id: string | null;
     channel_type: string | null;
     thread_id: string | null;
+    in_reply_to: string | null;
     content: string;
   },
   session: Session,
@@ -358,6 +360,7 @@ async function deliverMessage(
     msg.kind,
     msg.content,
     files,
+    msg.in_reply_to,
   );
   log.info('Message delivered', {
     id: msg.id,

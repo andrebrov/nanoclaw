@@ -217,6 +217,7 @@ export interface OutboundMessage {
   platform_id: string | null;
   channel_type: string | null;
   thread_id: string | null;
+  in_reply_to: string | null;
   content: string;
 }
 

@@ -94,6 +94,8 @@ export interface OutboundMessage {
   kind: string;
   content: unknown; // parsed JSON from messages_out
   files?: OutboundFile[]; // file attachments from the session outbox
+  /** Platform message ID of the message being replied to, if any. */
+  replyToId?: string | null;
 }
 
 /** Discovered conversation info (from syncConversations). */
