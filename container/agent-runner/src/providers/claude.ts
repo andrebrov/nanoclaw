@@ -41,16 +41,12 @@ const SDK_DISALLOWED_TOOLS = [
   'ExitWorktree',
 ];
 
-// Tool allowlist for NanoClaw agent containers
-const TOOL_ALLOWLIST = [
-  'Bash',
+// Safe default tools: read-only filesystem access + agent communication.
+// These are available to every agent regardless of allowedCapabilities.
+const BASE_TOOLS = [
   'Read',
-  'Write',
-  'Edit',
   'Glob',
   'Grep',
-  'WebSearch',
-  'WebFetch',
   'Task',
   'TaskOutput',
   'TaskStop',
@@ -60,9 +56,24 @@ const TOOL_ALLOWLIST = [
   'TodoWrite',
   'ToolSearch',
   'Skill',
-  'NotebookEdit',
   'mcp__nanoclaw__*',
 ];
+
+// Tools unlocked by explicit capability grants in container.json.
+const CAPABILITY_TOOLS: Record<string, string[]> = {
+  shell_exec: ['Bash'],
+  file_write: ['Write', 'Edit', 'NotebookEdit'],
+  network: ['WebSearch', 'WebFetch'],
+};
+
+/**
+ * Build the tool allowlist for a given capability set.
+ * Returns BASE_TOOLS plus any extra tools unlocked by the granted capabilities.
+ */
+function buildToolAllowlist(allowedCapabilities: string[]): string[] {
+  const extra = allowedCapabilities.flatMap((cap) => CAPABILITY_TOOLS[cap] ?? []);
+  return [...BASE_TOOLS, ...extra];
+}
 
 interface SDKUserMessage {
   type: 'user';
@@ -324,11 +335,13 @@ export class ClaudeProvider implements AgentProvider {
   private mcpServers: Record<string, McpServerConfig>;
   private env: Record<string, string | undefined>;
   private additionalDirectories?: string[];
+  private toolAllowlist: string[];
 
   constructor(options: ProviderOptions = {}) {
     this.assistantName = options.assistantName;
     this.mcpServers = options.mcpServers ?? {};
     this.additionalDirectories = options.additionalDirectories;
+    this.toolAllowlist = buildToolAllowlist(options.allowedCapabilities ?? []);
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude
     // subprocess — it spawns with a filtered/sanitized env. Symptom when
@@ -370,7 +383,7 @@ export class ClaudeProvider implements AgentProvider {
         systemPrompt: instructions
           ? { type: 'preset' as const, preset: 'claude_code' as const, append: instructions }
           : undefined,
-        allowedTools: TOOL_ALLOWLIST,
+        allowedTools: this.toolAllowlist,
         disallowedTools: SDK_DISALLOWED_TOOLS,
         env: this.env,
         permissionMode: 'bypassPermissions',

@@ -42,6 +42,19 @@ export interface AdditionalMountConfig {
   readonly?: boolean;
 }
 
+/**
+ * Capabilities that must be explicitly granted before the agent may use the
+ * corresponding tools. Omitting this field (or leaving it empty) keeps the
+ * agent in the safe default: read-only filesystem access, no shell, no
+ * outbound network calls — only NanoClaw MCP tools and read operations.
+ *
+ * Valid entries:
+ *   "shell_exec"  — Bash
+ *   "file_write"  — Write, Edit, NotebookEdit
+ *   "network"     — WebSearch, WebFetch
+ */
+export type AgentCapability = 'shell_exec' | 'file_write' | 'network';
+
 export interface ContainerConfig {
   mcpServers: Record<string, McpServerConfig>;
   packages: { apt: string[]; npm: string[] };
@@ -65,6 +78,12 @@ export interface ContainerConfig {
    * Only set on designated admin agent groups.
    */
   isAdmin?: boolean;
+  /**
+   * Opt-in capabilities beyond the safe default. Missing or empty array means
+   * the agent runs in restricted mode: no shell, no file writes, no network.
+   * See AgentCapability for valid values.
+   */
+  allowedCapabilities?: AgentCapability[];
 }
 
 function emptyConfig(): ContainerConfig {
@@ -106,6 +125,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
       isAdmin: raw.isAdmin,
+      allowedCapabilities: raw.allowedCapabilities,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

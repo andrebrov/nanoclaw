@@ -25,6 +25,12 @@ export interface ProviderOptions {
   mcpServers?: Record<string, McpServerConfig>;
   env?: Record<string, string | undefined>;
   additionalDirectories?: string[];
+  /**
+   * Opt-in capabilities beyond the safe default. Missing or empty means
+   * restricted: no shell, no file writes, no network. Providers that
+   * understand capability-gating use this to build their tool allowlists.
+   */
+  allowedCapabilities?: string[];
 }
 
 export interface QueryInput {
