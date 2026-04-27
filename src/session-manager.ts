@@ -348,7 +348,15 @@ export function writeOutboundDirect(
           `INSERT OR IGNORE INTO messages_out (id, seq, timestamp, kind, platform_id, channel_type, thread_id, content)
            VALUES (?, ?, datetime('now'), ?, ?, ?, ?, ?)`,
         )
-        .run(message.id, nextSeq, message.kind, message.platformId, message.channelType, message.threadId, message.content);
+        .run(
+          message.id,
+          nextSeq,
+          message.kind,
+          message.platformId,
+          message.channelType,
+          message.threadId,
+          message.content,
+        );
       outDb.exec('COMMIT');
     } catch (err) {
       outDb.exec('ROLLBACK');

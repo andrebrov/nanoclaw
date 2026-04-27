@@ -91,37 +91,62 @@ export const addMcpServer: McpToolDefinition = {
   tool: {
     name: 'add_mcp_server',
     description:
-      'Wire an EXISTING third-party MCP server into YOUR per-agent runtime config — you must already know the exact `command` + `args` to invoke it (e.g. `npx @modelcontextprotocol/server-github`). Requires admin approval; fire-and-forget.',
+      'Wire an EXISTING third-party MCP server into YOUR per-agent runtime config. For local process servers provide `command` + `args`. For remote HTTP/SSE servers (e.g. `https://mcp.granola.ai/mcp`) provide `url` and optionally `type` ("http" or "sse", default "http") and `headers`. Requires admin approval; fire-and-forget.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         name: { type: 'string', description: 'MCP server name (unique identifier)' },
-        command: { type: 'string', description: 'Command to run the MCP server' },
-        args: { type: 'array', items: { type: 'string' }, description: 'Command arguments' },
-        env: { type: 'object', description: 'Environment variables for the server' },
+        command: { type: 'string', description: 'Command to run a local stdio MCP server (e.g. `npx @modelcontextprotocol/server-github`)' },
+        args: { type: 'array', items: { type: 'string' }, description: 'Command arguments (local servers only)' },
+        env: { type: 'object', description: 'Environment variables for local servers' },
+        url: { type: 'string', description: 'URL of a remote HTTP or SSE MCP server' },
+        type: {
+          type: 'string',
+          enum: ['http', 'sse'],
+          description: 'Transport type for remote servers: "http" (Streamable HTTP, default) or "sse"',
+        },
+        headers: { type: 'object', description: 'HTTP headers for remote servers (e.g. Authorization: Bearer <token>)' },
       },
-      required: ['name', 'command'],
+      required: ['name'],
     },
   },
   async handler(args) {
     const name = args.name as string;
-    const command = args.command as string;
-    if (!name || !command) return err('name and command are required');
+    const command = args.command as string | undefined;
+    const url = args.url as string | undefined;
+    if (!name) return err('name is required');
+    if (!command && !url) return err('either command (for local servers) or url (for remote servers) is required');
 
     const requestId = generateId();
-    writeMessageOut({
-      id: requestId,
-      kind: 'system',
-      content: JSON.stringify({
-        action: 'add_mcp_server',
-        name,
-        command,
-        args: (args.args as string[]) || [],
-        env: (args.env as Record<string, string>) || {},
-      }),
-    });
-
-    log(`add_mcp_server: ${requestId} → "${name}" (${command})`);
+    if (url) {
+      const type = (args.type as string) || 'http';
+      if (type !== 'http' && type !== 'sse') return err('type must be "http" or "sse"');
+      writeMessageOut({
+        id: requestId,
+        kind: 'system',
+        content: JSON.stringify({
+          action: 'add_mcp_server',
+          name,
+          url,
+          type,
+          headers: (args.headers as Record<string, string>) || {},
+        }),
+      });
+      log(`add_mcp_server: ${requestId} → "${name}" (${url})`);
+    } else {
+      writeMessageOut({
+        id: requestId,
+        kind: 'system',
+        content: JSON.stringify({
+          action: 'add_mcp_server',
+          name,
+          command: command!,
+          args: (args.args as string[]) || [],
+          env: (args.env as Record<string, string>) || {},
+        }),
+      });
+      log(`add_mcp_server: ${requestId} → "${name}" (${command})`);
+    }
     return ok(`MCP server request submitted. You will be notified when admin approves or rejects.`);
   },
 };

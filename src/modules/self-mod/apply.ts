@@ -72,11 +72,20 @@ export const applyAddMcpServer: ApprovalHandler = async ({ session, payload, use
     return;
   }
   updateContainerConfig(agentGroup.folder, (cfg) => {
-    cfg.mcpServers[payload.name as string] = {
-      command: payload.command as string,
-      args: (payload.args as string[]) || [],
-      env: (payload.env as Record<string, string>) || {},
-    };
+    const name = payload.name as string;
+    if (payload.url) {
+      cfg.mcpServers[name] = {
+        url: payload.url as string,
+        type: (payload.type as 'http' | 'sse') ?? 'http',
+        headers: (payload.headers as Record<string, string>) || undefined,
+      };
+    } else {
+      cfg.mcpServers[name] = {
+        command: payload.command as string,
+        args: (payload.args as string[]) || [],
+        env: (payload.env as Record<string, string>) || {},
+      };
+    }
   });
 
   killContainer(session.id, 'mcp server added');
