@@ -27,6 +27,7 @@ import { fileURLToPath } from 'url';
 
 import { loadConfig } from './config.js';
 import { buildSystemPromptAddendum } from './destinations.js';
+import { readSnapshot } from './db/session-snapshot.js';
 // Providers barrel — each enabled provider self-registers on import.
 // Provider skills append imports to providers/index.ts.
 import './providers/index.js';
@@ -78,6 +79,24 @@ async function main(): Promise<void> {
     }
   }
 
+  // Session snapshot: auto-saved before each message batch so a container
+  // crash doesn't lose in-flight context. Load it here and inject into
+  // the system prompt so the agent knows what it was processing when it
+  // last stopped. Distinct from the threshold-nuke checkpoint above —
+  // the snapshot is small and written by the poll-loop, not the agent.
+  let snapshotAddendum = '';
+  const snapshot = readSnapshot();
+  if (snapshot && !checkpointAddendum) {
+    log(`Session snapshot found — injecting into system context`);
+    snapshotAddendum =
+      `\n\n<session-snapshot>\n` +
+      `The container restarted since the last session. The following messages were ` +
+      `being processed when it stopped. Resume naturally — check CLAUDE.local.md ` +
+      `for persisted context:\n\n` +
+      `${snapshot.trim()}\n` +
+      `</session-snapshot>`;
+  }
+
   // Discover additional directories mounted at /workspace/extra/*
   const additionalDirectories: string[] = [];
   const extraBase = '/workspace/extra';
@@ -115,7 +134,11 @@ async function main(): Promise<void> {
   for (const [k, v] of Object.entries(process.env)) {
     if (v !== undefined) childEnv[k] = v;
   }
-  const mcpServers: Record<string, { command: string; args: string[]; env: Record<string, string> } | { url: string; type: 'http' | 'sse'; headers?: Record<string, string> }> = {
+  const mcpServers: Record<
+    string,
+    | { command: string; args: string[]; env: Record<string, string> }
+    | { url: string; type: 'http' | 'sse'; headers?: Record<string, string> }
+  > = {
     nanoclaw: {
       command: 'bun',
       args: ['run', mcpServerPath],
@@ -139,7 +162,7 @@ async function main(): Promise<void> {
   await runPollLoop({
     provider,
     cwd: CWD,
-    systemContext: { instructions: instructions + checkpointAddendum },
+    systemContext: { instructions: instructions + checkpointAddendum + snapshotAddendum },
   });
 }
 
