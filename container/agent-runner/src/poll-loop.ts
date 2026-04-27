@@ -395,16 +395,18 @@ async function processQuery(
         // Claude session with no prior context.
         setStoredSessionId(event.continuation);
       } else if (event.type === 'result') {
-        // A result — with or without text — means the turn is done. Mark
-        // the initial batch completed now so the host sweep doesn't see
-        // stale 'processing' claims while the query stays open for
-        // follow-up pushes. The agent may have responded via MCP
-        // (send_message) mid-turn, or the message may not need a response
-        // at all — either way the turn is finished.
-        markCompleted(initialBatchIds);
+        // Write the reply to messages_out BEFORE marking the batch completed
+        // in processing_ack. If the container crashes between the two writes,
+        // processing_ack stays 'processing' and the host sweep's crash-recovery
+        // path (resetStuckProcessingRows) can reset the message for retry. With
+        // the reverse order, the message would be marked complete with no reply
+        // in messages_out, silently dropping it. Both writes are synchronous
+        // SQLite calls so the window between them is negligible in normal
+        // operation — only a crash scenario is affected.
         if (event.text) {
           dispatchResultText(event.text, routing);
         }
+        markCompleted(initialBatchIds);
       } else if (event.type === 'threshold_warn') {
         const contextPct = Math.round(
           (event.tokens / parseInt(process.env.CLAUDE_CODE_MAX_CONTEXT_WINDOW || '200000', 10)) * 100,
