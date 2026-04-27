@@ -94,7 +94,11 @@ function resolveRouting(
 export const sendMessage: McpToolDefinition = {
   tool: {
     name: 'send_message',
-    description: 'Send a message to a named destination. If you have only one destination, you can omit `to`.',
+    description:
+      'Send a message to a named destination. If you have only one destination, you can omit `to`. ' +
+      "Pass `inReplyTo` (a message seq) to reply in that message's thread/topic — useful in forum-mode " +
+      'group chats where you want to thread your reply under a specific message rather than the ' +
+      "session's default thread.",
     inputSchema: {
       type: 'object' as const,
       properties: {
@@ -103,6 +107,14 @@ export const sendMessage: McpToolDefinition = {
           description: 'Destination name (e.g., "family", "worker-1"). Optional if you have only one destination.',
         },
         text: { type: 'string', description: 'Message content' },
+        inReplyTo: {
+          type: 'integer',
+          description:
+            'Optional message seq (the numeric id shown next to incoming messages) to thread the ' +
+            "reply under. Overrides the destination's default thread for this one message. Use when " +
+            'the user wrote in a specific topic and you want your reply in that same topic, not the ' +
+            "group's general thread.",
+        },
       },
       required: ['text'],
     },
@@ -114,17 +126,35 @@ export const sendMessage: McpToolDefinition = {
     const routing = resolveRouting(args.to as string | undefined);
     if ('error' in routing) return err(routing.error);
 
+    // Optional thread override: agent wants to reply in a specific message's
+    // thread (forum topic / Discord thread). Look up that message's thread_id
+    // and override routing.thread_id for this send. Falls back to a hard
+    // error if the seq doesn't exist — better than silently posting to the
+    // wrong thread.
+    let threadId = routing.thread_id;
+    let inReplyToId: string | null = null;
+    if (args.inReplyTo !== undefined && args.inReplyTo !== null) {
+      const seq = Number(args.inReplyTo);
+      if (!seq || seq <= 0) return err('inReplyTo must be a positive integer message seq');
+      const refRouting = getRoutingBySeq(seq);
+      if (!refRouting) return err(`inReplyTo: message #${seq} not found`);
+      threadId = refRouting.thread_id;
+      const refPlatformId = getMessageIdBySeq(seq);
+      if (refPlatformId) inReplyToId = refPlatformId;
+    }
+
     const id = generateId();
     const seq = writeMessageOut({
       id,
+      in_reply_to: inReplyToId,
       kind: 'chat',
       platform_id: routing.platform_id,
       channel_type: routing.channel_type,
-      thread_id: routing.thread_id,
+      thread_id: threadId,
       content: JSON.stringify({ text }),
     });
 
-    log(`send_message: #${seq} → ${routing.resolvedName}`);
+    log(`send_message: #${seq} → ${routing.resolvedName}${inReplyToId ? ` (reply to ${inReplyToId})` : ''}`);
     return ok(`Message sent to ${routing.resolvedName} (id: ${seq})`);
   },
 };
