@@ -12,6 +12,7 @@ import path from 'path';
 import { findByName, getAllDestinations } from '../destinations.js';
 import { getDeliveryStatus, getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
+import { getTurnReplyTo } from '../db/session-state.js';
 import { registerTools } from './server.js';
 import type { McpToolDefinition } from './types.js';
 
@@ -173,6 +174,10 @@ export const sendMessage: McpToolDefinition = {
       };
       const refPlatformMsgId = getMessageIdBySeq(refSeq);
       if (refPlatformMsgId) inReplyToId = refPlatformMsgId;
+    } else if (!args.to) {
+      // No explicit destination and no explicit inReplyTo: default to the
+      // triggering message of the current turn so replies thread correctly.
+      inReplyToId = getTurnReplyTo();
     }
 
     const id = generateId();

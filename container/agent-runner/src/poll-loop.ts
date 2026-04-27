@@ -5,7 +5,13 @@ import { findByName, getAllDestinations, type DestinationEntry } from './destina
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
-import { getStoredSessionId, setStoredSessionId, clearStoredSessionId } from './db/session-state.js';
+import {
+  getStoredSessionId,
+  setStoredSessionId,
+  clearStoredSessionId,
+  setTurnReplyTo,
+  clearTurnReplyTo,
+} from './db/session-state.js';
 import { scheduleSnapshotWrite, clearSnapshot } from './db/session-snapshot.js';
 import {
   formatMessages,
@@ -100,6 +106,14 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     scheduleSnapshotWrite(messages);
 
     const routing = extractRouting(messages);
+
+    // Publish the triggering message ID so MCP send_message can default
+    // in_reply_to correctly without the agent tracking it manually.
+    if (routing.inReplyTo) {
+      setTurnReplyTo(routing.inReplyTo);
+    } else {
+      clearTurnReplyTo();
+    }
 
     // Command handling: the host router gates filtered and unauthorized
     // admin commands before they reach the container. The only command
@@ -210,6 +224,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // Ensure completed even if processQuery ended without a result event
     // (e.g. stream closed unexpectedly).
     markCompleted(processingIds);
+    clearTurnReplyTo();
     log(`Completed ${ids.length} message(s)`);
   }
 }

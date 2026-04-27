@@ -37,3 +37,23 @@ export function setStoredSessionId(sessionId: string): void {
 export function clearStoredSessionId(): void {
   deleteValue(SDK_SESSION_KEY);
 }
+
+const TURN_REPLY_TO_KEY = 'turn_reply_to';
+
+/**
+ * The inReplyTo ID for the current turn — set by the poll-loop at the start of
+ * each turn from the last inbound message's ID, cleared at end of turn.
+ * Used by send_message as the default in_reply_to so replies thread correctly
+ * without the agent needing to track and pass the current message ID manually.
+ */
+export function getTurnReplyTo(): string | null {
+  return getValue(TURN_REPLY_TO_KEY) ?? null;
+}
+
+export function setTurnReplyTo(id: string): void {
+  setValue(TURN_REPLY_TO_KEY, id);
+}
+
+export function clearTurnReplyTo(): void {
+  deleteValue(TURN_REPLY_TO_KEY);
+}
