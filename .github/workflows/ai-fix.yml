@@ -56,24 +56,34 @@ jobs:
           # producing a diff.
           prompt: |
             You are an autonomous coding agent working on the NanoClaw
-            repository. The triggering GitHub issue's title and body are
-            in the conversation context above — read them carefully and
-            implement the requested change.
+            repository. You have been triggered by an `ai-fix` label being
+            added to GitHub issue **#${{ github.event.issue.number }}**:
+
+              Title: ${{ github.event.issue.title }}
+
+            That is the ONE issue you must work on. Do not run
+            `gh issue list` to "find" the issue — the workflow told you
+            which one. Multiple ai-fix runs fire in parallel; if you pick
+            from `gh issue list` you will collide with sibling runs and
+            multiple branches end up targeting the same issue while
+            others get nothing.
+
+            Read the full body via `gh issue view ${{ github.event.issue.number }}`
+            before making any code edits.
 
             The CI runner is Ubuntu, the working tree is checked out at
             HEAD of `main`, and `gh` CLI is pre-installed and pre-auth'd
             via `GITHUB_TOKEN` env var.
 
             Mandatory steps, in order:
-              1. Read the issue body. The issue number is in the env var
-                 `$GITHUB_REF_NAME` is wrong — get it from the issue
-                 title in context, or run
-                 `gh issue list --label ai-fix --state open --json number,title`
-                 to find the most recent.
+              1. `gh issue view ${{ github.event.issue.number }}` — read
+                 the full issue body. Use this issue number (referred to
+                 as `<N>` below) in every subsequent step.
               2. Create a fresh branch off main:
                  `git checkout -b claude/issue-<N>-<short-slug>`
-                 (branch name MUST start with `claude/` so notify-pr.yml
-                 picks it up).
+                 (branch name MUST start with `claude/issue-<N>-` so
+                 notify-pr.yml picks it up and so we can map the branch
+                 back to the triggering issue without ambiguity).
               3. Use Read/Glob/Grep to locate relevant files. Read
                  CLAUDE.md and CONTRIBUTING.md before editing.
               4. Make the smallest correct edit. No drive-by refactors.
