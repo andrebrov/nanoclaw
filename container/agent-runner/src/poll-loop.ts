@@ -300,6 +300,13 @@ async function processQuery(
   let queryContinuation: string | undefined;
   let done = false;
 
+  // Replay buffer for compaction recovery. SDK auto-compaction wipes the
+  // turn's prior messages and replaces them with a summary; the agent must
+  // be re-prompted to actually answer post-compaction. Track every prompt
+  // we sent (initial + follow-ups pushed by the active poll) so the
+  // recovery path replays all of them, not just the initial batch.
+  const pushedPrompts: string[] = [prompt];
+
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open is
   // strictly cheaper than close+reopen (no cold prompt cache, no reconnect).
@@ -335,9 +342,10 @@ async function processQuery(
         const newIds = newMessages.map((m) => m.id);
         markProcessing(newIds);
 
-        const prompt = formatMessages(newMessages);
+        const followUp = formatMessages(newMessages);
         log(`Pushing ${newMessages.length} follow-up message(s) into active query`);
-        query.push(prompt);
+        query.push(followUp);
+        pushedPrompts.push(followUp);
 
         markCompleted(newIds);
       }
@@ -400,9 +408,15 @@ async function processQuery(
         process.exit(75);
       } else if (event.type === 'compaction') {
         // SDK auto-compact fired (window set to 9M so this should not happen
-        // in practice). Re-submit the prompt so the agent actually answers.
-        log(`Compaction event: ${event.message} — re-submitting prompt`);
-        query.push(prompt);
+        // in practice). Compaction wipes the turn's prior messages and
+        // replaces them with a summary, so we must re-submit every prompt
+        // we sent so the agent answers them post-compaction. Replaying just
+        // the initial batch would silently drop any follow-up that arrived
+        // mid-turn via the active-poll push above.
+        log(`Compaction event: ${event.message} — replaying ${pushedPrompts.length} pushed prompt(s)`);
+        for (const p of pushedPrompts) {
+          query.push(p);
+        }
       }
     }
   } finally {
