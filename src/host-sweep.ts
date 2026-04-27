@@ -61,28 +61,37 @@ const BACKOFF_BASE_MS = 5000;
 export const MAX_CONSECUTIVE_FAILURES = 5;
 export const CIRCUIT_BREAKER_COOLDOWN_MS = 30 * 60 * 1000;
 
-// Keyed by agent group folder.
+// Keyed by "folder:session_name" so maintenance and default session slots
+// track failures independently — a crashing maintenance container does not
+// trip the circuit breaker for the user-facing default session.
 const consecutiveFailures = new Map<string, number>();
 const circuitBreakerUntil = new Map<string, number>();
 
-function isGroupInCooldown(folder: string): boolean {
-  const until = circuitBreakerUntil.get(folder);
+function sessionKey(folder: string, sessionName: string): string {
+  return `${folder}:${sessionName}`;
+}
+
+function isGroupInCooldown(folder: string, sessionName: string): boolean {
+  const key = sessionKey(folder, sessionName);
+  const until = circuitBreakerUntil.get(key);
   if (!until) return false;
   if (Date.now() >= until) {
-    circuitBreakerUntil.delete(folder);
-    consecutiveFailures.delete(folder);
+    circuitBreakerUntil.delete(key);
+    consecutiveFailures.delete(key);
     return false;
   }
   return true;
 }
 
-function recordGroupFailure(folder: string, groupName: string): void {
-  const count = (consecutiveFailures.get(folder) ?? 0) + 1;
-  consecutiveFailures.set(folder, count);
-  if (count >= MAX_CONSECUTIVE_FAILURES && !circuitBreakerUntil.has(folder)) {
-    circuitBreakerUntil.set(folder, Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS);
-    log.warn('Circuit breaker triggered — group entering cooldown', {
+function recordGroupFailure(folder: string, sessionName: string, groupName: string): void {
+  const key = sessionKey(folder, sessionName);
+  const count = (consecutiveFailures.get(key) ?? 0) + 1;
+  consecutiveFailures.set(key, count);
+  if (count >= MAX_CONSECUTIVE_FAILURES && !circuitBreakerUntil.has(key)) {
+    circuitBreakerUntil.set(key, Date.now() + CIRCUIT_BREAKER_COOLDOWN_MS);
+    log.warn('Circuit breaker triggered — session slot entering cooldown', {
       folder,
+      sessionName,
       groupName,
       failures: count,
       cooldownMs: CIRCUIT_BREAKER_COOLDOWN_MS,
@@ -91,8 +100,8 @@ function recordGroupFailure(folder: string, groupName: string): void {
   }
 }
 
-function resetGroupFailures(folder: string): void {
-  consecutiveFailures.delete(folder);
+function resetGroupFailures(folder: string, sessionName: string): void {
+  consecutiveFailures.delete(sessionKey(folder, sessionName));
 }
 
 function notifyMainGroup(failingFolder: string, failingGroupName: string): void {
@@ -218,8 +227,11 @@ async function sweepSession(session: Session): Promise<void> {
     }
 
     // 2. Skip kill/reset/wake while circuit breaker cooldown is active.
-    if (isGroupInCooldown(agentGroup.folder)) {
-      log.debug('Group in circuit breaker cooldown — skipping', { folder: agentGroup.folder });
+    if (isGroupInCooldown(agentGroup.folder, session.session_name)) {
+      log.debug('Session slot in circuit breaker cooldown — skipping', {
+        folder: agentGroup.folder,
+        sessionName: session.session_name,
+      });
       return;
     }
 
@@ -238,14 +250,18 @@ async function sweepSession(session: Session): Promise<void> {
     }
 
     if (hadFailure) {
-      recordGroupFailure(agentGroup.folder, agentGroup.name);
+      recordGroupFailure(agentGroup.folder, session.session_name, agentGroup.name);
     } else {
-      resetGroupFailures(agentGroup.folder);
+      resetGroupFailures(agentGroup.folder, session.session_name);
     }
 
     // 5. Wake a container if new work is due, nothing is running, and not in cooldown.
     const dueCount = countDueMessages(inDb);
-    if (dueCount > 0 && !isContainerRunning(session.id) && !isGroupInCooldown(agentGroup.folder)) {
+    if (
+      dueCount > 0 &&
+      !isContainerRunning(session.id) &&
+      !isGroupInCooldown(agentGroup.folder, session.session_name)
+    ) {
       log.info('Waking container for due messages', { sessionId: session.id, count: dueCount });
       await wakeContainer(session);
     }
