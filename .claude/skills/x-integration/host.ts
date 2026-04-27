@@ -11,6 +11,8 @@ import path from 'path';
 
 import { logger } from '../../../src/logger.js';
 
+const VALID_REQUEST_ID_RE = /^[A-Za-z0-9_-]+$/;
+
 interface SkillResult {
   success: boolean;
   message: string;
@@ -63,7 +65,11 @@ async function runScript(script: string, args: object): Promise<SkillResult> {
 function writeResult(dataDir: string, sourceGroup: string, requestId: string, result: SkillResult): void {
   const resultsDir = path.join(dataDir, 'ipc', sourceGroup, 'x_results');
   fs.mkdirSync(resultsDir, { recursive: true });
-  fs.writeFileSync(path.join(resultsDir, `${requestId}.json`), JSON.stringify(result));
+  const safeId = VALID_REQUEST_ID_RE.test(requestId) ? requestId : '_invalid_request';
+  if (safeId !== requestId) {
+    logger.warn({ requestId }, 'IPC requestId failed validation — writing to fallback');
+  }
+  fs.writeFileSync(path.join(resultsDir, `${safeId}.json`), JSON.stringify(result));
 }
 
 /**
