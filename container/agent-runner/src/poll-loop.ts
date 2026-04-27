@@ -6,6 +6,7 @@ import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } 
 import { writeMessageOut } from './db/messages-out.js';
 import { touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
 import { getStoredSessionId, setStoredSessionId, clearStoredSessionId } from './db/session-state.js';
+import { scheduleSnapshotWrite, clearSnapshot } from './db/session-snapshot.js';
 import {
   formatMessages,
   extractRouting,
@@ -92,6 +93,12 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     const ids = messages.map((m) => m.id);
     markProcessing(ids);
 
+    // Persist a snapshot of the incoming batch before handing off to the
+    // provider. If the container crashes mid-turn, the next startup loads
+    // this file and injects it into the system prompt so the agent knows
+    // what was in-flight. Debounced to absorb rapid message bursts.
+    scheduleSnapshotWrite(messages);
+
     const routing = extractRouting(messages);
 
     // Command handling: the host router gates filtered and unauthorized
@@ -105,6 +112,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
         log('Clearing session (resetting continuation)');
         continuation = undefined;
         clearStoredSessionId();
+        clearSnapshot();
         writeMessageOut({
           id: generateId(),
           kind: 'chat',
