@@ -328,7 +328,19 @@ function enforceRunningContainerSla(
   return true;
 }
 
-/** Reset stuck processing rows. Returns true if any claims were found and handled. */
+/**
+ * Reset stuck processing rows. Returns true only when actual work was done
+ * (a message was reset for retry or marked failed) — NOT just because stale
+ * processing_ack rows happen to exist in outbound.db.
+ *
+ * Why: the host cannot write to outbound.db (single-writer rule), so a
+ * dead container's 'processing' processing_ack rows persist until the next
+ * container starts and runs clearStaleProcessingAcks. After all matching
+ * messages_in rows have been marked 'failed', getMessageForRetry returns
+ * null for every claim — but the claim rows are still there. Returning
+ * `true` in that case meant every subsequent sweep tick reported a
+ * "failure" and tripped the circuit breaker for nothing.
+ */
 function resetStuckProcessingRows(
   inDb: Database.Database,
   outDb: Database.Database,
@@ -338,6 +350,7 @@ function resetStuckProcessingRows(
   const claims = getProcessingClaims(outDb);
   if (claims.length === 0) return false;
 
+  let didWork = false;
   for (const { message_id } of claims) {
     const msg = getMessageForRetry(inDb, message_id, 'pending');
     if (!msg) continue;
@@ -360,6 +373,7 @@ function resetStuckProcessingRows(
         reason,
       });
     }
+    didWork = true;
   }
-  return true;
+  return didWork;
 }
