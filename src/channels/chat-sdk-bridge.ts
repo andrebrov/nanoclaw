@@ -18,6 +18,7 @@ import {
   type ConcurrencyStrategy,
   type Message as ChatMessage,
 } from 'chat';
+import sharp from 'sharp';
 import { log } from '../log.js';
 import { SqliteStateAdapter } from '../state-sqlite.js';
 import { registerWebhookAdapter } from '../webhook-server.js';
@@ -99,6 +100,39 @@ export function splitForLimit(text: string, limit: number): string[] {
   return chunks;
 }
 
+const IMAGE_MAX_SIDE = 1024;
+const IMAGE_JPEG_QUALITY = 80;
+const RESIZABLE_MIME_TYPES = new Set(['image/jpeg', 'image/png']);
+
+/**
+ * Resize an image buffer so its longest side is ≤ IMAGE_MAX_SIDE.
+ * Outputs JPEG at IMAGE_JPEG_QUALITY. Returns the original buffer unchanged
+ * for non-image types or images already within the size limit.
+ */
+async function maybeResizeImage(
+  buffer: Buffer,
+  mimeType: string | undefined,
+): Promise<{ buffer: Buffer; mimeType: string; name?: string }> {
+  if (!mimeType || !RESIZABLE_MIME_TYPES.has(mimeType)) {
+    return { buffer, mimeType: mimeType ?? '' };
+  }
+  try {
+    const img = sharp(buffer);
+    const { width = 0, height = 0 } = await img.metadata();
+    if (Math.max(width, height) <= IMAGE_MAX_SIDE) {
+      return { buffer, mimeType };
+    }
+    const resized = await img
+      .resize({ width: IMAGE_MAX_SIDE, height: IMAGE_MAX_SIDE, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: IMAGE_JPEG_QUALITY })
+      .toBuffer();
+    return { buffer: resized, mimeType: 'image/jpeg', name: '.jpg' };
+  } catch (err) {
+    log.warn('Image resize failed, using original', { mimeType, err });
+    return { buffer, mimeType: mimeType ?? '' };
+  }
+}
+
 export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter {
   const { adapter } = config;
   const transformText = (t: string): string => (config.transformOutboundText ? config.transformOutboundText(t) : t);
@@ -147,8 +181,14 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
         };
         if (att.fetchData) {
           try {
-            const buffer = await att.fetchData();
-            entry.data = buffer.toString('base64');
+            const raw = await att.fetchData();
+            const resized = await maybeResizeImage(raw, att.mimeType);
+            entry.data = resized.buffer.toString('base64');
+            entry.mimeType = resized.mimeType || att.mimeType;
+            entry.size = resized.buffer.length;
+            if (resized.name && typeof entry.name === 'string') {
+              entry.name = entry.name.replace(/\.[^.]+$/, '') + resized.name;
+            }
             // Note: earlier we also wrote attachments to /workspace/agent/images/
             // and set `entry.localPath`, but that's a container path written
             // from host code — `EACCES: permission denied, mkdir
