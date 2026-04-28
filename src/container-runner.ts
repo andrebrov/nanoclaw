@@ -9,7 +9,16 @@ import path from 'path';
 
 import { OneCLI } from '@onecli-sh/sdk';
 
-import { CONTAINER_IMAGE, DATA_DIR, GROUPS_DIR, ONECLI_API_KEY, ONECLI_URL, TIMEZONE } from './config.js';
+import {
+  CONTAINER_IMAGE,
+  DATA_DIR,
+  DEFAULT_SESSION_NAME,
+  GROUPS_DIR,
+  MAX_CONCURRENT_CONTAINERS,
+  ONECLI_API_KEY,
+  ONECLI_URL,
+  TIMEZONE,
+} from './config.js';
 import { readContainerConfig, writeContainerConfig } from './container-config.js';
 import { CONTAINER_RUNTIME_BIN, hostGatewayArgs, readonlyMountArgs, stopContainer } from './container-runtime.js';
 import { composeGroupClaudeMd } from './claude-md-compose.js';
@@ -53,6 +62,40 @@ const activeContainers = new Map<string, { process: ChildProcess; containerName:
  */
 const wakePromises = new Map<string, Promise<void>>();
 
+/** Wake requests waiting for a free container slot. */
+interface PendingWake {
+  session: Session;
+  resolve: () => void;
+  reject: (err: unknown) => void;
+}
+const pendingWakeQueue: PendingWake[] = [];
+
+/**
+ * Resolver that returns true when a session belongs to the owner's main DM
+ * group. Wired from the orchestrator after DB init. Returns false (safe
+ * default) when not yet wired — so no session bypasses the cap at cold start.
+ */
+let isMainGroupResolver: ((session: Session) => boolean) | null = null;
+
+export function setIsMainGroupResolver(fn: (session: Session) => boolean): void {
+  isMainGroupResolver = fn;
+}
+
+/**
+ * Pure decision: given the current active-container count, cap, and session,
+ * return whether to spawn immediately, bypass the cap (main DM), or queue.
+ */
+export function evaluateConcurrencyAction(
+  activeCount: number,
+  cap: number,
+  session: Session,
+  resolver: ((session: Session) => boolean) | null,
+): 'spawn' | 'bypass' | 'queue' {
+  if (activeCount < cap) return 'spawn';
+  const isMainDm = session.session_name === DEFAULT_SESSION_NAME && (resolver?.(session) ?? false);
+  return isMainDm ? 'bypass' : 'queue';
+}
+
 export function getActiveContainerCount(): number {
   return activeContainers.size;
 }
@@ -64,6 +107,12 @@ export function isContainerRunning(sessionId: string): boolean {
 /**
  * Wake up a container for a session. If already running or mid-spawn, no-op
  * (the in-flight wake promise is reused).
+ *
+ * When the concurrency cap is saturated the wake is queued until a slot
+ * opens — except for the owner's main DM default session, which proceeds
+ * immediately so the owner always gets a response even when background tasks
+ * fill the cap. The bypass is intentionally limited to default (user-facing)
+ * sessions; maintenance sessions on the main group still queue normally.
  *
  * The container runs the v2 agent-runner which polls the session DB.
  */
@@ -77,11 +126,61 @@ export function wakeContainer(session: Session): Promise<void> {
     log.debug('Container wake already in-flight — joining existing promise', { sessionId: session.id });
     return existing;
   }
+
+  const concurrencyAction = evaluateConcurrencyAction(
+    activeContainers.size,
+    MAX_CONCURRENT_CONTAINERS,
+    session,
+    isMainGroupResolver,
+  );
+  if (concurrencyAction === 'queue') {
+    return new Promise<void>((resolve, reject) => {
+      pendingWakeQueue.push({ session, resolve, reject });
+      log.debug('Wake queued — at concurrency cap', {
+        sessionId: session.id,
+        queueLength: pendingWakeQueue.length,
+        cap: MAX_CONCURRENT_CONTAINERS,
+      });
+    });
+  }
+  if (concurrencyAction === 'bypass') {
+    const holders = [...activeContainers.keys()];
+    log.info('Main DM bypassing concurrency cap', {
+      sessionId: session.id,
+      cap: MAX_CONCURRENT_CONTAINERS,
+      holders,
+    });
+  }
+
+  return doSpawn(session);
+}
+
+function doSpawn(session: Session): Promise<void> {
   const promise = spawnContainer(session).finally(() => {
     wakePromises.delete(session.id);
   });
   wakePromises.set(session.id, promise);
   return promise;
+}
+
+/** Drain the pending wake queue after a container slot opens. */
+function drainWakeQueue(): void {
+  while (pendingWakeQueue.length > 0 && activeContainers.size < MAX_CONCURRENT_CONTAINERS) {
+    const item = pendingWakeQueue.shift()!;
+    const { session, resolve, reject } = item;
+
+    if (activeContainers.has(session.id)) {
+      resolve();
+      continue;
+    }
+    const existing = wakePromises.get(session.id);
+    if (existing) {
+      existing.then(resolve, reject);
+      continue;
+    }
+
+    doSpawn(session).then(resolve, reject);
+  }
 }
 
 async function spawnContainer(session: Session): Promise<void> {
@@ -168,6 +267,7 @@ async function spawnContainer(session: Session): Promise<void> {
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
     log.info('Container exited', { sessionId: session.id, code, containerName });
+    drainWakeQueue();
   });
 
   container.on('error', (err) => {
@@ -175,6 +275,7 @@ async function spawnContainer(session: Session): Promise<void> {
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
     log.error('Container spawn error', { sessionId: session.id, err });
+    drainWakeQueue();
   });
 }
 
