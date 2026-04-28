@@ -112,7 +112,7 @@ function sendObserverMessage(text: string): void {
  * Build the tool allowlist for a given capability set.
  * Returns BASE_TOOLS plus any extra tools unlocked by the granted capabilities.
  */
-function buildToolAllowlist(allowedCapabilities: string[]): string[] {
+export function buildToolAllowlist(allowedCapabilities: string[]): string[] {
   const extra = allowedCapabilities.flatMap((cap) => CAPABILITY_TOOLS[cap] ?? []);
   return [...BASE_TOOLS, ...extra];
 }

@@ -1,3 +1,6 @@
+import type { AgentCapability } from '../config.js';
+export type { AgentCapability } from '../config.js';
+
 export interface AgentProvider {
   /**
    * True if the provider's underlying SDK handles slash commands natively and
@@ -30,7 +33,7 @@ export interface ProviderOptions {
    * restricted: no shell, no file writes, no network. Providers that
    * understand capability-gating use this to build their tool allowlists.
    */
-  allowedCapabilities?: string[];
+  allowedCapabilities?: AgentCapability[];
 }
 
 export interface QueryInput {

@@ -13,6 +13,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { GROUPS_DIR } from './config.js';
+import { log } from './log.js';
 
 export type McpServerConfig =
   | {
@@ -86,13 +87,49 @@ export interface ContainerConfig {
   allowedCapabilities?: AgentCapability[];
 }
 
+const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
+const KNOWN_CAPABILITIES = new Set<string>(ALL_CAPABILITIES);
+
 function emptyConfig(): ContainerConfig {
   return {
     mcpServers: {},
     packages: { apt: [], npm: [] },
     additionalMounts: [],
     skills: 'all',
+    allowedCapabilities: [...ALL_CAPABILITIES],
   };
+}
+
+/**
+ * Validate and normalise a raw `allowedCapabilities` value from JSON.
+ *
+ * - Absent / undefined → permissive default (all caps), so pre-#61 installs
+ *   that omit the field continue to work exactly as before.
+ * - Non-array → loud warning, permissive default.
+ * - Array with unknown strings → warn for each unknown, drop them.
+ * - Empty array → restricted mode (intentional operator choice).
+ */
+function parseAllowedCapabilities(raw: unknown, source: string): AgentCapability[] {
+  if (raw === undefined || raw === null) {
+    return [...ALL_CAPABILITIES];
+  }
+  if (!Array.isArray(raw)) {
+    log.warn('[container-config] allowedCapabilities must be an array — ignoring and defaulting to permissive', {
+      source,
+      got: typeof raw,
+    });
+    return [...ALL_CAPABILITIES];
+  }
+  const result: AgentCapability[] = [];
+  for (const item of raw) {
+    const s = typeof item === 'string' ? item.trim().toLowerCase() : '';
+    if (KNOWN_CAPABILITIES.has(s)) {
+      result.push(s as AgentCapability);
+    } else {
+      log.warn('[container-config] unknown capability — ignored', { source, value: item });
+    }
+  }
+  return result;
 }
 
 function configPath(folder: string): string {
@@ -125,7 +162,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
       isAdmin: raw.isAdmin,
-      allowedCapabilities: raw.allowedCapabilities,
+      allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);
@@ -166,4 +203,45 @@ export function initContainerConfig(folder: string): boolean {
   if (fs.existsSync(p)) return false;
   writeContainerConfig(folder, emptyConfig());
   return true;
+}
+
+/**
+ * One-shot startup migration: backfill allowedCapabilities into any existing
+ * groups/<folder>/container.json files that pre-date PR #61 and therefore
+ * omit the field. Without this, those groups would silently lose Bash /
+ * Write / WebFetch on the next container restart.
+ *
+ * Safe to call repeatedly — skips files that already declare the field.
+ */
+export function backfillAllowedCapabilities(): void {
+  if (!fs.existsSync(GROUPS_DIR)) return;
+
+  const patched: string[] = [];
+
+  for (const entry of fs.readdirSync(GROUPS_DIR, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const p = configPath(entry.name);
+    if (!fs.existsSync(p)) continue;
+
+    let raw: Record<string, unknown>;
+    try {
+      raw = JSON.parse(fs.readFileSync(p, 'utf8')) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+
+    if (raw.allowedCapabilities !== undefined) continue;
+
+    raw.allowedCapabilities = [...ALL_CAPABILITIES];
+    try {
+      fs.writeFileSync(p, JSON.stringify(raw, null, 2) + '\n');
+      patched.push(entry.name);
+    } catch (err) {
+      log.warn('[container-config] backfill failed', { folder: entry.name, err });
+    }
+  }
+
+  if (patched.length > 0) {
+    log.info('[container-config] backfilled allowedCapabilities', { groups: patched });
+  }
 }

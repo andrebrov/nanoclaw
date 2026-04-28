@@ -19,6 +19,37 @@ export type McpServerEntry =
  */
 export type AgentCapability = 'shell_exec' | 'file_write' | 'network';
 
+const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
+const KNOWN_CAPABILITIES = new Set<string>(ALL_CAPABILITIES);
+
+/**
+ * Validate and normalise a raw allowedCapabilities value from container.json.
+ * Absent / null → permissive default so pre-#61 installs keep working.
+ * Non-array → logs warning, returns permissive default.
+ * Array with unknown strings → drops unknowns and warns.
+ */
+function parseAllowedCapabilities(raw: unknown): AgentCapability[] {
+  if (raw === undefined || raw === null) {
+    return [...ALL_CAPABILITIES];
+  }
+  if (!Array.isArray(raw)) {
+    console.error(
+      `[config] allowedCapabilities must be an array — ignoring and defaulting to permissive (got: ${typeof raw})`,
+    );
+    return [...ALL_CAPABILITIES];
+  }
+  const result: AgentCapability[] = [];
+  for (const item of raw) {
+    const s = typeof item === 'string' ? item.trim().toLowerCase() : '';
+    if (KNOWN_CAPABILITIES.has(s)) {
+      result.push(s as AgentCapability);
+    } else {
+      console.error(`[config] unknown capability '${String(item)}' — ignored`);
+    }
+  }
+  return result;
+}
+
 export interface RunnerConfig {
   provider: string;
   assistantName: string;
@@ -61,9 +92,7 @@ export function loadConfig(): RunnerConfig {
     maxMessagesPerPrompt: (raw.maxMessagesPerPrompt as number) || DEFAULT_MAX_MESSAGES,
     mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
     isAdmin: (raw.isAdmin as boolean) === true,
-    allowedCapabilities: Array.isArray(raw.allowedCapabilities)
-      ? (raw.allowedCapabilities as AgentCapability[])
-      : [],
+    allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities),
   };
 
   return _config;

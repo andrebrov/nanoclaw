@@ -8,6 +8,7 @@ import path from 'path';
 
 import { DATA_DIR } from './config.js';
 import { migrateGroupsToClaudeLocal } from './claude-md-compose.js';
+import { backfillAllowedCapabilities } from './container-config.js';
 import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
@@ -72,6 +73,8 @@ async function main(): Promise<void> {
 
   // 1b. One-time filesystem cutover — idempotent, no-op after first run.
   migrateGroupsToClaudeLocal();
+  // 1c. Backfill allowedCapabilities for pre-#61 groups that omit the field.
+  backfillAllowedCapabilities();
 
   // 2. Container runtime
   ensureContainerRuntimeRunning();
