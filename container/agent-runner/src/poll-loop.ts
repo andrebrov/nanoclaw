@@ -341,6 +341,12 @@ async function processQuery(
   // recovery path replays all of them, not just the initial batch.
   const pushedPrompts: string[] = [prompt];
 
+  // IDs of follow-up messages pushed mid-query. Marked completed at the
+  // query boundary (finally block) rather than immediately after push —
+  // if the container crashes mid-turn, they stay in 'processing' state and
+  // clearStaleProcessingAcks() on the next startup can reset them for retry.
+  const pushedIds: string[] = [];
+
   // Concurrent polling: push follow-ups into the active query as they arrive.
   // We do NOT force-end the stream on silence — keeping the query open is
   // strictly cheaper than close+reopen (no cold prompt cache, no reconnect).
@@ -380,8 +386,7 @@ async function processQuery(
         log(`Pushing ${newMessages.length} follow-up message(s) into active query`);
         query.push(followUp);
         pushedPrompts.push(followUp);
-
-        markCompleted(newIds);
+        pushedIds.push(...newIds);
       }
     } catch (err) {
       // Most likely the session DB was closed under us (test teardown).
@@ -468,6 +473,13 @@ async function processQuery(
   } finally {
     done = true;
     clearInterval(pollHandle);
+    // Drain at query boundary: mark all follow-ups pushed mid-turn completed now
+    // that the query has ended (normally or via exception). Deferring this from
+    // the push site means a container crash leaves them in 'processing' state,
+    // so clearStaleProcessingAcks() on the next startup can reset them for retry.
+    if (pushedIds.length > 0) {
+      markCompleted(pushedIds);
+    }
   }
 
   return { continuation: queryContinuation };
