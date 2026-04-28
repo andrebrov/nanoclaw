@@ -27,6 +27,7 @@ import { normalizeOptions } from './channels/ask-question.js';
 import { indexMessage } from './message-store.js';
 import { clearOutbox, openInboundDb, openOutboundDb, readOutboxFiles } from './session-manager.js';
 import { pauseTypingRefreshAfterDelivery, setTypingAdapter } from './modules/typing/index.js';
+import { notifyObserverReply } from './observer.js';
 import type { OutboundFile } from './channels/adapter.js';
 import type { Session } from './types.js';
 
@@ -246,6 +247,8 @@ async function drainSession(session: Session): Promise<void> {
         // shouldn't get a gap in their typing indicator for them.
         if (msg.kind !== 'system' && msg.channel_type !== 'agent') {
           pauseTypingRefreshAfterDelivery(session.id);
+          // Stop the watchdog — agent has replied, no more "Still working" pings.
+          notifyObserverReply(session.id);
         }
       } catch (err) {
         // Reactions are cosmetic — fail immediately with no backoff retries so
