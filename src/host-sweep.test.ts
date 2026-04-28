@@ -77,6 +77,7 @@ describe('decideStuckAction', () => {
         current_tool: 'Bash',
         tool_declared_timeout_ms: twoHrMs,
         tool_started_at: new Date(BASE - 45 * 60 * 1000).toISOString(),
+        declared_max_ms: null,
       },
       claims: [],
     });
@@ -128,6 +129,7 @@ describe('decideStuckAction', () => {
         current_tool: 'Bash',
         tool_declared_timeout_ms: tenMinMs,
         tool_started_at: new Date(BASE - 5 * 60 * 1000).toISOString(),
+        declared_max_ms: null,
       },
       claims: [claim('msg-1', 5 * 60 * 1000)],
     });
@@ -142,5 +144,39 @@ describe('decideStuckAction', () => {
       claims: [{ message_id: 'x', status_changed: 'not-a-date' }],
     });
     expect(res.action).toBe('ok');
+  });
+
+  it('stays alive when declared_max_ms covers a heartbeat older than 30 min', () => {
+    // extend_ceiling({ seconds: 3600 }) → declared_max_ms = 3600000
+    const res = decideStuckAction({
+      now: BASE,
+      // 45 min old — over the default ceiling, but under declared_max_ms
+      heartbeatMtimeMs: BASE - 45 * 60 * 1000,
+      containerState: {
+        current_tool: null,
+        tool_declared_timeout_ms: null,
+        tool_started_at: null,
+        declared_max_ms: 3600_000,
+      },
+      claims: [],
+    });
+    expect(res.action).toBe('ok');
+  });
+
+  it('kills when declared_max_ms is cleared and heartbeat is 35 min old', () => {
+    const res = decideStuckAction({
+      now: BASE,
+      heartbeatMtimeMs: BASE - 35 * 60 * 1000,
+      containerState: {
+        current_tool: null,
+        tool_declared_timeout_ms: null,
+        tool_started_at: null,
+        declared_max_ms: null,
+      },
+      claims: [],
+    });
+    expect(res.action).toBe('kill-ceiling');
+    if (res.action !== 'kill-ceiling') return;
+    expect(res.ceilingMs).toBe(ABSOLUTE_CEILING_MS);
   });
 });

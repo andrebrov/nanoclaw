@@ -46,6 +46,17 @@ Use `/workspace/memory/` for persistent private notes and structured data that s
 
 The `conversations/` folder in your workspace holds searchable transcripts of past sessions with this group. Use it to recall prior context when a request references something that happened before. For structured long-lived data, prefer dedicated files (`customers.md`, `preferences.md`, etc.); split any file over ~500 lines into a folder with an index.
 
+## Long-running tasks and the sweep ceiling
+
+The host sweep kills containers whose heartbeat file goes stale for more than 30 minutes. For tasks that will run longer than that — deep research, batch API calls, multi-stage pipelines — call `extend_ceiling` **before** the long phase begins:
+
+```
+extend_ceiling({ seconds: 3600 })   // declare up to 1 hour of headroom
+extend_ceiling({ seconds: 0 })      // clear the override when done
+```
+
+The host sweep uses `max(30 min, bash_timeout, declared_max_ms)` as the effective ceiling, so the Bash `timeout` arg and `extend_ceiling` work together. Use `extend_ceiling` for phases that span multiple tools or long gaps between Claude SDK events. See `scheduling.instructions.md` for the full guidance.
+
 ## API credentials and the vault proxy
 
 API credentials are managed by the OneCLI vault proxy (`HTTPS_PROXY`), not by environment variables. The proxy intercepts outbound HTTPS requests and injects the real credential into the `Authorization` or `x-api-key` header.

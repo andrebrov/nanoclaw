@@ -184,6 +184,7 @@ export interface ContainerState {
   current_tool: string | null;
   tool_declared_timeout_ms: number | null;
   tool_started_at: string | null;
+  declared_max_ms: number | null;
 }
 
 /**
@@ -196,7 +197,7 @@ export function getContainerState(outDb: Database.Database): ContainerState | nu
   try {
     const row = outDb
       .prepare(
-        `SELECT current_tool, tool_declared_timeout_ms, tool_started_at
+        `SELECT current_tool, tool_declared_timeout_ms, tool_started_at, declared_max_ms
            FROM container_state WHERE id = 1`,
       )
       .get() as ContainerState | undefined;

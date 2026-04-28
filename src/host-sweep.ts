@@ -142,6 +142,7 @@ export function decideStuckAction(args: {
 }): StuckDecision {
   const { now, heartbeatMtimeMs, containerState, claims } = args;
   const declaredBashMs = bashTimeoutMs(containerState);
+  const declaredMaxMs = containerState?.declared_max_ms ?? null;
 
   // Ceiling check only applies when we have an actual heartbeat timestamp.
   // A freshly-spawned container hasn't had any SDK activity yet so no
@@ -153,7 +154,7 @@ export function decideStuckAction(args: {
   // claim-stuck check below handles it.
   if (heartbeatMtimeMs !== 0) {
     const heartbeatAge = now - heartbeatMtimeMs;
-    const ceiling = Math.max(ABSOLUTE_CEILING_MS, declaredBashMs ?? 0);
+    const ceiling = Math.max(ABSOLUTE_CEILING_MS, declaredBashMs ?? 0, declaredMaxMs ?? 0);
     if (heartbeatAge > ceiling) {
       return { action: 'kill-ceiling', heartbeatAgeMs: heartbeatAge, ceilingMs: ceiling };
     }
