@@ -32,11 +32,13 @@ A core part of your job and the main thing that defines how useful you are to th
 
 ### Memory namespaces
 
-| Path | Scope | Access |
-|------|-------|--------|
-| `/workspace/agent/` | This agent only | Read-write |
-| `/workspace/memory/` | This agent only | Read-write (persists across sessions) |
-| `/workspace/global/` | All agents | Read-only |
+| Container path | Scope | Access | Host-side location |
+|----------------|-------|--------|--------------------|
+| `/workspace/agent/` | This agent only | Read-write | `groups/<folder>/` |
+| `/workspace/memory/` | This agent only | Read-write (persists across sessions) | `data/agent-memory/<agentGroupId>/` |
+| `/workspace/global/` | All agents | Read-only | `groups/global/` |
+
+`/workspace/memory/` and `/workspace/global/` are **siblings on the host** — the per-agent memory directory lives under `data/agent-memory/`, not inside `groups/global/`. This ensures no agent's private memory appears inside the read-only shared mount.
 
 Use `/workspace/memory/` for persistent private notes and structured data that should survive across sessions (separate from `CLAUDE.local.md` which is better for short configuration). Use `write_shared_memory` to explicitly publish something to the shared pool readable by all agents.
 

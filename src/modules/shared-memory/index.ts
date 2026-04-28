@@ -14,7 +14,7 @@ import { log } from '../../log.js';
 import type { Session } from '../../types.js';
 
 // Mirror of the container-side validation — must stay in sync.
-const SAFE_FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
+export const SAFE_FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
 async function handleWriteSharedMemory(content: Record<string, unknown>, session: Session): Promise<void> {
   const filename = content.filename as string;
@@ -34,6 +34,12 @@ async function handleWriteSharedMemory(content: Record<string, unknown>, session
   if (!fs.existsSync(globalDir)) fs.mkdirSync(globalDir, { recursive: true });
 
   const target = path.join(globalDir, filename);
+  // Belt-and-suspenders: confirm the resolved path is still inside globalDir
+  // even though the regex already prevents traversal characters.
+  if (!target.startsWith(globalDir + path.sep)) {
+    log.warn('write_shared_memory: resolved path escapes globalDir', { filename, target, sessionId: session.id });
+    return;
+  }
   if (mode === 'overwrite') {
     fs.writeFileSync(target, text, 'utf-8');
   } else {

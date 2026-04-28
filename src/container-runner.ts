@@ -373,8 +373,26 @@ function buildMounts(
   mounts.push({ hostPath: globalDir, containerPath: '/workspace/global', readonly: true });
 
   // Per-agent memory namespace — read-write, scoped to this agent group.
-  // Isolated from other agents; use write_shared_memory for cross-agent sharing.
-  const agentMemoryDir = path.join(globalDir, agentGroup.id);
+  // Lives under data/agent-memory/ NOT under groups/global/ so it is never
+  // visible inside the read-only /workspace/global mount shared across agents.
+  const agentMemoryDir = path.join(DATA_DIR, 'agent-memory', agentGroup.id);
+  // Migrate pre-existing data from the old location (groups/global/<id>/) if present.
+  const legacyMemoryDir = path.join(globalDir, agentGroup.id);
+  if (fs.existsSync(legacyMemoryDir)) {
+    if (!fs.existsSync(agentMemoryDir)) {
+      fs.mkdirSync(path.join(DATA_DIR, 'agent-memory'), { recursive: true });
+      fs.renameSync(legacyMemoryDir, agentMemoryDir);
+    } else {
+      // Both exist — move any files not yet in the new location, then remove legacy
+      // so it no longer appears under the read-only /workspace/global mount.
+      for (const entry of fs.readdirSync(legacyMemoryDir)) {
+        const src = path.join(legacyMemoryDir, entry);
+        const dst = path.join(agentMemoryDir, entry);
+        if (!fs.existsSync(dst)) fs.renameSync(src, dst);
+      }
+      fs.rmSync(legacyMemoryDir, { recursive: true });
+    }
+  }
   if (!fs.existsSync(agentMemoryDir)) fs.mkdirSync(agentMemoryDir, { recursive: true });
   mounts.push({ hostPath: agentMemoryDir, containerPath: '/workspace/memory', readonly: false });
 
