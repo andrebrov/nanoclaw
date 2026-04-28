@@ -8,6 +8,7 @@
  * Admin-only tools (observability) are dynamically imported after config load
  * so they are never registered in non-admin containers.
  */
+import './ceiling.js';
 import './core.js';
 import './scheduling.js';
 import './interactive.js';
