@@ -24,7 +24,8 @@ export async function runScript(script: string, taskId: string): Promise<ScriptR
     log(`task id contains invalid characters — skipping script execution`);
     return null;
   }
-  const scriptPath = path.join('/tmp', `task-script-${taskId}.sh`);
+  const ipcDir = process.env.TMPDIR || '/tmp';
+  const scriptPath = path.join(ipcDir, `task-script-${taskId}.sh`);
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
 
   return new Promise((resolve) => {

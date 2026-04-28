@@ -361,6 +361,26 @@ function readLatestTokens(transcriptPath: string): number {
   return 0;
 }
 
+// ── Thinking-only end_turn detection ──
+
+/**
+ * Returns true when the SDK result message represents a thinking-only end_turn:
+ * the model produced thinking blocks but no text output. The caller should
+ * clear the continuation anchor so the next turn starts fresh instead of
+ * resuming a session that will loop on empty replies.
+ */
+export function isThinkingOnlyEndTurn(message: unknown): boolean {
+  if (typeof message !== 'object' || message === null) return false;
+  const m = message as Record<string, unknown>;
+  return (
+    m.type === 'result' &&
+    m.subtype === 'success' &&
+    m.stop_reason === 'end_turn' &&
+    typeof m.result === 'string' &&
+    m.result.trim() === ''
+  );
+}
+
 // ── Provider ──
 
 /**
@@ -475,9 +495,7 @@ export class ClaudeProvider implements AgentProvider {
           yield { type: 'init', continuation: message.session_id };
           if (observerEnabled) {
             const promptPreview = input.prompt.slice(0, 150).replace(/\s+/g, ' ');
-            sendObserverMessage(
-              `[query:start] ${promptPreview}${input.prompt.length > 150 ? '...' : ''}`,
-            );
+            sendObserverMessage(`[query:start] ${promptPreview}${input.prompt.length > 150 ? '...' : ''}`);
           }
         } else if (message.type === 'assistant') {
           // Extract thinking blocks and tool-use blocks for the observer.
@@ -518,14 +536,16 @@ export class ClaudeProvider implements AgentProvider {
             };
             if (!reportedToolUseIds.has(tp.tool_use_id)) {
               reportedToolUseIds.add(tp.tool_use_id);
-              sendObserverMessage(
-                `[tool:progress] ${tp.tool_name} (${Math.round(tp.elapsed_time_seconds)}s)`,
-              );
+              sendObserverMessage(`[tool:progress] ${tp.tool_name} (${Math.round(tp.elapsed_time_seconds)}s)`);
             }
           }
         } else if (message.type === 'result') {
           const text = 'result' in message ? ((message as { result?: string }).result ?? null) : null;
-          yield { type: 'result', text };
+          const thinkingOnly = isThinkingOnlyEndTurn(message);
+          if (thinkingOnly) {
+            log('Thinking-only end_turn detected — will clear continuation anchor');
+          }
+          yield { type: 'result', text, thinkingOnly };
 
           if (observerEnabled) {
             const preview = text ? text.slice(0, 300) : '(empty)';

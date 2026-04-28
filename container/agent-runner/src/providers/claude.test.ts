@@ -1,6 +1,47 @@
 import { describe, it, expect } from 'bun:test';
 
-import { buildToolAllowlist } from './claude.js';
+import { buildToolAllowlist, isThinkingOnlyEndTurn } from './claude.js';
+
+describe('isThinkingOnlyEndTurn', () => {
+  const base = { type: 'result', subtype: 'success', stop_reason: 'end_turn', result: '' };
+
+  it('returns true for a canonical thinking-only end_turn', () => {
+    expect(isThinkingOnlyEndTurn(base)).toBe(true);
+  });
+
+  it('returns true when result is whitespace-only', () => {
+    expect(isThinkingOnlyEndTurn({ ...base, result: '   \n  ' })).toBe(true);
+  });
+
+  it('returns false when result has text', () => {
+    expect(isThinkingOnlyEndTurn({ ...base, result: 'hello' })).toBe(false);
+  });
+
+  it('returns false when stop_reason is not end_turn', () => {
+    expect(isThinkingOnlyEndTurn({ ...base, stop_reason: 'max_tokens' })).toBe(false);
+  });
+
+  it('returns false when subtype is not success', () => {
+    expect(isThinkingOnlyEndTurn({ ...base, subtype: 'error' })).toBe(false);
+  });
+
+  it('returns false when type is not result', () => {
+    expect(isThinkingOnlyEndTurn({ ...base, type: 'assistant' })).toBe(false);
+  });
+
+  it('returns false for null', () => {
+    expect(isThinkingOnlyEndTurn(null)).toBe(false);
+  });
+
+  it('returns false for a non-object', () => {
+    expect(isThinkingOnlyEndTurn('result')).toBe(false);
+  });
+
+  it('returns false when result field is missing', () => {
+    const { result: _r, ...noResult } = base;
+    expect(isThinkingOnlyEndTurn(noResult)).toBe(false);
+  });
+});
 
 const SDK_DISALLOWED = [
   'CronCreate',

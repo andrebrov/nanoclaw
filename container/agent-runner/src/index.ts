@@ -153,10 +153,25 @@ async function main(): Promise<void> {
     log(`Additional MCP server: ${name} (${label})`);
   }
 
+  // Per-session IPC dir: task scripts write here so they're isolated from
+  // shared /tmp and survive VirtioFS staleness on macOS Docker. Falls back
+  // to the process TMPDIR (or /tmp) if /workspace/tmp can't be created.
+  const perSessionIpcDir = '/workspace/tmp';
+  let ipcDir: string | undefined;
+  try {
+    fs.mkdirSync(perSessionIpcDir, { recursive: true });
+    ipcDir = perSessionIpcDir;
+    log(`Per-session IPC dir: ${ipcDir}`);
+  } catch (err) {
+    log(
+      `ENOENT on per-session IPC dir — falling back to shared TMPDIR: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   const provider = createProvider(providerName, {
     assistantName: config.assistantName || undefined,
     mcpServers,
-    env: { ...process.env },
+    env: { ...process.env, ...(ipcDir ? { TMPDIR: ipcDir } : {}) },
     additionalDirectories: additionalDirectories.length > 0 ? additionalDirectories : undefined,
     allowedCapabilities: config.allowedCapabilities,
   });
