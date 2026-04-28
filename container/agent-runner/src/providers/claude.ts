@@ -336,6 +336,7 @@ export class ClaudeProvider implements AgentProvider {
   private env: Record<string, string | undefined>;
   private additionalDirectories?: string[];
   private toolAllowlist: string[];
+  private model: string | undefined;
 
   constructor(options: ProviderOptions = {}) {
     this.assistantName = options.assistantName;
@@ -360,6 +361,8 @@ export class ClaudeProvider implements AgentProvider {
       NODE_EXTRA_CA_CERTS: process.env.NODE_EXTRA_CA_CERTS,
       CLAUDE_CODE_AUTO_COMPACT_WINDOW,
     };
+    const rawModel = process.env.AGENT_MODEL?.trim();
+    this.model = rawModel || undefined;
   }
 
   isSessionInvalid(err: unknown): boolean {
@@ -386,6 +389,7 @@ export class ClaudeProvider implements AgentProvider {
         allowedTools: this.toolAllowlist,
         disallowedTools: SDK_DISALLOWED_TOOLS,
         env: this.env,
+        model: this.model,
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         settingSources: ['project', 'user'],

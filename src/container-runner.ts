@@ -46,6 +46,9 @@ import {
   writeSessionRouting,
 } from './session-manager.js';
 import type { AgentGroup, Session } from './types.js';
+import { resolveAgentModel } from './agent-model.js';
+
+export { resolveAgentModel };
 
 const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
 
@@ -725,6 +728,13 @@ async function buildContainerArgs(
   // credential, so any non-empty placeholder works.
   if (!process.env['COMPOSIO_API_KEY']) {
     args.push('-e', 'COMPOSIO_API_KEY=test');
+  }
+
+  // AGENT_MODEL override — forwarded so the container runner can pass it to
+  // the Claude SDK. Only injected when set; absent means the SDK uses its default.
+  const agentModel = resolveAgentModel();
+  if (agentModel) {
+    args.push('-e', `AGENT_MODEL=${agentModel}`);
   }
 
   // OneCLI gateway — injects HTTPS_PROXY + certs so container API calls
