@@ -29,6 +29,7 @@ import {
 } from './db/messaging-groups.js';
 import { findSessionForAgent } from './db/sessions.js';
 import { startTypingRefresh } from './modules/typing/index.js';
+import { startSessionObserver } from './observer.js';
 import { log } from './log.js';
 import { indexMessage } from './message-store.js';
 import { resolveSession, writeSessionMessage, writeOutboundDirect } from './session-manager.js';
@@ -566,6 +567,16 @@ async function deliverToAgent(
     // Typing indicator + wake are only for the engaged branch; accumulated
     // messages sit silently until a real trigger fires.
     startTypingRefresh(session.id, session.agent_group_id, event.channelType, event.platformId, event.threadId);
+    // Start observer: 👀 reaction + watchdog. Use the original event channel
+    // (not deliveryAddr) so reactions land on the message the user sent.
+    startSessionObserver(
+      session,
+      event.message.id,
+      event.channelType,
+      event.platformId,
+      event.threadId,
+      agentGroup.folder,
+    );
     const freshSession = getSession(session.id);
     if (freshSession) {
       await wakeContainer(freshSession);

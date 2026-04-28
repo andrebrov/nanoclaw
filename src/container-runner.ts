@@ -26,6 +26,7 @@ import { getAgentGroup } from './db/agent-groups.js';
 import { getDb, hasTable } from './db/connection.js';
 import { initGroupFilesystem } from './group-init.js';
 import { stopTypingRefresh } from './modules/typing/index.js';
+import { destroySessionObserver, feedObserverLine } from './observer.js';
 import { log } from './log.js';
 import { validateAdditionalMounts } from './modules/mount-security/index.js';
 // Provider host-side config barrel — each provider that needs host-side
@@ -250,10 +251,13 @@ async function spawnContainer(session: Session): Promise<void> {
   activeContainers.set(session.id, { process: container, containerName });
   markContainerRunning(session.id);
 
-  // Log stderr
+  // Log stderr and forward observer: lines to the session observer.
   container.stderr?.on('data', (data) => {
     for (const line of data.toString().trim().split('\n')) {
-      if (line) log.debug(line, { container: agentGroup.folder });
+      if (line) {
+        log.debug(line, { container: agentGroup.folder });
+        feedObserverLine(session.id, line);
+      }
     }
   });
 
@@ -269,6 +273,7 @@ async function spawnContainer(session: Session): Promise<void> {
     activeContainers.delete(session.id);
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
+    destroySessionObserver(session.id);
     log.info('Container exited', { sessionId: session.id, code, containerName });
     drainWakeQueue();
   });
@@ -277,6 +282,7 @@ async function spawnContainer(session: Session): Promise<void> {
     activeContainers.delete(session.id);
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
+    destroySessionObserver(session.id);
     log.error('Container spawn error', { sessionId: session.id, err });
     drainWakeQueue();
   });

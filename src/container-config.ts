@@ -93,6 +93,17 @@ export interface ContainerConfig {
    * specs/linkedin-post-validator.spec.md.
    */
   linkedinPostValidator?: boolean;
+  /**
+   * Optional observer status channel — streams thinking/tool events and
+   * watchdog pings to a separate channel for real-time observability.
+   * When absent, the status-channel feature is disabled; the reaction
+   * cycle and main-chat watchdog still fire regardless.
+   */
+  observer?: {
+    statusChannelId: string;
+    statusChannelType: string;
+    statusThreadId?: string | null;
+  };
 }
 
 const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
@@ -173,6 +184,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       isAdmin: raw.isAdmin,
       allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
       linkedinPostValidator: raw.linkedinPostValidator === true,
+      observer: raw.observer,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

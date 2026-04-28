@@ -515,35 +515,45 @@ export class ClaudeProvider implements AgentProvider {
         if (message.type === 'system' && message.subtype === 'init') {
           sessionId = message.session_id;
           transcriptPath = `/home/node/.claude/projects/${CLAUDE_PROJECT_SLUG}/${sessionId}.jsonl`;
+          // Always emit to stderr so the host-side observer can start its watchdog.
+          process.stderr.write('observer:query_start=1\n');
           yield { type: 'init', continuation: message.session_id };
           if (observerEnabled) {
             const promptPreview = input.prompt.slice(0, 150).replace(/\s+/g, ' ');
             sendObserverMessage(`[query:start] ${promptPreview}${input.prompt.length > 150 ? '...' : ''}`);
           }
         } else if (message.type === 'assistant') {
-          // Extract thinking blocks and tool-use blocks for the observer.
-          if (observerEnabled) {
-            const contentBlocks = (
-              message as {
-                message: {
-                  content: Array<{
-                    type: string;
-                    thinking?: string;
-                    name?: string;
-                    id?: string;
-                    input?: unknown;
-                  }>;
-                };
-              }
-            ).message.content;
-            for (const block of contentBlocks) {
-              if (block.type === 'thinking' && typeof block.thinking === 'string' && block.thinking) {
-                // Chunk long thinking text to stay within platform message limits.
+          // Extract thinking blocks and tool-use blocks for host observer (stderr)
+          // and the optional status-channel observer (outbound DB).
+          const contentBlocks = (
+            message as {
+              message: {
+                content: Array<{
+                  type: string;
+                  thinking?: string;
+                  name?: string;
+                  id?: string;
+                  input?: unknown;
+                }>;
+              };
+            }
+          ).message.content;
+          for (const block of contentBlocks) {
+            if (block.type === 'thinking' && typeof block.thinking === 'string' && block.thinking) {
+              // Stderr: compact preview for host observer reaction cycle.
+              process.stderr.write(`observer:thinking=${JSON.stringify(block.thinking.slice(0, 500))}\n`);
+              // Outbound DB: full text (chunked) for status channel (gated).
+              if (observerEnabled) {
                 for (let i = 0; i < block.thinking.length; i += OBSERVER_CHUNK_SIZE) {
                   sendObserverMessage(`[thinking] ${block.thinking.slice(i, i + OBSERVER_CHUNK_SIZE)}`);
                 }
-              } else if (block.type === 'tool_use' && typeof block.name === 'string') {
-                if (block.id) reportedToolUseIds.add(block.id);
+              }
+            } else if (block.type === 'tool_use' && typeof block.name === 'string') {
+              if (block.id) reportedToolUseIds.add(block.id);
+              // Stderr: tool name + id for host observer reaction cycle.
+              process.stderr.write(`observer:tool_use=${JSON.stringify({ name: block.name, id: block.id })}\n`);
+              // Outbound DB: tool + input preview for status channel (gated).
+              if (observerEnabled) {
                 const inputPreview = block.input ? JSON.stringify(block.input).slice(0, 100) : '';
                 sendObserverMessage(`[tool] ${block.name}: ${inputPreview}`);
               }
@@ -568,6 +578,8 @@ export class ClaudeProvider implements AgentProvider {
           if (thinkingOnly) {
             log('Thinking-only end_turn detected — will clear continuation anchor');
           }
+          // Always emit to stderr so the host observer advances to ✍ and stops watchdog.
+          process.stderr.write('observer:result=done\n');
           yield { type: 'result', text, thinkingOnly };
 
           if (observerEnabled) {
