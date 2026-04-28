@@ -59,6 +59,8 @@ container/skills/*
 !container/skills/vercel-cli/
 !container/skills/welcome/
 !container/skills/agent-mesh/
+!container/skills/session-reentry/
+!container/skills/tweet-curator/
 
 # One-off / local scripts
 scripts/.granola-auth-state.json
