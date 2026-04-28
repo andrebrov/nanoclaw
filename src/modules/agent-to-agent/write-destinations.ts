@@ -49,35 +49,46 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
     }
   }
 
-  // Synthetic broadcast destination — always injected so any agent can fan
-  // out to all peers via send_message({ to: 'broadcast' }). Routed by
-  // agent-route.ts using the '__broadcast__' sentinel id.
-  resolved.push({
-    name: 'broadcast',
-    display_name: 'All Agents',
-    type: 'agent',
-    channel_type: null,
-    platform_id: null,
-    agent_group_id: '__broadcast__',
-  });
+  // Track names claimed so far so synthetic injections never collide with
+  // explicit destinations. The destinations table has UNIQUE(name); if an
+  // operator already pointed `main` at a specific agent (or `broadcast` at
+  // a specific channel), respect that and skip the synthetic with the same
+  // name — explicit user wiring wins.
+  const usedNames = new Set(resolved.map((r) => r.name));
 
-  // Synthetic main destination — always injected so any agent can reach the
-  // user's primary DM agent (oldest group by created_at) without operator
-  // wiring. Routed by agent-route.ts using the '__main__' sentinel id.
-  resolved.push({
-    name: 'main',
-    display_name: 'Main Agent',
-    type: 'agent',
-    channel_type: null,
-    platform_id: null,
-    agent_group_id: '__main__',
-  });
+  // Synthetic broadcast destination — fan out to all peers via
+  // send_message({ to: 'broadcast' }). Routed by agent-route.ts using
+  // the '__broadcast__' sentinel id.
+  if (!usedNames.has('broadcast')) {
+    resolved.push({
+      name: 'broadcast',
+      display_name: 'All Agents',
+      type: 'agent',
+      channel_type: null,
+      platform_id: null,
+      agent_group_id: '__broadcast__',
+    });
+    usedNames.add('broadcast');
+  }
+
+  // Synthetic main destination — reach the user's primary DM agent (oldest
+  // group by created_at) without operator wiring. Routed by agent-route.ts
+  // using the '__main__' sentinel id.
+  if (!usedNames.has('main')) {
+    resolved.push({
+      name: 'main',
+      display_name: 'Main Agent',
+      type: 'agent',
+      channel_type: null,
+      platform_id: null,
+      agent_group_id: '__main__',
+    });
+    usedNames.add('main');
+  }
 
   // Synthetic peer destinations — inject every other agent group so agents
   // can reach peers by name (e.g. send_message({ to: 'researcher', ... }))
-  // without the operator having to manually wire destinations. Skips any
-  // name already claimed by an explicit destination, broadcast, or main.
-  const usedNames = new Set(resolved.map((r) => r.name));
+  // without the operator having to manually wire destinations.
   for (const ag of getAllAgentGroups()) {
     if (ag.id === agentGroupId) continue;
     const peerName = normalizeName(ag.name);
