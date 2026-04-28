@@ -14,6 +14,7 @@ import './interactive.js';
 import './agents.js';
 import './self-mod.js';
 import './memory.js';
+import './send-voice.js';
 import { loadConfig } from '../config.js';
 import { startMcpServer } from './server.js';
 

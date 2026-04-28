@@ -300,6 +300,50 @@ registerChannelAdapter('telegram', {
           }
         }
 
+        // Voice note — bypass Chat SDK and call sendVoice directly.
+        // The OGG/Opus file is passed as a multipart upload; sendVoice is the
+        // only Telegram Bot API method that delivers files as voice notes
+        // (postMessage with a file attachment sends them as documents instead).
+        if (message.kind === 'voice') {
+          const tid = threadId ?? platformId;
+          const tidParts = tid.replace(/^telegram:/, '').split(':');
+          const chatId = tidParts[0]!;
+          const messageThreadId = tidParts[1] ? parseInt(tidParts[1], 10) : undefined;
+
+          const oggFile = message.files?.[0];
+          if (!oggFile) {
+            log.warn('send_voice: no OGG file in outbox, skipping');
+            return undefined;
+          }
+
+          const form = new FormData();
+          form.append('chat_id', chatId);
+          if (messageThreadId) form.append('message_thread_id', String(messageThreadId));
+          form.append('voice', new Blob([oggFile.data], { type: 'audio/ogg' }), oggFile.filename);
+
+          try {
+            const res = await fetch(`https://api.telegram.org/bot${token}/sendVoice`, {
+              method: 'POST',
+              body: form,
+            });
+            if (res.ok) {
+              const json = (await res.json()) as {
+                result?: { message_id?: number; chat?: { id?: number | string } };
+              };
+              if (json.result?.message_id) {
+                const resultChatId = json.result.chat?.id ?? chatId;
+                return `${resultChatId}:${json.result.message_id}`;
+              }
+              return undefined;
+            }
+            const errBody = await res.text().catch(() => '');
+            log.warn('Telegram sendVoice failed', { status: res.status, body: errBody });
+          } catch (voiceErr) {
+            log.warn('Telegram sendVoice error', { err: voiceErr });
+          }
+          return undefined;
+        }
+
         return bridge.deliver(platformId, threadId, message);
       },
     };
