@@ -6,11 +6,17 @@
  * read-only at /workspace/messages.db and open it with sqlite3 / better-
  * sqlite3 in readonly mode.
  *
- * Cross-mount visibility: `journal_mode=DELETE` is load-bearing here, same
- * as the per-session inbound/outbound dbs (see
- * `container/agent-runner/src/db/connection.ts` for the rationale). WAL
- * mode would force the reader to access the `-shm`/`-wal` siblings via
- * shared memory, which doesn't survive bind-mount boundaries.
+ * WAL mode is safe here — unlike inbound/outbound session DBs where containers
+ * need real-time visibility of host writes, containers only need a consistent
+ * historical snapshot from messages.db. WAL guarantees the main file always
+ * reflects the last checkpoint (never partial mid-page writes), eliminating
+ * the false "database disk image is malformed" errors under concurrent access.
+ * Containers that can't access the -wal/-shm sidecars simply read the last
+ * checkpointed state, which is fine for context-recovery queries.
+ *
+ * ⚠ Backup caveat: WAL creates messages.db-wal + messages.db-shm sidecars.
+ * Any file-level backup must either run `PRAGMA wal_checkpoint(TRUNCATE)` first
+ * or include all three files.
  */
 import Database from 'better-sqlite3';
 import path from 'path';
@@ -26,7 +32,8 @@ let saveStmt: Database.Statement | null = null;
 function init(): void {
   if (db) return;
   db = new Database(DB_PATH);
-  db.pragma('journal_mode = DELETE');
+  db.pragma('journal_mode = WAL');
+  db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = NORMAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS messages (
