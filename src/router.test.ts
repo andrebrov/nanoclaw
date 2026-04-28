@@ -1,9 +1,14 @@
 /**
- * Regression tests for the router's threadId preservation fix (issue #7).
+ * Regression tests for the router's threadId preservation fix (issue #7) and
+ * DM auth gate (issue #72).
  *
  * Non-threaded adapters (Telegram, WhatsApp, iMessage) collapse all topics
  * into one session per group, but the inbound message must keep the real
  * threadId so outbound delivery can route replies back to the originating topic.
+ *
+ * The core DM gate (issue #72) blocks DM messages from senders who are not
+ * listed in user_roles or agent_group_members when no accessGate hook is
+ * registered (permissions module absent).
  */
 import Database from 'better-sqlite3';
 import fs from 'fs';
@@ -16,6 +21,7 @@ import {
   createAgentGroup,
   createMessagingGroup,
   createMessagingGroupAgent,
+  getDb,
 } from './db/index.js';
 import { inboundDbPath } from './session-manager.js';
 import { findSession } from './db/sessions.js';
@@ -197,5 +203,125 @@ describe('threadId preservation for non-threaded adapters (issue #7)', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].thread_id).toBe('750');
     expect(rows[1].thread_id).toBe('999');
+  });
+});
+
+// ── Core DM gate (issue #72) ──────────────────────────────────────────────────
+//
+// When no permissions module is loaded (accessGate === null), the router must
+// still refuse DM messages from senders who are not listed in user_roles or
+// agent_group_members.  These tests verify that invariant without registering
+// any accessGate hook.
+
+describe('core DM gate — no accessGate registered (issue #72)', () => {
+  const DM_PLATFORM_ID = 'tg-dm-owner';
+
+  // Each test registers a Telegram adapter and imports routeInbound freshly.
+  // The shared beforeEach/afterEach above already handle DB init and cleanup.
+
+  beforeEach(() => {
+    const db = getDb();
+
+    // DM messaging group (is_group=0, strict policy)
+    createMessagingGroup({
+      id: 'mg-dm',
+      channel_type: 'telegram',
+      platform_id: DM_PLATFORM_ID,
+      name: 'Owner DM',
+      is_group: 0,
+      unknown_sender_policy: 'strict',
+      created_at: now(),
+    });
+    createMessagingGroupAgent({
+      id: 'mga-dm',
+      messaging_group_id: 'mg-dm',
+      agent_group_id: 'ag-1',
+      engage_mode: 'pattern',
+      engage_pattern: '.',
+      sender_scope: 'all',
+      ignored_message_policy: 'drop',
+      session_mode: 'shared',
+      priority: 0,
+      created_at: now(),
+    });
+
+    // Register the owner in users + user_roles so the DM gate can find them.
+    db.prepare('INSERT INTO users (id, kind, display_name, created_at) VALUES (?, ?, ?, ?)').run(
+      'telegram:dm-owner',
+      'telegram',
+      'Owner',
+      now(),
+    );
+    db.prepare(
+      'INSERT INTO user_roles (user_id, role, agent_group_id, granted_by, granted_at) VALUES (?, ?, ?, ?, ?)',
+    ).run('telegram:dm-owner', 'owner', null, null, now());
+  });
+
+  async function setupAdapter() {
+    const { registerChannelAdapter, initChannelAdapters } = await import('./channels/channel-registry.js');
+    registerChannelAdapter('telegram', {
+      factory: () => ({
+        name: 'telegram',
+        channelType: 'telegram',
+        supportsThreads: false,
+        async setup() {},
+        async teardown() {},
+        isConnected: () => true,
+        async deliver() {
+          return undefined;
+        },
+      }),
+    });
+    await initChannelAdapters(() => ({
+      conversations: [],
+      onInbound: () => {},
+      onInboundEvent: () => {},
+      onMetadata: () => {},
+      onAction: () => {},
+    }));
+  }
+
+  it('unknown sender DM → message dropped, container not spawned', async () => {
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: DM_PLATFORM_ID,
+      threadId: null,
+      message: {
+        id: 'dm-stranger-1',
+        kind: 'chat',
+        content: JSON.stringify({ senderId: 'telegram:stranger', text: 'hi from stranger' }),
+        timestamp: now(),
+        isMention: true,
+      },
+    });
+
+    expect(wakeContainer).not.toHaveBeenCalled();
+  });
+
+  it('owner DM → container spawned normally', async () => {
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: DM_PLATFORM_ID,
+      threadId: null,
+      message: {
+        id: 'dm-owner-1',
+        kind: 'chat',
+        content: JSON.stringify({ senderId: 'telegram:dm-owner', text: 'hi from owner' }),
+        timestamp: now(),
+        isMention: true,
+      },
+    });
+
+    expect(wakeContainer).toHaveBeenCalled();
   });
 });

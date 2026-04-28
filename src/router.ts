@@ -20,6 +20,7 @@
 import { getChannelAdapter } from './channels/channel-registry.js';
 import { gateCommand } from './command-gate.js';
 import { getAgentGroup } from './db/agent-groups.js';
+import { getDb } from './db/connection.js';
 import { recordDroppedMessage } from './db/dropped-messages.js';
 import {
   createMessagingGroup,
@@ -38,6 +39,45 @@ import type { InboundEvent } from './channels/adapter.js';
 
 function generateId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Minimal sender-id extraction for the core DM gate (no permissions module).
+ * Mirrors the senderId parsing in permissions/index.ts but without the
+ * users-table upsert — we only need to know who is knocking, not to create
+ * a row for them.
+ */
+function extractCoreSenderId(event: InboundEvent): string | null {
+  const content = safeParseContent(event.message.content);
+  const raw = content.senderId ?? content.sender ?? null;
+  if (!raw) return null;
+  return raw.includes(':') ? raw : `${event.channelType}:${raw}`;
+}
+
+/**
+ * Core DM-gate trust check. Queries user_roles and agent_group_members
+ * directly — no dependency on the optional permissions module.
+ * Used only when accessGate is not registered (module absent).
+ */
+function isDmSenderTrusted(userId: string, agentGroupId: string): boolean {
+  const db = getDb();
+  const hasRole = db
+    .prepare(
+      `SELECT 1 FROM user_roles
+       WHERE user_id = ?
+         AND (
+           (role = 'owner' AND agent_group_id IS NULL)
+           OR (role = 'admin' AND agent_group_id IS NULL)
+           OR (role = 'admin' AND agent_group_id = ?)
+         )
+       LIMIT 1`,
+    )
+    .get(userId, agentGroupId);
+  if (hasRole) return true;
+  const isMember = db
+    .prepare('SELECT 1 FROM agent_group_members WHERE user_id = ? AND agent_group_id = ? LIMIT 1')
+    .get(userId, agentGroupId);
+  return !!isMember;
 }
 
 /**
@@ -241,10 +281,11 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
     return;
   }
 
-  // 2. Sender resolution (permissions module upserts the users row as a
-  //    side effect so later role/access lookups find a real record).
-  //    Without the module, userId is null — downstream tolerates it.
-  const userId: string | null = senderResolver ? senderResolver(event) : null;
+  // 2. Sender resolution. The permissions module registers a full resolver
+  //    that upserts the users row so later role lookups find a real record.
+  //    Without the module, fall back to a minimal parse so the core DM gate
+  //    below can still identify the sender without writing to the DB.
+  const userId: string | null = senderResolver ? senderResolver(event) : extractCoreSenderId(event);
 
   // 3. Fetch wired agents in full (we already know the count is > 0; now
   //    we need their actual rows for fan-out).
@@ -279,7 +320,35 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
     // writes, approval cards). We only run them when the engage decision
     // would otherwise let the message through, to avoid spurious gate work
     // for agents whose engage_mode already declined.
-    const accessOk = engages && (!accessGate || accessGate(event, userId, mg, agent.agent_group_id).allowed);
+    //
+    // When the permissions module is installed it registers a full accessGate.
+    // When it is absent, DM channels fall back to a direct DB check so an
+    // unknown sender cannot spawn a container just by DMing the bot.
+    // Non-DM channels keep the existing allow-all behaviour when ungated.
+    let accessAllowed: boolean;
+    if (accessGate) {
+      accessAllowed = accessGate(event, userId, mg, agent.agent_group_id).allowed;
+    } else if (mg.is_group === 0) {
+      accessAllowed = userId !== null && isDmSenderTrusted(userId, agent.agent_group_id);
+      if (engages && !accessAllowed) {
+        recordDroppedMessage({
+          channel_type: event.channelType,
+          platform_id: event.platformId,
+          user_id: userId,
+          sender_name: parsed.sender ?? null,
+          reason: 'dm_sender_not_authorized',
+          messaging_group_id: mg.id,
+          agent_group_id: agent.agent_group_id,
+        });
+        log.warn('DM blocked by core gate — sender not in user_roles or agent_group_members', {
+          userId,
+          agentGroupId: agent.agent_group_id,
+        });
+      }
+    } else {
+      accessAllowed = true;
+    }
+    const accessOk = engages && accessAllowed;
     const scopeOk = engages && accessOk && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
 
     if (engages && accessOk && scopeOk) {
