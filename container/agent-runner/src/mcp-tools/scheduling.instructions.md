@@ -38,3 +38,23 @@ If a user wants a task to run more than a few times a day and a script can't be 
 - Suggest adjusting the task requirements in a way that will allow you to use a script
 - If the user needs an LLM to evaluate data, suggest using an API key with direct Anthropic API calls inside the script
 - Help the user find the minimum viable frequency
+
+## Long-running tasks (`extend_ceiling`)
+
+The host sweep kills containers whose heartbeat goes stale for more than 30 minutes. For long tasks — deep research, batch processing, multi-stage pipelines — call `extend_ceiling` **at the start of the long phase** to declare the headroom you need.
+
+```
+extend_ceiling({ seconds: 3600 })   // needs up to 1 hour
+extend_ceiling({ seconds: 0 })      // clear override early when done
+```
+
+**When to use it:**
+
+- Any phase that may go longer than 30 min without a Claude SDK event touching the heartbeat (waiting on a slow external API, a large file write, a multi-tool pipeline).
+- Call it proactively — before the long phase starts, not after the sweep fires.
+- The override persists until cleared (`seconds: 0`) or until the container is restarted. It does not need to be renewed per-turn.
+
+**When not to use it:**
+
+- Interactive turns — the default 30-min ceiling is intentional for interactive sessions.
+- Bash calls with an explicit `timeout` arg already widen the ceiling automatically; `extend_ceiling` is for phases that span multiple tools or thinking-heavy gaps between calls.

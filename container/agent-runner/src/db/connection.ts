@@ -64,16 +64,24 @@ export function getOutboundDb(): Database {
     }
     // container_state: tracks the current tool in flight (if any) so the host
     // sweep can widen its stuck tolerance when Bash is running with a user-
-    // declared long timeout. Forward-compat for older outbound.db files.
+    // declared long timeout. declared_max_ms is a task-level ceiling override
+    // written by the extend_ceiling MCP tool. Forward-compat for older files.
     _outbound.exec(`
       CREATE TABLE IF NOT EXISTS container_state (
         id                       INTEGER PRIMARY KEY CHECK (id = 1),
         current_tool             TEXT,
         tool_declared_timeout_ms INTEGER,
         tool_started_at          TEXT,
+        declared_max_ms          INTEGER,
         updated_at               TEXT NOT NULL
       );
     `);
+    const csCols = new Set(
+      (_outbound.prepare("PRAGMA table_info('container_state')").all() as Array<{ name: string }>).map((c) => c.name),
+    );
+    if (!csCols.has('declared_max_ms')) {
+      _outbound.exec(`ALTER TABLE container_state ADD COLUMN declared_max_ms INTEGER`);
+    }
   }
   return _outbound;
 }
@@ -96,6 +104,39 @@ export function setContainerToolInFlight(tool: string, declaredTimeoutMs: number
          updated_at = excluded.updated_at`,
     )
     .run(tool, declaredTimeoutMs, now, now);
+}
+
+/**
+ * Set a task-level ceiling override. The host sweep uses
+ * max(ABSOLUTE_CEILING_MS, tool_declared_timeout_ms, declared_max_ms) so
+ * long tasks can survive past the global 30-min default without needing a
+ * single Bash call with an explicit timeout.
+ */
+export function setDeclaredMaxMs(ms: number): void {
+  const now = new Date().toISOString();
+  getOutboundDb()
+    .prepare(
+      `INSERT INTO container_state (id, declared_max_ms, updated_at)
+       VALUES (1, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         declared_max_ms = excluded.declared_max_ms,
+         updated_at = excluded.updated_at`,
+    )
+    .run(ms, now);
+}
+
+/** Clear the declared task ceiling (call when the long phase ends or the turn ends). */
+export function clearDeclaredMaxMs(): void {
+  const now = new Date().toISOString();
+  getOutboundDb()
+    .prepare(
+      `INSERT INTO container_state (id, declared_max_ms, updated_at)
+       VALUES (1, NULL, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         declared_max_ms = NULL,
+         updated_at = excluded.updated_at`,
+    )
+    .run(now);
 }
 
 /** Clear the in-flight tool — called on PostToolUse / PostToolUseFailure. */
@@ -216,6 +257,7 @@ export function initTestSessionDb(): { inbound: Database; outbound: Database } {
       current_tool             TEXT,
       tool_declared_timeout_ms INTEGER,
       tool_started_at          TEXT,
+      declared_max_ms          INTEGER,
       updated_at               TEXT NOT NULL
     );
   `);
