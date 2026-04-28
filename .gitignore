@@ -59,6 +59,7 @@ container/skills/*
 !container/skills/vercel-cli/
 !container/skills/welcome/
 !container/skills/agent-mesh/
+!container/skills/social-monitor/
 !container/skills/session-reentry/
 !container/skills/tweet-curator/
 
