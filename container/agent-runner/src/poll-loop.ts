@@ -211,26 +211,55 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // Process the query while concurrently polling for new messages
     const skippedSet = new Set(skipped);
     const processingIds = ids.filter((id) => !commandIds.includes(id) && !skippedSet.has(id));
+    let queryError: unknown = null;
     try {
       const result = await processQuery(query, routing, processingIds, prompt);
-      if (result.continuation && result.continuation !== continuation) {
+      if (result.clearContinuation) {
+        log('Clearing continuation anchor (thinking-only result)');
+        continuation = undefined;
+        clearStoredSessionId();
+      } else if (result.continuation && result.continuation !== continuation) {
         continuation = result.continuation;
         setStoredSessionId(continuation);
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      log(`Query error: ${errMsg}`);
+      log(`Query error (attempt 1/2): ${errMsg}`);
 
-      // Stale/corrupt continuation recovery: ask the provider whether
-      // this error means the stored continuation is unusable, and clear
-      // it so the next attempt starts fresh.
+      // Stale/corrupt continuation recovery: clear it before the retry so the
+      // fresh attempt doesn't resume a broken session.
       if (continuation && config.provider.isSessionInvalid(err)) {
-        log(`Stale session detected (${continuation}) — clearing for next retry`);
+        log(`Stale session detected (${continuation}) — clearing for retry`);
         continuation = undefined;
         clearStoredSessionId();
       }
 
-      // Write error response so the user knows something went wrong
+      // Single automatic retry with a fresh session.
+      try {
+        const retryQuery = config.provider.query({
+          prompt,
+          continuation: undefined,
+          cwd: config.cwd,
+          systemContext: config.systemContext,
+          isScheduledTask: keep.every((m) => m.kind === 'task'),
+        });
+        const retryResult = await processQuery(retryQuery, routing, processingIds, prompt);
+        if (retryResult.clearContinuation) {
+          continuation = undefined;
+          clearStoredSessionId();
+        } else if (retryResult.continuation) {
+          continuation = retryResult.continuation;
+          setStoredSessionId(continuation);
+        }
+      } catch (retryErr) {
+        const retryErrMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+        log(`RETRY ALSO FAILED — giving up: ${retryErrMsg}`);
+        queryError = retryErr;
+      }
+    }
+
+    if (queryError) {
+      const errMsg = queryError instanceof Error ? queryError.message : String(queryError);
       writeMessageOut({
         id: generateId(),
         kind: 'chat',
@@ -286,6 +315,7 @@ function formatMessagesWithCommands(messages: MessageInRow[], nativeSlashCommand
 
 interface QueryResult {
   continuation?: string;
+  clearContinuation?: boolean;
 }
 
 /**
@@ -342,6 +372,7 @@ async function processQuery(
   prompt: string,
 ): Promise<QueryResult> {
   let queryContinuation: string | undefined;
+  let clearContinuation = false;
   let done = false;
 
   // Replay buffer for compaction recovery. SDK auto-compaction wipes the
@@ -435,6 +466,14 @@ async function processQuery(
         // a Result. Sending it would produce a second message. Log it but skip
         // delivery. add_reaction does NOT set this flag — reaction + closing
         // summary is a valid reply path.
+        if (event.thinkingOnly) {
+          // Model produced only thinking blocks — clear continuation so the
+          // next turn starts fresh rather than resuming a stuck session.
+          log('Thinking-only result: clearing continuation anchor');
+          clearStoredSessionId();
+          queryContinuation = undefined;
+          clearContinuation = true;
+        }
         if (event.text) {
           if (getTurnSendInvoked()) {
             log(`Suppressing result text (send already fired this turn): ${event.text.slice(0, 200)}`);
@@ -497,7 +536,7 @@ async function processQuery(
     }
   }
 
-  return { continuation: queryContinuation };
+  return { continuation: queryContinuation, clearContinuation };
 }
 
 function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
