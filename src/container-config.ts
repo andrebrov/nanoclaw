@@ -73,6 +73,8 @@ export interface ContainerConfig {
   agentGroupId?: string;
   /** Max messages per prompt. Falls back to code default if unset. */
   maxMessagesPerPrompt?: number;
+  /** Claude model override for this group (e.g. "claude-haiku-4-5"). Passed as AGENT_MODEL env var. */
+  model?: string;
   /**
    * Grant this container admin observability: mounts host logs + session dirs
    * read-only at /workspace/host-logs/ and enables the chat_status MCP tool.
@@ -161,6 +163,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       assistantName: raw.assistantName,
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
+      model: typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : undefined,
       isAdmin: raw.isAdmin,
       allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
     };

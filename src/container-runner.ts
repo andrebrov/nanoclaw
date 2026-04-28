@@ -748,9 +748,9 @@ async function buildContainerArgs(
     args.push('-e', 'COMPOSIO_API_KEY=test');
   }
 
-  // AGENT_MODEL override — forwarded so the container runner can pass it to
-  // the Claude SDK. Only injected when set; absent means the SDK uses its default.
-  const agentModel = resolveAgentModel();
+  // AGENT_MODEL override — per-group containerConfig.model takes priority over
+  // the host AGENT_MODEL env var. Only injected when set; absent means SDK default.
+  const agentModel = containerConfig.model?.trim() || resolveAgentModel();
   if (agentModel) {
     args.push('-e', `AGENT_MODEL=${agentModel}`);
   }

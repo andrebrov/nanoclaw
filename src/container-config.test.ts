@@ -77,6 +77,32 @@ describe('readContainerConfig — allowedCapabilities', () => {
   });
 });
 
+describe('readContainerConfig — model', () => {
+  it('absent field → undefined', () => {
+    writeGroupConfig('g1', { mcpServers: {} });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.model).toBeUndefined();
+  });
+
+  it('model string → returned as-is', () => {
+    writeGroupConfig('g1', { model: 'claude-haiku-4-5' });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.model).toBe('claude-haiku-4-5');
+  });
+
+  it('whitespace-only model → undefined', () => {
+    writeGroupConfig('g1', { model: '   ' });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.model).toBeUndefined();
+  });
+
+  it('model with surrounding whitespace → trimmed', () => {
+    writeGroupConfig('g1', { model: '  claude-sonnet-4-6  ' });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.model).toBe('claude-sonnet-4-6');
+  });
+});
+
 describe('initContainerConfig', () => {
   it('new group gets permissive default', () => {
     initContainerConfig('g2');
