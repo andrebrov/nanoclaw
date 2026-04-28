@@ -197,6 +197,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
       continuation: isTaskBatch ? undefined : continuation,
       cwd: config.cwd,
       systemContext: config.systemContext,
+      isScheduledTask: keep.every((m) => m.kind === 'task'),
     });
 
     // Process the query while concurrently polling for new messages

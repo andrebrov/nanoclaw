@@ -4,6 +4,7 @@ import path from 'path';
 import { query as sdkQuery, type HookCallback, type PreCompactHookInput } from '@anthropic-ai/claude-agent-sdk';
 
 import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/connection.js';
+import { writeMessageOut } from '../db/messages-out.js';
 import { registerProvider } from './provider-registry.js';
 import type {
   AgentProvider,
@@ -65,6 +66,47 @@ const CAPABILITY_TOOLS: Record<string, string[]> = {
   file_write: ['Write', 'Edit', 'NotebookEdit'],
   network: ['WebSearch', 'WebFetch'],
 };
+
+// ── Observer side channel ──
+
+/**
+ * Parse OBSERVER_CHAT_JID env var ("channel_type:platform_id").
+ * Returns null when unset or malformed — observer is disabled by default.
+ */
+function parseObserverJid(): { channelType: string; platformId: string } | null {
+  const jid = process.env.OBSERVER_CHAT_JID;
+  if (!jid) return null;
+  const colonIdx = jid.indexOf(':');
+  if (colonIdx <= 0) {
+    log(`OBSERVER_CHAT_JID "${jid}" must be "channel_type:platform_id" — observer disabled`);
+    return null;
+  }
+  return { channelType: jid.slice(0, colonIdx), platformId: jid.slice(colonIdx + 1) };
+}
+
+const OBSERVER = parseObserverJid();
+
+/** Max characters per observer thinking chunk before splitting into multiple messages. */
+const OBSERVER_CHUNK_SIZE = 2000;
+
+/**
+ * Write a message to the observer chat via the outbound DB.
+ * Swallows errors so observer failures never affect the main query.
+ */
+function sendObserverMessage(text: string): void {
+  if (!OBSERVER) return;
+  try {
+    writeMessageOut({
+      id: `obs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind: 'chat',
+      channel_type: OBSERVER.channelType,
+      platform_id: OBSERVER.platformId,
+      content: JSON.stringify({ text }),
+    });
+  } catch (err) {
+    log(`Observer send failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
 
 /**
  * Build the tool allowlist for a given capability set.
@@ -410,11 +452,15 @@ export class ClaudeProvider implements AgentProvider {
     let aborted = false;
 
     async function* translateEvents(): AsyncGenerator<ProviderEvent> {
+      // Observer is disabled for scheduled tasks (silent maintenance runs) and when unconfigured.
+      const observerEnabled = !!(OBSERVER && !input.isScheduledTask);
       let messageCount = 0;
       let sessionId: string | undefined;
       let transcriptPath: string | undefined;
       let warnEmitted = false;
       let nukeEmitted = false;
+      // Track tool_use_ids forwarded to the observer so tool_progress duplicates are skipped.
+      const reportedToolUseIds = new Set<string>();
 
       for await (const message of sdkResult) {
         if (aborted) return;
@@ -427,9 +473,64 @@ export class ClaudeProvider implements AgentProvider {
           sessionId = message.session_id;
           transcriptPath = `/home/node/.claude/projects/${CLAUDE_PROJECT_SLUG}/${sessionId}.jsonl`;
           yield { type: 'init', continuation: message.session_id };
+          if (observerEnabled) {
+            const promptPreview = input.prompt.slice(0, 150).replace(/\s+/g, ' ');
+            sendObserverMessage(
+              `[query:start] ${promptPreview}${input.prompt.length > 150 ? '...' : ''}`,
+            );
+          }
+        } else if (message.type === 'assistant') {
+          // Extract thinking blocks and tool-use blocks for the observer.
+          if (observerEnabled) {
+            const contentBlocks = (
+              message as {
+                message: {
+                  content: Array<{
+                    type: string;
+                    thinking?: string;
+                    name?: string;
+                    id?: string;
+                    input?: unknown;
+                  }>;
+                };
+              }
+            ).message.content;
+            for (const block of contentBlocks) {
+              if (block.type === 'thinking' && typeof block.thinking === 'string' && block.thinking) {
+                // Chunk long thinking text to stay within platform message limits.
+                for (let i = 0; i < block.thinking.length; i += OBSERVER_CHUNK_SIZE) {
+                  sendObserverMessage(`[thinking] ${block.thinking.slice(i, i + OBSERVER_CHUNK_SIZE)}`);
+                }
+              } else if (block.type === 'tool_use' && typeof block.name === 'string') {
+                if (block.id) reportedToolUseIds.add(block.id);
+                const inputPreview = block.input ? JSON.stringify(block.input).slice(0, 100) : '';
+                sendObserverMessage(`[tool] ${block.name}: ${inputPreview}`);
+              }
+            }
+          }
+        } else if (message.type === 'tool_progress') {
+          // Forward the first progress event per tool call; skip subsequent ones to avoid flooding.
+          if (observerEnabled) {
+            const tp = message as {
+              tool_use_id: string;
+              tool_name: string;
+              elapsed_time_seconds: number;
+            };
+            if (!reportedToolUseIds.has(tp.tool_use_id)) {
+              reportedToolUseIds.add(tp.tool_use_id);
+              sendObserverMessage(
+                `[tool:progress] ${tp.tool_name} (${Math.round(tp.elapsed_time_seconds)}s)`,
+              );
+            }
+          }
         } else if (message.type === 'result') {
           const text = 'result' in message ? ((message as { result?: string }).result ?? null) : null;
           yield { type: 'result', text };
+
+          if (observerEnabled) {
+            const preview = text ? text.slice(0, 300) : '(empty)';
+            sendObserverMessage(`[query:done] ${preview}${text && text.length > 300 ? '...' : ''}`);
+          }
 
           // Check token threshold after each completed turn.
           // Only fires when we have a transcript path (after init) and haven't nuked yet.
@@ -450,8 +551,10 @@ export class ClaudeProvider implements AgentProvider {
           }
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'api_retry') {
           yield { type: 'error', message: 'API retry', retryable: true };
+          if (observerEnabled) sendObserverMessage('[error] API retry');
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'rate_limit_event') {
           yield { type: 'error', message: 'Rate limit', retryable: false, classification: 'quota' };
+          if (observerEnabled) sendObserverMessage('[error] Rate limit');
         } else if (message.type === 'system' && (message as { subtype?: string }).subtype === 'compact_boundary') {
           const meta = (message as { compact_metadata?: { pre_tokens?: number } }).compact_metadata;
           const detail = meta?.pre_tokens ? ` (${meta.pre_tokens.toLocaleString()} tokens compacted)` : '';

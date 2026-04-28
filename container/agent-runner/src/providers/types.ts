@@ -53,6 +53,13 @@ export interface QueryInput {
   systemContext?: {
     instructions?: string;
   };
+
+  /**
+   * True when all messages in the batch are scheduled tasks (kind='task').
+   * Providers can use this to suppress observer side-channel forwarding
+   * for silent maintenance runs.
+   */
+  isScheduledTask?: boolean;
 }
 
 export type McpServerConfig =
