@@ -26,32 +26,72 @@ HOST_PATTERN="${HOST_PATTERN:-api.anthropic.com}"
 command -v onecli >/dev/null \
   || { echo "onecli not found. Install it first (see /setup §4)." >&2; exit 1; }
 
-if ! command -v claude >/dev/null 2>&1; then
-  echo "Claude Code CLI not found — installing it now (needed for subscription sign-in)…"
-  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if ! bash "$SCRIPT_DIR/install-claude.sh"; then
-    echo >&2
-    echo "Couldn't install the Claude Code CLI automatically." >&2
-    echo "Install it manually with" >&2
-    echo "  curl -fsSL https://claude.ai/install.sh | bash" >&2
-    echo "and re-run setup." >&2
+# True when there is no display server available — common on headless cloud
+# servers (DO, EC2, etc.) where a browser cannot be opened.
+is_headless() {
+  [ "$(uname -s)" = "Linux" ] \
+    && [ -z "${DISPLAY:-}" ] \
+    && [ -z "${WAYLAND_DISPLAY:-}" ]
+}
+
+if is_headless; then
+  # ── Headless path ────────────────────────────────────────────────────
+  # No browser available. Guide the user to run `claude setup-token` on
+  # any machine that HAS a browser, then paste the resulting token here.
+  cat <<'EOF'
+No browser is available on this server.
+
+To get your OAuth token:
+  1. On a machine with a browser, install the Claude CLI:
+       curl -fsSL https://claude.ai/install.sh | bash
+  2. Run:  claude setup-token
+  3. Sign in and copy the token that starts with  sk-ant-oat
+
+Then paste it below (the token is never echoed to the screen).
+EOF
+  echo
+
+  read -r -s -p "Paste token: " token </dev/tty
+  echo  # newline after hidden input
+  token="${token//[$'\t\r\n ']}"  # strip whitespace
+
+  if [ -z "$token" ]; then
+    echo "No token provided." >&2
     exit 1
   fi
-  # install-claude.sh PATH additions are scoped to its own subshell; redo
-  # them here so the rest of this script can see the fresh `claude` binary.
-  if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
-    export PATH="$HOME/.local/bin:$PATH"
+
+  if ! echo "$token" | grep -qE '^sk-ant-oat[A-Za-z0-9_-]{80,500}AA$'; then
+    echo "Token doesn't look right (expected sk-ant-oat…AA). Check you copied it completely." >&2
+    exit 1
   fi
-  hash -r 2>/dev/null || true
-fi
+else
+  # ── Browser path (PTY-based) ─────────────────────────────────────────
+  if ! command -v claude >/dev/null 2>&1; then
+    echo "Claude Code CLI not found — installing it now (needed for subscription sign-in)…"
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if ! bash "$SCRIPT_DIR/install-claude.sh"; then
+      echo >&2
+      echo "Couldn't install the Claude Code CLI automatically." >&2
+      echo "Install it manually with" >&2
+      echo "  curl -fsSL https://claude.ai/install.sh | bash" >&2
+      echo "and re-run setup." >&2
+      exit 1
+    fi
+    # install-claude.sh PATH additions are scoped to its own subshell; redo
+    # them here so the rest of this script can see the fresh `claude` binary.
+    if [ -d "$HOME/.local/bin" ] && [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+      export PATH="$HOME/.local/bin:$PATH"
+    fi
+    hash -r 2>/dev/null || true
+  fi
 
-command -v script >/dev/null \
-  || { echo "script(1) is required for PTY capture." >&2; exit 1; }
+  command -v script >/dev/null \
+    || { echo "script(1) is required for PTY capture." >&2; exit 1; }
 
-tmpfile=$(mktemp -t claude-setup-token.XXXXXX)
-trap 'rm -f "$tmpfile"' EXIT
+  tmpfile=$(mktemp -t claude-setup-token.XXXXXX)
+  trap 'rm -f "$tmpfile"' EXIT
 
-cat <<'EOF'
+  cat <<'EOF'
 A browser window will open for you to sign in with your Claude account.
 When you finish, we'll save the token to your OneCLI vault automatically.
 
@@ -59,38 +99,39 @@ Press Enter to continue, or edit the command first.
 
 EOF
 
-cmd="claude setup-token"
-if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then
-  # bash 4+: pre-fill the readline buffer so Enter literally submits.
-  read -r -e -i "$cmd" -p "$ " cmd </dev/tty
-else
-  # bash 3.x (macOS default /bin/bash): no readline preload. Fall back.
-  echo "$ $cmd"
-  read -r -p "Press Enter to run, Ctrl-C to abort. " _ </dev/tty
-fi
+  cmd="claude setup-token"
+  if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then
+    # bash 4+: pre-fill the readline buffer so Enter literally submits.
+    read -r -e -i "$cmd" -p "$ " cmd </dev/tty
+  else
+    # bash 3.x (macOS default /bin/bash): no readline preload. Fall back.
+    echo "$ $cmd"
+    read -r -p "Press Enter to run, Ctrl-C to abort. " _ </dev/tty
+  fi
 
-# `script` arg order differs between BSD (macOS) and util-linux.
-if script --version 2>/dev/null | grep -q util-linux; then
-  script -q -c "$cmd" "$tmpfile"
-else
-  # BSD script: command is argv after the file, so let it word-split.
-  # shellcheck disable=SC2086
-  script -q "$tmpfile" $cmd
-fi
+  # `script` arg order differs between BSD (macOS) and util-linux.
+  if script --version 2>/dev/null | grep -q util-linux; then
+    script -q -c "$cmd" "$tmpfile"
+  else
+    # BSD script: command is argv after the file, so let it word-split.
+    # shellcheck disable=SC2086
+    script -q "$tmpfile" $cmd
+  fi
 
-# Strip ANSI codes + newlines (TTY wraps the token mid-string), then match
-# the sk-ant-oat…AA token. perl because BSD grep caps {n,m} at 255.
-token=$(sed $'s/\x1b\\[[0-9;]*[a-zA-Z]//g' "$tmpfile" \
-        | tr -d '\n\r' \
-        | perl -ne 'print "$1\n" while /(sk-ant-oat[A-Za-z0-9_-]{80,500}AA)/g' \
-        | tail -1 || true)
+  # Strip ANSI codes + newlines (TTY wraps the token mid-string), then match
+  # the sk-ant-oat…AA token. perl because BSD grep caps {n,m} at 255.
+  token=$(sed $'s/\x1b\\[[0-9;]*[a-zA-Z]//g' "$tmpfile" \
+          | tr -d '\n\r' \
+          | perl -ne 'print "$1\n" while /(sk-ant-oat[A-Za-z0-9_-]{80,500}AA)/g' \
+          | tail -1 || true)
 
-if [ -z "$token" ]; then
-  keep=$(mktemp -t claude-setup-token-log.XXXXXX)
-  cp "$tmpfile" "$keep"
-  echo >&2
-  echo "No sk-ant-oat…AA token found. Raw log: $keep" >&2
-  exit 1
+  if [ -z "$token" ]; then
+    keep=$(mktemp -t claude-setup-token-log.XXXXXX)
+    cp "$tmpfile" "$keep"
+    echo >&2
+    echo "No sk-ant-oat…AA token found. Raw log: $keep" >&2
+    exit 1
+  fi
 fi
 
 echo

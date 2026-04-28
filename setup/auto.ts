@@ -32,10 +32,7 @@ import { runTelegramChannel } from './channels/telegram.js';
 import { runWhatsAppChannel } from './channels/whatsapp.js';
 import { pingCliAgent, type PingResult } from './lib/agent-ping.js';
 import { offerClaudeAssist } from './lib/claude-assist.js';
-import {
-  claudeCliAvailable,
-  resolveTimezoneViaClaude,
-} from './lib/tz-from-claude.js';
+import { claudeCliAvailable, resolveTimezoneViaClaude } from './lib/tz-from-claude.js';
 import * as setupLog from './logs.js';
 import { ensureAnswer, fail, runQuietChild, runQuietStep } from './lib/runner.js';
 import { emit as phEmit } from './lib/diagnostics.js';
@@ -72,12 +69,7 @@ async function main(): Promise<void> {
   }
 
   if (!skip.has('container')) {
-    p.log.message(
-      dimWrap(
-        'Your assistant lives in its own sandbox. It can only see what you explicitly share.',
-        4,
-      ),
-    );
+    p.log.message(dimWrap('Your assistant lives in its own sandbox. It can only see what you explicitly share.', 4));
     const res = await runQuietStep('container', {
       running: "Preparing your assistant's sandbox…",
       done: 'Sandbox ready.',
@@ -161,21 +153,12 @@ async function main(): Promise<void> {
       done: 'NanoClaw is running.',
     });
     if (!res.ok) {
-      await fail(
-        'service',
-        "Couldn't start NanoClaw.",
-        'See logs/nanoclaw.error.log for details.',
-      );
+      await fail('service', "Couldn't start NanoClaw.", 'See logs/nanoclaw.error.log for details.');
     }
     if (res.terminal?.fields.DOCKER_GROUP_STALE === 'true') {
-      p.log.warn(
-        "NanoClaw's permissions need a tweak before it can reach Docker.",
-      );
+      p.log.warn("NanoClaw's permissions need a tweak before it can reach Docker.");
       p.log.message(
-        k.dim(
-          '  sudo setfacl -m u:$(whoami):rw /var/run/docker.sock\n' +
-            '  systemctl --user restart nanoclaw',
-        ),
+        k.dim('  sudo setfacl -m u:$(whoami):rw /var/run/docker.sock\n' + '  systemctl --user restart nanoclaw'),
       );
     }
   }
@@ -217,7 +200,7 @@ async function main(): Promise<void> {
           msg:
             ping === 'socket_error'
               ? "NanoClaw service isn't listening on its CLI socket."
-              : "No reply from the assistant within 30 seconds.",
+              : 'No reply from the assistant within 30 seconds.',
           hint:
             ping === 'socket_error'
               ? 'Socket at data/cli.sock did not accept a connection.'
@@ -260,7 +243,7 @@ async function main(): Promise<void> {
     if (!res.ok) {
       const notes: string[] = [];
       if (res.terminal?.fields.CREDENTIALS !== 'configured') {
-        notes.push('• Your Claude account isn\'t connected. Re-run setup and try again.');
+        notes.push("• Your Claude account isn't connected. Re-run setup and try again.");
       }
       const service = res.terminal?.fields.SERVICE;
       if (service === 'running_other_checkout') {
@@ -285,7 +268,9 @@ async function main(): Promise<void> {
         }
       }
       if (!res.terminal?.fields.CONFIGURED_CHANNELS) {
-        notes.push('• Want to chat from your phone? Add a messaging app with `/add-telegram`, `/add-slack`, or `/add-discord`.');
+        notes.push(
+          '• Want to chat from your phone? Add a messaging app with `/add-telegram`, `/add-slack`, or `/add-discord`.',
+        );
       }
       if (notes.length > 0) {
         p.note(notes.join('\n'), "What's left");
@@ -319,9 +304,7 @@ async function main(): Promise<void> {
     ['Open Claude Code:', 'claude'],
   ];
   const labelWidth = Math.max(...rows.map(([l]) => l.length));
-  const nextSteps = rows
-    .map(([l, c]) => `${k.cyan(l.padEnd(labelWidth))}  ${c}`)
-    .join('\n');
+  const nextSteps = rows.map(([l, c]) => `${k.cyan(l.padEnd(labelWidth))}  ${c}`).join('\n');
   p.note(nextSteps, 'Try these');
   setupLog.complete(Date.now() - RUN_START);
   phEmit('setup_completed', { duration_ms: Date.now() - RUN_START });
@@ -357,9 +340,7 @@ async function confirmAssistantResponds(): Promise<PingResult> {
     s.stop(`${fitToWidth('Your assistant is ready.', suffix)}${k.dim(suffix)}`);
   } else {
     const msg =
-      result === 'socket_error'
-        ? "Couldn't reach the NanoClaw service."
-        : "Your assistant didn't reply in time.";
+      result === 'socket_error' ? "Couldn't reach the NanoClaw service." : "Your assistant didn't reply in time.";
     s.stop(`${fitToWidth(msg, suffix)}${k.dim(suffix)}`, 1);
   }
   return result;
@@ -409,11 +390,9 @@ function sendChatMessage(message: string): Promise<void> {
     // agent's reply reads as a clean block under the prompt. Splitting on
     // whitespace mirrors `pnpm run chat hello world` — chat.ts joins argv
     // with spaces on the far side.
-    const child = spawn(
-      'pnpm',
-      ['--silent', 'run', 'chat', ...message.split(/\s+/)],
-      { stdio: ['ignore', 'inherit', 'inherit'] },
-    );
+    const child = spawn('pnpm', ['--silent', 'run', 'chat', ...message.split(/\s+/)], {
+      stdio: ['ignore', 'inherit', 'inherit'],
+    });
     child.on('close', () => resolve());
     child.on('error', () => resolve());
   });
@@ -460,16 +439,20 @@ async function runAuthStep(): Promise<void> {
   }
 }
 
+function isHeadlessLinux(): boolean {
+  return process.platform === 'linux' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+}
+
 async function runSubscriptionAuth(): Promise<void> {
-  p.log.step("Opening the Claude sign-in flow…");
-  console.log(
-    k.dim('   (a browser will open for sign-in; this part is interactive)'),
-  );
+  p.log.step('Opening the Claude sign-in flow…');
+  if (isHeadlessLinux()) {
+    console.log(k.dim("   (no browser detected — you'll be prompted to paste a token from another machine)"));
+  } else {
+    console.log(k.dim('   (a browser will open for sign-in; this part is interactive)'));
+  }
   console.log();
   const start = Date.now();
-  const code = await runInheritScript('bash', [
-    'setup/register-claude-token.sh',
-  ]);
+  const code = await runInheritScript('bash', ['setup/register-claude-token.sh']);
   const durationMs = Date.now() - start;
   console.log();
   if (code !== 0) {
@@ -509,11 +492,16 @@ async function runPasteAuth(method: 'oauth' | 'api'): Promise<void> {
     'auth',
     'onecli',
     [
-      'secrets', 'create',
-      '--name', 'Anthropic',
-      '--type', 'anthropic',
-      '--value', token,
-      '--host-pattern', 'api.anthropic.com',
+      'secrets',
+      'create',
+      '--name',
+      'Anthropic',
+      '--type',
+      'anthropic',
+      '--value',
+      token,
+      '--host-pattern',
+      'api.anthropic.com',
     ],
     {
       running: `Saving your ${label} to your OneCLI vault…`,
@@ -552,10 +540,7 @@ async function runTimezoneStep(): Promise<void> {
   const fields = res.terminal?.fields ?? {};
   const resolvedTz = fields.RESOLVED_TZ;
   const needsInput = fields.NEEDS_USER_INPUT === 'true';
-  const isUtc =
-    resolvedTz === 'UTC' ||
-    resolvedTz === 'Etc/UTC' ||
-    resolvedTz === 'Universal';
+  const isUtc = resolvedTz === 'UTC' || resolvedTz === 'Etc/UTC' || resolvedTz === 'Universal';
 
   if (!needsInput && !isUtc && resolvedTz && resolvedTz !== 'none') {
     return;
@@ -565,7 +550,7 @@ async function runTimezoneStep(): Promise<void> {
   // check that's really what the user wants before leaving it there.
   const message = needsInput
     ? "Your system didn't expose a timezone. Which one are you in?"
-    : "Your system reports UTC as the timezone. Is that right, or are you somewhere else?";
+    : 'Your system reports UTC as the timezone. Is that right, or are you somewhere else?';
 
   const choice = ensureAnswer(
     await p.select({
@@ -587,7 +572,7 @@ async function runTimezoneStep(): Promise<void> {
 
   const answer = ensureAnswer(
     await p.text({
-      message: "Where are you? (city, region, or IANA zone)",
+      message: 'Where are you? (city, region, or IANA zone)',
       placeholder: 'e.g. New York, London, Asia/Tokyo',
       validate: (v) => (v && v.trim() ? undefined : 'Required'),
     }),
@@ -656,9 +641,7 @@ async function askDisplayName(fallback: string): Promise<string> {
   return value;
 }
 
-async function askChannelChoice(): Promise<
-  'telegram' | 'discord' | 'whatsapp' | 'teams' | 'skip'
-> {
+async function askChannelChoice(): Promise<'telegram' | 'discord' | 'whatsapp' | 'teams' | 'skip'> {
   const choice = ensureAnswer(
     await p.select({
       message: 'Want to chat with your assistant from your phone?',
@@ -729,9 +712,7 @@ function printIntro(): void {
   const wordmark = `${k.bold('Nano')}${brandBold('Claw')}`;
 
   if (isReexec) {
-    p.intro(
-      `${brandChip(' Welcome ')}  ${wordmark}  ${k.dim('· picking up where we left off')}`,
-    );
+    p.intro(`${brandChip(' Welcome ')}  ${wordmark}  ${k.dim('· picking up where we left off')}`);
     return;
   }
 

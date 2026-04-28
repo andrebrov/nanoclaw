@@ -259,6 +259,58 @@ Tell the user:
 - To manage secrets: `onecli secrets list`, or open ${ONECLI_URL}
 - To add rate limits or policies: `onecli rules create --help`
 
+## Headless / cloud servers (no browser)
+
+If OneCLI is running on a headless server (DigitalOcean, EC2, etc.) where you can't open a browser, use the CLI-only workflow for every credential type.
+
+### Anthropic credential (Claude subscription or API key)
+
+**Subscription (OAuth token):**
+
+1. On *any machine with a browser*, run:
+   ```bash
+   curl -fsSL https://claude.ai/install.sh | bash
+   claude setup-token
+   ```
+2. Copy the token that starts with `sk-ant-oat`.
+3. On the headless server, inject it:
+   ```bash
+   onecli secrets create --name Anthropic --type anthropic \
+     --value <token> --host-pattern api.anthropic.com
+   ```
+
+**API key:**
+```bash
+onecli secrets create --name Anthropic --type anthropic \
+  --value sk-ant-api... --host-pattern api.anthropic.com
+```
+
+The setup script (`bash nanoclaw.sh`) detects headless Linux automatically and prompts you to paste the token — no SSH tunnel or port-forwarding needed.
+
+### Third-party integrations (Gmail, Calendar, SmartThings, etc.)
+
+All integrations follow the same pattern: complete the OAuth flow once on a machine with a browser, export the token, then inject it on the server.
+
+1. Complete the OAuth flow on a machine with a browser to obtain the token or API key.
+2. On the headless server, inject it:
+   ```bash
+   # Generic API key / OAuth token
+   onecli secrets create \
+     --name <IntegrationName> \
+     --type api_key \
+     --value <token> \
+     --host-pattern <api.example.com>
+
+   # Examples:
+   onecli secrets create --name Gmail --type api_key \
+     --value <token> --host-pattern oauth2.googleapis.com
+   onecli secrets create --name SmartThings --type api_key \
+     --value <token> --host-pattern api.smartthings.com
+   ```
+3. Verify: `onecli secrets list`
+
+No restart needed after adding a secret — the gateway looks up credentials per request, so the running container will see the new credential on its next API call.
+
 ## Troubleshooting
 
 **"OneCLI gateway not reachable" in logs:** The gateway isn't running. Check with `curl -sf ${ONECLI_URL}/health`. Start it with `onecli start` if needed.
