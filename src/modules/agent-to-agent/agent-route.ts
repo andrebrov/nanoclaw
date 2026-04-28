@@ -121,7 +121,11 @@ export const BROADCAST_SENTINEL = '__broadcast__';
  */
 export const MAIN_SENTINEL = '__main__';
 
-async function deliverToAgent(targetAgentGroupId: string, sourceSession: Session, msg: RoutableAgentMessage): Promise<void> {
+async function deliverToAgent(
+  targetAgentGroupId: string,
+  sourceSession: Session,
+  msg: RoutableAgentMessage,
+): Promise<void> {
   const { session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared');
   const a2aMsgId = `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
