@@ -45,7 +45,7 @@ agent-browser snapshot -d 3       # Limit depth to 3
 agent-browser snapshot -s "#main" # Scope to CSS selector
 ```
 
-### Interactions (use @refs from snapshot)
+### Interactions (use snapshot-returned refs like `@e1`)
 
 ```bash
 agent-browser click @e1           # Click

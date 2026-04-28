@@ -34,6 +34,12 @@ export interface ProviderOptions {
    * understand capability-gating use this to build their tool allowlists.
    */
   allowedCapabilities?: AgentCapability[];
+  /**
+   * Enable the merchant-advocate LinkedIn-post gate. The Claude provider
+   * wraps its PreToolUse hook so Bash commands posting to LinkedIn are
+   * routed through the rubric before they execute.
+   */
+  linkedinPostValidator?: boolean;
 }
 
 export interface QueryInput {

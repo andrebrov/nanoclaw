@@ -1,6 +1,6 @@
 {
   "name": "finsi/gh-issue",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "summary": "File a GitHub issue against the nanoclaw repo to trigger an AI-fix run. Use when the user wants a code change to NanoClaw itself — bugs, features, refactors. The issue will get labeled `ai-fix`, a GitHub Action picks it up, Claude opens a PR, CI gates it, and after merge the droplet auto-syncs and restarts.",
   "skills": {

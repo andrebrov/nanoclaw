@@ -64,6 +64,13 @@ export interface RunnerConfig {
    * means restricted mode: no shell, no file writes, no network.
    */
   allowedCapabilities: AgentCapability[];
+  /**
+   * When true, Bash commands matching the LinkedIn-post patterns
+   * (composio-tool linkedin-* / heyreach-tool *) are gated by the
+   * merchant-advocate review hook before they execute. See
+   * specs/linkedin-post-validator.spec.md.
+   */
+  linkedinPostValidator: boolean;
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
@@ -93,6 +100,7 @@ export function loadConfig(): RunnerConfig {
     mcpServers: (raw.mcpServers as RunnerConfig['mcpServers']) || {},
     isAdmin: (raw.isAdmin as boolean) === true,
     allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities),
+    linkedinPostValidator: raw.linkedinPostValidator === true,
   };
 
   return _config;

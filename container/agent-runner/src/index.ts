@@ -174,6 +174,7 @@ async function main(): Promise<void> {
     env: { ...process.env, ...(ipcDir ? { TMPDIR: ipcDir } : {}) },
     additionalDirectories: additionalDirectories.length > 0 ? additionalDirectories : undefined,
     allowedCapabilities: config.allowedCapabilities,
+    linkedinPostValidator: config.linkedinPostValidator,
   });
 
   await runPollLoop({

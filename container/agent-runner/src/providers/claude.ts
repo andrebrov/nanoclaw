@@ -5,6 +5,7 @@ import { query as sdkQuery, type HookCallback, type PreCompactHookInput } from '
 
 import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/connection.js';
 import { writeMessageOut } from '../db/messages-out.js';
+import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
 import { registerProvider } from './provider-registry.js';
 import type {
   AgentProvider,
@@ -213,31 +214,49 @@ function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | nu
 }
 
 /**
- * PreToolUse hook: record the current tool + its declared timeout so the host
- * sweep can widen its stuck tolerance while Bash is running a long-declared
- * script. Defense-in-depth: if SDK_DISALLOWED_TOOLS slips through somehow,
- * block the call here instead of letting the agent hang.
+ * PreToolUse hook factory. Records the current tool + its declared timeout
+ * so the host sweep can widen its stuck tolerance while Bash is running a
+ * long-declared script. Defense-in-depth: if SDK_DISALLOWED_TOOLS slips
+ * through somehow, block the call here instead of letting the agent hang.
+ *
+ * When `linkedinPostValidator` is true, Bash commands matching the
+ * LinkedIn-posting patterns are also routed through the merchant-advocate
+ * gate before they execute (see ../hooks/linkedin-post-validator.ts).
  */
-const preToolUseHook: HookCallback = async (input) => {
-  const i = input as { tool_name?: string; tool_input?: Record<string, unknown> };
-  const toolName = i.tool_name ?? '';
-  if (SDK_DISALLOWED_TOOLS.includes(toolName)) {
-    return {
-      decision: 'block',
-      stopReason: `Tool '${toolName}' is not available in this environment — use the nanoclaw equivalent.`,
-    } as unknown as ReturnType<HookCallback>;
-  }
-  // Bash exposes its timeout via the tool_input.timeout field (ms). Any other
-  // tool: no declared timeout.
-  const declaredTimeoutMs =
-    toolName === 'Bash' && typeof i.tool_input?.timeout === 'number' ? (i.tool_input.timeout as number) : null;
-  try {
-    setContainerToolInFlight(toolName, declaredTimeoutMs);
-  } catch (err) {
-    log(`PreToolUse: failed to record container_state: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  return { continue: true };
-};
+function createPreToolUseHook(options: { linkedinPostValidator: boolean }): HookCallback {
+  return async (input) => {
+    const i = input as { tool_name?: string; tool_input?: Record<string, unknown> };
+    const toolName = i.tool_name ?? '';
+    if (SDK_DISALLOWED_TOOLS.includes(toolName)) {
+      return {
+        decision: 'block',
+        stopReason: `Tool '${toolName}' is not available in this environment — use the nanoclaw equivalent.`,
+      } as unknown as ReturnType<HookCallback>;
+    }
+    if (options.linkedinPostValidator && toolName === 'Bash') {
+      const cmd = typeof i.tool_input?.command === 'string' ? (i.tool_input.command as string) : '';
+      if (cmd) {
+        const decision = await gateLinkedInPostCommand(cmd);
+        if ('block' in decision && decision.block) {
+          return {
+            decision: 'block',
+            stopReason: decision.reason,
+          } as unknown as ReturnType<HookCallback>;
+        }
+      }
+    }
+    // Bash exposes its timeout via the tool_input.timeout field (ms). Any other
+    // tool: no declared timeout.
+    const declaredTimeoutMs =
+      toolName === 'Bash' && typeof i.tool_input?.timeout === 'number' ? (i.tool_input.timeout as number) : null;
+    try {
+      setContainerToolInFlight(toolName, declaredTimeoutMs);
+    } catch (err) {
+      log(`PreToolUse: failed to record container_state: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    return { continue: true };
+  };
+}
 
 /** Clear in-flight tool on PostToolUse / PostToolUseFailure. */
 const postToolUseHook: HookCallback = async () => {
@@ -399,12 +418,16 @@ export class ClaudeProvider implements AgentProvider {
   private additionalDirectories?: string[];
   private toolAllowlist: string[];
   private model: string | undefined;
+  private preToolUseHook: HookCallback;
 
   constructor(options: ProviderOptions = {}) {
     this.assistantName = options.assistantName;
     this.mcpServers = options.mcpServers ?? {};
     this.additionalDirectories = options.additionalDirectories;
     this.toolAllowlist = buildToolAllowlist(options.allowedCapabilities ?? []);
+    this.preToolUseHook = createPreToolUseHook({
+      linkedinPostValidator: options.linkedinPostValidator === true,
+    });
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude
     // subprocess — it spawns with a filtered/sanitized env. Symptom when
@@ -461,7 +484,7 @@ export class ClaudeProvider implements AgentProvider {
         // 'summarized' so thinking is always visible when the model uses it.
         thinking: { type: 'adaptive', display: 'summarized' },
         hooks: {
-          PreToolUse: [{ hooks: [preToolUseHook] }],
+          PreToolUse: [{ hooks: [this.preToolUseHook] }],
           PostToolUse: [{ hooks: [postToolUseHook] }],
           PostToolUseFailure: [{ hooks: [postToolUseHook] }],
           PreCompact: [{ hooks: [createPreCompactHook(this.assistantName)] }],

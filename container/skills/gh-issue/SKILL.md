@@ -25,7 +25,7 @@ Use when the user reports a bug or asks for a change in NanoClaw's own code (any
 Run the helper script:
 
 ```bash
-/app/skills/gh-issue/create.sh "<title>" "<body>"
+/app/skills/gh-issue/scripts/create.sh "<title>" "<body>"
 ```
 
 - **Title:** one-line summary, action-verb first ("Fix container kill loop on stale heartbeat", "Add foo bar to bar.ts").
@@ -45,7 +45,7 @@ User: "There's a race in container-runner.ts where the heartbeat file from a pri
 
 You:
 ```bash
-/app/skills/gh-issue/create.sh \
+/app/skills/gh-issue/scripts/create.sh \
   "Stale .heartbeat file SIGKILLs freshly-spawned container" \
   "## Symptom
 Container spawn → host sweep sees old heartbeat mtime → kills container with SIGKILL (exit 137) within 1 second of spawn.

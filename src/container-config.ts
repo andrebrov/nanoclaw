@@ -87,6 +87,12 @@ export interface ContainerConfig {
    * See AgentCapability for valid values.
    */
   allowedCapabilities?: AgentCapability[];
+  /**
+   * When true, this group's agent has its outbound LinkedIn-post Bash
+   * commands gated by the merchant-advocate review. See
+   * specs/linkedin-post-validator.spec.md.
+   */
+  linkedinPostValidator?: boolean;
 }
 
 const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
@@ -166,6 +172,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       model: typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : undefined,
       isAdmin: raw.isAdmin,
       allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
+      linkedinPostValidator: raw.linkedinPostValidator === true,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);
