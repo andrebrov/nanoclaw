@@ -11,6 +11,8 @@ import {
   clearStoredSessionId,
   setTurnReplyTo,
   clearTurnReplyTo,
+  setTurnSourceRouting,
+  clearTurnSourceRouting,
   getTurnSendInvoked,
   clearTurnSendInvoked,
 } from './db/session-state.js';
@@ -116,6 +118,12 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     } else {
       clearTurnReplyTo();
     }
+
+    // Publish the source channel so send_message defaults to the channel the
+    // triggering message came from (e.g. a group chat), not the session's
+    // bound default (e.g. a DM). Mirrors the dispatchResultText behaviour for
+    // plain text so both paths route consistently.
+    setTurnSourceRouting(routing.channelType, routing.platformId, routing.threadId);
 
     // Reset the per-turn send flag so a fresh turn starts clean.
     clearTurnSendInvoked();
@@ -237,6 +245,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // (e.g. stream closed unexpectedly).
     markCompleted(processingIds);
     clearTurnReplyTo();
+    clearTurnSourceRouting();
     log(`Completed ${ids.length} message(s)`);
   }
 }

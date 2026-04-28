@@ -115,7 +115,9 @@ function buildDestinationsSection(): string {
     return [
       '## Sending messages',
       '',
-      `Your messages are delivered to \`${d.name}\`${label}. Just write your response directly — no special wrapping needed.`,
+      'Your response is delivered to the channel where the triggering message came from. Just write your response directly — no special wrapping needed.',
+      '',
+      `To explicitly send to \`${d.name}\`${label} regardless of the source channel, call \`send_message(to="${d.name}", text="...")\`.`,
       '',
       'To mark something as scratchpad (logged but not sent), wrap it in `<internal>...</internal>`.',
       '',
@@ -131,8 +133,10 @@ function buildDestinationsSection(): string {
   lines.push('');
   lines.push('To send a message, wrap it in a `<message to="name">...</message>` block.');
   lines.push('You can include multiple `<message>` blocks in one response to send to multiple destinations.');
-  lines.push('Text outside of `<message>` blocks is scratchpad — logged but not sent anywhere.');
-  lines.push('Use `<internal>...</internal>` to make scratchpad intent explicit.');
+  lines.push(
+    'Text outside of `<message>` blocks is delivered to the channel the triggering message came from (not to a named destination).',
+  );
+  lines.push('Use `<internal>...</internal>` to mark something as scratchpad — logged but never delivered.');
   lines.push('');
   lines.push(
     'To send a message mid-response (e.g., an acknowledgment before a long task), call the `send_message` MCP tool with the `to` parameter set to a destination name.',

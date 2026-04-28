@@ -12,7 +12,7 @@ import path from 'path';
 import { findByName, getAllDestinations } from '../destinations.js';
 import { getDeliveryStatus, getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
-import { getTurnReplyTo, setTurnSendInvoked } from '../db/session-state.js';
+import { getTurnReplyTo, getTurnSourceRouting, setTurnSendInvoked } from '../db/session-state.js';
 import { registerTools } from './server.js';
 import type { McpToolDefinition } from './types.js';
 
@@ -71,7 +71,23 @@ function resolveRouting(
   to: string | undefined,
 ): { channel_type: string; platform_id: string; thread_id: string | null; resolvedName: string } | { error: string } {
   if (!to) {
-    // Default: reply to whatever thread/channel this session is bound to.
+    // Prefer the source channel of the current turn's triggering message.
+    // When a message arrives from a group chat and the agent calls send_message()
+    // without an explicit destination, the reply should go to that group — not
+    // to the session's default DM binding. Mirrors the dispatchResultText path
+    // for plain text so both delivery paths route consistently.
+    const turnSource = getTurnSourceRouting();
+    if (turnSource) {
+      return {
+        channel_type: turnSource.channelType,
+        platform_id: turnSource.platformId,
+        thread_id: turnSource.threadId,
+        resolvedName: '(current conversation)',
+      };
+    }
+
+    // Fallback: reply to whatever thread/channel this session is bound to
+    // (used when there's no active chat turn, e.g. scheduled tasks).
     const session = getSessionRouting();
     if (session.channel_type && session.platform_id) {
       return {

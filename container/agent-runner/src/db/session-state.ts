@@ -58,6 +58,61 @@ export function clearTurnReplyTo(): void {
   deleteValue(TURN_REPLY_TO_KEY);
 }
 
+const TURN_SOURCE_ROUTING_KEY = 'turn_source_routing';
+
+/**
+ * The source channel routing for the current turn — set by the poll-loop at
+ * the start of each turn from the last inbound message's channel/platform IDs,
+ * cleared at end of turn.
+ *
+ * Used by send_message as the default routing destination when `to` is omitted,
+ * so replies go back to the channel the triggering message came from (e.g. a
+ * group chat) rather than the session's bound default channel (e.g. a DM).
+ * Consistent with dispatchResultText, which also uses inbound routing to
+ * decide where plain text goes.
+ */
+export function setTurnSourceRouting(
+  channelType: string | null,
+  platformId: string | null,
+  threadId: string | null,
+): void {
+  if (channelType && platformId) {
+    setValue(TURN_SOURCE_ROUTING_KEY, JSON.stringify({ channelType, platformId, threadId: threadId ?? null }));
+  } else {
+    deleteValue(TURN_SOURCE_ROUTING_KEY);
+  }
+}
+
+export function getTurnSourceRouting(): {
+  channelType: string;
+  platformId: string;
+  threadId: string | null;
+} | null {
+  const raw = getValue(TURN_SOURCE_ROUTING_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as {
+      channelType?: string;
+      platformId?: string;
+      threadId?: string | null;
+    };
+    if (parsed.channelType && parsed.platformId) {
+      return {
+        channelType: parsed.channelType,
+        platformId: parsed.platformId,
+        threadId: parsed.threadId ?? null,
+      };
+    }
+  } catch {
+    /* corrupt value — treat as absent */
+  }
+  return null;
+}
+
+export function clearTurnSourceRouting(): void {
+  deleteValue(TURN_SOURCE_ROUTING_KEY);
+}
+
 const TURN_SEND_INVOKED_KEY = 'turn_send_invoked';
 
 /**
