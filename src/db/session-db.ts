@@ -255,6 +255,35 @@ export function markDeliveryFailed(db: Database.Database, messageOutId: string):
   ).run(messageOutId);
 }
 
+/**
+ * Record that the agent sent a reaction to a specific inbound message.
+ * Written by the host on successful reaction delivery so the container's
+ * read-only inbound.db always has an up-to-date reactions table for
+ * check-unanswered cron scripts that JOIN against it.
+ */
+export function recordReaction(db: Database.Database, id: string, messageId: string, emoji: string): void {
+  db.prepare(
+    "INSERT OR IGNORE INTO reactions (id, message_id, emoji, created_at) VALUES (?, ?, ?, datetime('now'))",
+  ).run(id, messageId, emoji);
+}
+
+/**
+ * Ensure the reactions table exists in inbound.db for pre-existing sessions
+ * created before the reactions table was added to INBOUND_SCHEMA.
+ * CREATE TABLE IF NOT EXISTS is idempotent — safe to call on every delivery cycle.
+ */
+export function migrateReactionsTable(db: Database.Database): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reactions (
+      id          TEXT PRIMARY KEY,
+      message_id  TEXT NOT NULL,
+      emoji       TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON reactions(message_id);
+  `);
+}
+
 /** Ensure the delivered table has columns added after initial schema. */
 export function migrateDeliveredTable(db: Database.Database): void {
   const cols = new Set(

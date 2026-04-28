@@ -19,6 +19,8 @@ import {
   markDelivered,
   markDeliveryFailed,
   migrateDeliveredTable,
+  migrateReactionsTable,
+  recordReaction,
 } from './db/session-db.js';
 import { log } from './log.js';
 import { normalizeOptions } from './channels/ask-question.js';
@@ -208,6 +210,9 @@ async function drainSession(session: Session): Promise<void> {
 
     // Ensure platform_message_id column exists (migration for existing sessions)
     migrateDeliveredTable(inDb);
+    // Ensure reactions table exists — pre-existing sessions were created before
+    // reactions was added to INBOUND_SCHEMA (idempotent, cheap).
+    migrateReactionsTable(inDb);
 
     const now = Date.now();
     for (const msg of undelivered) {
@@ -220,6 +225,18 @@ async function drainSession(session: Session): Promise<void> {
         const platformMsgId = await deliverMessage(msg, session, inDb);
         markDelivered(inDb, msg.id, platformMsgId ?? null);
         deliveryRetries.delete(msg.id);
+
+        // Record successfully delivered reactions in inbound.db so the
+        // container's check-unanswered cron scripts can JOIN against the
+        // reactions table without hitting "no such table: reactions".
+        try {
+          const c = JSON.parse(msg.content) as Record<string, unknown>;
+          if (c.operation === 'reaction' && typeof c.messageId === 'string' && typeof c.emoji === 'string') {
+            recordReaction(inDb, msg.id, c.messageId, c.emoji);
+          }
+        } catch {
+          /* non-JSON or missing fields — skip reaction recording */
+        }
 
         // Pause the typing indicator after a real user-facing message
         // lands on the user's screen, so the client has time to visually

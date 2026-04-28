@@ -454,6 +454,11 @@ async function processQuery(
           `Context threshold nuke: ${event.tokens.toLocaleString()} tokens (${contextPct}%) — checkpointing and exiting`,
         );
         writeNukeCheckpoint(event.tokens, event.transcriptPath, '/workspace/agent');
+        // Wipe the stored session ID so the next container starts a fresh
+        // session instead of resuming this full-context one. Without this,
+        // the next spawn would resume the same high-context transcript, hit
+        // the threshold again on the first reply, and loop indefinitely.
+        clearStoredSessionId();
         // Exit code 75 (EX_TEMPFAIL): planned nuke, not a crash.
         // Host orchestrator can watch for this code to trigger Facts writing + restart.
         process.exit(75);

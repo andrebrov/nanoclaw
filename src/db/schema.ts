@@ -208,6 +208,19 @@ CREATE TABLE IF NOT EXISTS session_routing (
   platform_id  TEXT,
   thread_id    TEXT
 );
+
+-- Reactions sent by the agent to inbound messages.
+-- Written by the host when a reaction from messages_out is successfully
+-- delivered to the platform. Readable by the container (read-only inbound.db)
+-- so check-unanswered cron scripts can JOIN against it to skip already-
+-- acknowledged messages without hitting "no such table: reactions".
+CREATE TABLE IF NOT EXISTS reactions (
+  id          TEXT PRIMARY KEY,
+  message_id  TEXT NOT NULL,
+  emoji       TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_reactions_message_id ON reactions(message_id);
 `;
 
 /** Container-owned: outbound messages + processing acknowledgments. */
