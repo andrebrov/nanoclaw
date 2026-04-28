@@ -4,6 +4,7 @@ import { initTestSessionDb, closeSessionDb, getInboundDb, getOutboundDb } from '
 import { getUndeliveredMessages } from './db/messages-out.js';
 import { getPendingMessages } from './db/messages-in.js';
 import { MockProvider } from './providers/mock.js';
+import type { AgentQuery, ProviderOptions, QueryInput } from './providers/types.js';
 import { runPollLoop } from './poll-loop.js';
 
 beforeEach(() => {
@@ -96,6 +97,86 @@ describe('poll loop integration', () => {
 
     const out = getUndeliveredMessages();
     expect(out.length).toBeGreaterThanOrEqual(1);
+
+    await loopPromise.catch(() => {});
+  });
+});
+
+describe('task batch session isolation', () => {
+  it('does not pass stored continuation to provider when batch is a task', async () => {
+    // Simulate a prior run having stored a session ID (task A's SDK session).
+    getOutboundDb()
+      .prepare(
+        "INSERT INTO session_state (key, value, updated_at) VALUES ('sdk_session_id', 'prev-session-abc', datetime('now'))",
+      )
+      .run();
+
+    // Spy provider: records the continuation it received.
+    let capturedContinuation: string | undefined = 'NOT_SET';
+    class SpyProvider extends MockProvider {
+      constructor(opts: ProviderOptions) {
+        super(opts, () => '<message to="discord-test">task output</message>');
+      }
+      query(input: QueryInput): AgentQuery {
+        capturedContinuation = input.continuation;
+        return super.query(input);
+      }
+    }
+
+    getInboundDb()
+      .prepare(
+        `INSERT INTO messages_in (id, kind, timestamp, status, platform_id, channel_type, content)
+         VALUES ('t1', 'task', datetime('now'), 'pending', 'chan-1', 'discord', '{"prompt":"check open PRs"}')`,
+      )
+      .run();
+
+    const provider = new SpyProvider({});
+    const controller = new AbortController();
+    const loopPromise = runPollLoopWithTimeout(provider, controller.signal, 2000);
+
+    await waitFor(() => getUndeliveredMessages().length > 0, 2000);
+    controller.abort();
+
+    // The task batch must have started a fresh SDK session (continuation=undefined).
+    expect(capturedContinuation).toBeUndefined();
+
+    await loopPromise.catch(() => {});
+  });
+
+  it('passes stored continuation to provider for chat batches', async () => {
+    getOutboundDb()
+      .prepare(
+        "INSERT INTO session_state (key, value, updated_at) VALUES ('sdk_session_id', 'chat-session-xyz', datetime('now'))",
+      )
+      .run();
+
+    let capturedContinuation: string | undefined = 'NOT_SET';
+    class SpyProvider extends MockProvider {
+      constructor(opts: ProviderOptions) {
+        super(opts, () => '<message to="discord-test">chat reply</message>');
+      }
+      query(input: QueryInput): AgentQuery {
+        capturedContinuation = input.continuation;
+        return super.query(input);
+      }
+    }
+
+    getInboundDb()
+      .prepare(
+        `INSERT INTO messages_in (id, kind, timestamp, status, platform_id, channel_type, content)
+         VALUES ('c1', 'chat', datetime('now'), 'pending', 'chan-1', 'discord', '{"sender":"Alice","text":"hi"}')`,
+      )
+      .run();
+
+    const provider = new SpyProvider({});
+    const controller = new AbortController();
+    const loopPromise = runPollLoopWithTimeout(provider, controller.signal, 2000);
+
+    await waitFor(() => getUndeliveredMessages().length > 0, 2000);
+    controller.abort();
+
+    // Chat batches must resume the existing SDK session.
+    expect(capturedContinuation).toBe('chat-session-xyz');
 
     await loopPromise.catch(() => {});
   });
