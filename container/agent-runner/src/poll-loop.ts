@@ -11,6 +11,8 @@ import {
   clearStoredSessionId,
   setTurnReplyTo,
   clearTurnReplyTo,
+  getTurnSendInvoked,
+  clearTurnSendInvoked,
 } from './db/session-state.js';
 import { scheduleSnapshotWrite, clearSnapshot } from './db/session-snapshot.js';
 import {
@@ -114,6 +116,9 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     } else {
       clearTurnReplyTo();
     }
+
+    // Reset the per-turn send flag so a fresh turn starts clean.
+    clearTurnSendInvoked();
 
     // Command handling: the host router gates filtered and unauthorized
     // admin commands before they reach the container. The only command
@@ -403,8 +408,18 @@ async function processQuery(
         // in messages_out, silently dropping it. Both writes are synchronous
         // SQLite calls so the window between them is negligible in normal
         // operation — only a crash scenario is affected.
+        //
+        // Duplicate suppression: if send_message or send_file already delivered
+        // a reply this turn, the SDK still surfaces the agent's closing text as
+        // a Result. Sending it would produce a second message. Log it but skip
+        // delivery. add_reaction does NOT set this flag — reaction + closing
+        // summary is a valid reply path.
         if (event.text) {
-          dispatchResultText(event.text, routing);
+          if (getTurnSendInvoked()) {
+            log(`Suppressing result text (send already fired this turn): ${event.text.slice(0, 200)}`);
+          } else {
+            dispatchResultText(event.text, routing);
+          }
         }
         markCompleted(initialBatchIds);
       } else if (event.type === 'threshold_warn') {

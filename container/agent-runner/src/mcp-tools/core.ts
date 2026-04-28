@@ -12,7 +12,7 @@ import path from 'path';
 import { findByName, getAllDestinations } from '../destinations.js';
 import { getDeliveryStatus, getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
-import { getTurnReplyTo } from '../db/session-state.js';
+import { getTurnReplyTo, setTurnSendInvoked } from '../db/session-state.js';
 import { registerTools } from './server.js';
 import type { McpToolDefinition } from './types.js';
 
@@ -46,10 +46,7 @@ function destinationList(): string {
  * appears within 1–2 s. A 5 s timeout gives reasonable headroom for slow
  * network round-trips to the platform API while keeping the tool responsive.
  */
-async function waitForDelivery(
-  messageOutId: string,
-  timeoutMs = 5000,
-): Promise<'delivered' | 'failed' | 'timeout'> {
+async function waitForDelivery(messageOutId: string, timeoutMs = 5000): Promise<'delivered' | 'failed' | 'timeout'> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     await new Promise<void>((r) => setTimeout(r, 250));
@@ -191,6 +188,7 @@ export const sendMessage: McpToolDefinition = {
       content: JSON.stringify({ text }),
     });
 
+    setTurnSendInvoked();
     log(`send_message: #${seq} → ${routing.resolvedName}${inReplyToId ? ` (reply to ${inReplyToId})` : ''}`);
     return ok(`Message sent to ${routing.resolvedName} (id: ${seq})`);
   },
@@ -245,6 +243,7 @@ export const sendFile: McpToolDefinition = {
       content: JSON.stringify({ text: (args.text as string) || '', files: [filename] }),
     });
 
+    setTurnSendInvoked();
     log(`send_file: ${id} → ${routing.resolvedName} (${filename})`);
     return ok(`File sent to ${routing.resolvedName} (id: ${id}, filename: ${filename})`);
   },
@@ -275,7 +274,9 @@ export const editMessage: McpToolDefinition = {
 
     const platformId = getMessageIdBySeq(seq);
     if (!platformId) {
-      return err(`Message #${seq} hasn't been delivered yet — wait a moment and try again, or it has no platform id to edit.`);
+      return err(
+        `Message #${seq} hasn't been delivered yet — wait a moment and try again, or it has no platform id to edit.`,
+      );
     }
 
     const id = generateId();
@@ -390,7 +391,9 @@ export const addReaction: McpToolDefinition = {
 
     const platformId = getMessageIdBySeq(seq);
     if (!platformId) {
-      return err(`Message #${seq} hasn't been delivered yet — wait a moment and try again, or it has no platform id to react to.`);
+      return err(
+        `Message #${seq} hasn't been delivered yet — wait a moment and try again, or it has no platform id to react to.`,
+      );
     }
 
     const emoji = normalizeEmoji(rawEmoji);
@@ -412,7 +415,9 @@ export const addReaction: McpToolDefinition = {
       return ok(`Reaction added to message #${seq}`);
     }
     if (deliveryStatus === 'failed') {
-      return err(`Reaction delivery failed for #${seq} — the platform rejected it (wrong permissions or unsupported emoji). Check server logs for details.`);
+      return err(
+        `Reaction delivery failed for #${seq} — the platform rejected it (wrong permissions or unsupported emoji). Check server logs for details.`,
+      );
     }
     return ok(`Reaction queued for #${seq}`);
   },
