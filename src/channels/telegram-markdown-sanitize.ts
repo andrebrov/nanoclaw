@@ -12,6 +12,28 @@ const CODE_PATTERN = /```[\s\S]*?```|`[^`\n]*`/g;
 const PLACEHOLDER_PREFIX = '\x00CODE';
 const PLACEHOLDER_SUFFIX = '\x00';
 
+// Telegram Bot API 7.x HTML tags. Phase 1b passes these through; anything else
+// is entity-escaped so stray tokens like <tool_use_error> render as visible
+// text instead of triggering a silent 400 from the Bot API.
+const TELEGRAM_ALLOWED_TAGS = new Set([
+  'b',
+  'strong',
+  'i',
+  'em',
+  'u',
+  'ins',
+  's',
+  'strike',
+  'del',
+  'span',
+  'tg-spoiler',
+  'tg-emoji',
+  'a',
+  'code',
+  'pre',
+  'blockquote',
+]);
+
 export function sanitizeTelegramLegacyMarkdown(input: string): string {
   if (!input) return input;
 
@@ -31,6 +53,14 @@ export function sanitizeTelegramLegacyMarkdown(input: string): string {
   text = text.replace(/<strong>([\s\S]*?)<\/strong>/gi, '*$1*');
   text = text.replace(/<i>([\s\S]*?)<\/i>/gi, '_$1_');
   text = text.replace(/<em>([\s\S]*?)<\/em>/gi, '_$1_');
+
+  // Phase 1b: escape any remaining HTML-shaped tokens not in the Telegram Bot
+  // API allowlist. Tag names are underscore-widened so <tool_use_error>-style
+  // tokens are matched. Known tags pass through; unknown ones become
+  // &lt;tag&gt; and render as visible text rather than causing a silent 400.
+  text = text.replace(/<\/?([A-Za-z][A-Za-z0-9_-]*)[^>]*>/g, (match, tagName: string) =>
+    TELEGRAM_ALLOWED_TAGS.has(tagName.toLowerCase()) ? match : match.replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+  );
 
   // The adapter re-parses and re-stringifies markdown before sending, which
   // rewrites `- item` list bullets into `* item` — injecting unbalanced

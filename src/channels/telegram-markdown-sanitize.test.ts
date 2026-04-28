@@ -90,6 +90,36 @@ describe('sanitizeTelegramLegacyMarkdown', () => {
     expect(sanitizeTelegramLegacyMarkdown('x < y & z > w')).toBe('x < y & z > w');
   });
 
+  it('escapes <tool_use_error> tags (Phase 1b)', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<tool_use_error>oops</tool_use_error>')).toBe(
+      '&lt;tool_use_error&gt;oops&lt;/tool_use_error&gt;',
+    );
+  });
+
+  it('escapes unknown tags with underscores in the name', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<deliveryScheduleId>123</deliveryScheduleId>')).toBe(
+      '&lt;deliveryScheduleId&gt;123&lt;/deliveryScheduleId&gt;',
+    );
+  });
+
+  it('passes allowed tags through Phase 1b unchanged', () => {
+    expect(sanitizeTelegramLegacyMarkdown('<code>x = 1</code>')).toBe('<code>x = 1</code>');
+    expect(sanitizeTelegramLegacyMarkdown('<pre>block</pre>')).toBe('<pre>block</pre>');
+    expect(sanitizeTelegramLegacyMarkdown('<a href="https://example.com">link</a>')).toBe(
+      '<a href="https://example.com">link</a>',
+    );
+  });
+
+  it('does not escape unknown tags inside code blocks (Phase 1a protects them)', () => {
+    const input = '```\n<tool_use_error>inside block</tool_use_error>\n```';
+    expect(sanitizeTelegramLegacyMarkdown(input)).toBe(input);
+  });
+
+  it('escapes unknown tag but leaves surrounding text intact', () => {
+    const result = sanitizeTelegramLegacyMarkdown('before <tool_use_error>err</tool_use_error> after');
+    expect(result).toBe('before &lt;tool_use_error&gt;err&lt;/tool_use_error&gt; after');
+  });
+
   it('replaces dash list bullets with • so the adapter does not re-emit `*` markers', () => {
     expect(sanitizeTelegramLegacyMarkdown('- one\n- two')).toBe('• one\n• two');
   });
