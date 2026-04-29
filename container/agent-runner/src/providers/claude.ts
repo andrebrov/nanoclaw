@@ -326,8 +326,9 @@ function createPreCompactHook(assistantName?: string): HookCallback {
  * Set a large window so SDK auto-compact never fires at normal usage.
  * Threshold-based nuke (below) replaces SDK compaction with deterministic
  * checkpointing and clean container restart.
+ * Configurable via AGENT_AUTO_COMPACT_WINDOW env variable.
  */
-const CLAUDE_CODE_AUTO_COMPACT_WINDOW = '9000000';
+const CLAUDE_CODE_AUTO_COMPACT_WINDOW = process.env.AGENT_AUTO_COMPACT_WINDOW ?? '9000000';
 
 /**
  * Context window size from env (Opus 4.7[1m] uses 1M, Sonnet 4.6 uses 200K).
