@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeTelegramLegacyMarkdown } from './telegram-markdown-sanitize.js';
+import { sanitizeTelegramLegacyMarkdown, toTelegramHtml } from './telegram-markdown-sanitize.js';
 
 describe('sanitizeTelegramLegacyMarkdown', () => {
   it('downgrades CommonMark **bold** to legacy *bold*', () => {
@@ -136,5 +136,51 @@ describe('sanitizeTelegramLegacyMarkdown', () => {
   it('leaves horizontal rules inside code blocks alone', () => {
     const input = '```\n---\n```';
     expect(sanitizeTelegramLegacyMarkdown(input)).toBe(input);
+  });
+});
+
+describe('toTelegramHtml', () => {
+  it('is a no-op on empty string', () => {
+    expect(toTelegramHtml('')).toBe('');
+  });
+
+  it('converts CommonMark **bold** to <b>bold</b>', () => {
+    expect(toTelegramHtml('**Host path**')).toBe('<b>Host path</b>');
+  });
+
+  it('converts __bold__ to <b>bold</b>', () => {
+    expect(toTelegramHtml('__label__')).toBe('<b>label</b>');
+  });
+
+  it('preserves existing <b> tags unchanged', () => {
+    expect(toTelegramHtml('<b>hello</b>')).toBe('<b>hello</b>');
+  });
+
+  it('preserves existing <i> tags unchanged', () => {
+    expect(toTelegramHtml('<i>hello</i>')).toBe('<i>hello</i>');
+  });
+
+  it('wraps inline code spans in <code>', () => {
+    expect(toTelegramHtml('see `file.py` here')).toBe('see <code>file.py</code> here');
+  });
+
+  it('wraps fenced code blocks in <pre>', () => {
+    expect(toTelegramHtml('```\nfoo\n```')).toBe('<pre>foo</pre>');
+  });
+
+  it('protects code spans from bold conversion', () => {
+    expect(toTelegramHtml('`**not bold**`')).toBe('<code>**not bold**</code>');
+  });
+
+  it('protects fenced blocks from bold conversion', () => {
+    expect(toTelegramHtml('```\n**raw**\n```')).toBe('<pre>**raw**</pre>');
+  });
+
+  it('converts multiple bold spans in one message', () => {
+    expect(toTelegramHtml('**foo** and **bar**')).toBe('<b>foo</b> and <b>bar</b>');
+  });
+
+  it('passes plain text with < > & unchanged', () => {
+    expect(toTelegramHtml('x < y & z > w')).toBe('x < y & z > w');
   });
 });

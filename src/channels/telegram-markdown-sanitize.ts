@@ -34,6 +34,42 @@ const TELEGRAM_ALLOWED_TAGS = new Set([
   'blockquote',
 ]);
 
+/**
+ * Prepare agent output for Telegram HTML parse mode.
+ *
+ * - Converts the most common CommonMark Markdown patterns (bold, code) to
+ *   their HTML equivalents so they render correctly in HTML parse mode.
+ * - Preserves existing Telegram-allowed HTML tags (already HTML-ready).
+ * - Code spans and blocks are wrapped in <code>/<pre>; their content is
+ *   kept verbatim — callers send with parse_mode:'HTML' and a 400 fallback
+ *   strips all tags, so imperfect escaping inside code blocks is tolerable.
+ * - Italic (`*...*`, `_..._`) is intentionally NOT converted: single-asterisk
+ *   and underscore patterns have too many false positives in prose and
+ *   snake_case identifiers. Agents can use <i>...</i> directly.
+ */
+export function toTelegramHtml(input: string): string {
+  if (!input) return input;
+
+  const codeParts: string[] = [];
+  let text = input.replace(/```[\s\S]*?```|`[^`\n]*`/g, (m) => {
+    codeParts.push(m);
+    return `\x00CODE${codeParts.length - 1}\x00`;
+  });
+
+  // CommonMark bold → HTML bold
+  text = text.replace(/\*\*([^*\n]+?)\*\*/g, '<b>$1</b>');
+  text = text.replace(/__([^_\n]+?)__/g, '<b>$1</b>');
+
+  return text.replace(/\x00CODE(\d+)\x00/g, (_, i: string) => {
+    const block = codeParts[Number(i)]!;
+    if (block.startsWith('```')) {
+      const inner = block.replace(/^```\w*\n?/, '').replace(/\n?```$/, '');
+      return `<pre>${inner}</pre>`;
+    }
+    return `<code>${block.slice(1, -1)}</code>`;
+  });
+}
+
 export function sanitizeTelegramLegacyMarkdown(input: string): string {
   if (!input) return input;
 

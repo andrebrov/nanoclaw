@@ -11,7 +11,7 @@ import { createMessagingGroup, getMessagingGroupByPlatform, updateMessagingGroup
 import { grantRole, hasAnyOwner } from '../modules/permissions/db/user-roles.js';
 import { upsertUser } from '../modules/permissions/db/users.js';
 import { createChatSdkBridge, type ReplyContext } from './chat-sdk-bridge.js';
-import { sanitizeTelegramLegacyMarkdown } from './telegram-markdown-sanitize.js';
+import { sanitizeTelegramLegacyMarkdown, toTelegramHtml } from './telegram-markdown-sanitize.js';
 import { registerChannelAdapter } from './channel-registry.js';
 import type { ChannelAdapter, ChannelSetup, InboundMessage, OutboundMessage } from './adapter.js';
 import { tryConsume } from './telegram-pairing.js';
@@ -36,6 +36,75 @@ async function withRetry<T>(fn: () => Promise<T>, label: string, maxAttempts = 5
     }
   }
   throw lastErr;
+}
+
+/**
+ * Send a text message via the Telegram Bot API using HTML parse mode.
+ *
+ * Narrows the error boundary so network blips never silently fall through to
+ * a plain-text path that would render HTML tags as visible literals:
+ *
+ * - HTTP 400 (Telegram rejected the HTML markup): strips all HTML tags and
+ *   retries as plain text. The correct fallback for markup errors only.
+ * - Network errors (fetch throws) or other HTTP errors: rethrow so
+ *   delivery.ts can handle the failure. Do NOT fall back to plain text here —
+ *   that would expose raw HTML tags to the user.
+ *
+ * Returns the "<chatId>:<messageId>" composite ID on success, null when the
+ * plain-text fallback also failed (caller may retry via a different path).
+ */
+async function sendTelegramMessage(
+  token: string,
+  params: {
+    chat_id: string;
+    text: string;
+    message_thread_id?: number;
+    reply_to_message_id?: number;
+    allow_sending_without_reply?: boolean;
+  },
+): Promise<string | null> {
+  const htmlText = toTelegramHtml(params.text);
+  // Network errors from fetch() propagate naturally — no broad catch here.
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...params, text: htmlText, parse_mode: 'HTML' }),
+  });
+
+  if (res.ok) {
+    const json = (await res.json()) as { result?: { message_id?: number; chat?: { id?: number | string } } };
+    if (json.result?.message_id) {
+      const resultChatId = json.result.chat?.id ?? params.chat_id;
+      return `${resultChatId}:${json.result.message_id}`;
+    }
+    return null;
+  }
+
+  if (res.status === 400) {
+    // GrammyError 400-class: Telegram rejected the HTML markup. Strip all tags
+    // and retry as plain text — the correct fallback for markup-rejection only.
+    const plainText = htmlText.replace(/<[^>]*>/g, '');
+    const plainRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...params, text: plainText }),
+    });
+    if (plainRes.ok) {
+      const json = (await plainRes.json()) as { result?: { message_id?: number; chat?: { id?: number | string } } };
+      if (json.result?.message_id) {
+        const resultChatId = json.result.chat?.id ?? params.chat_id;
+        return `${resultChatId}:${json.result.message_id}`;
+      }
+      return null;
+    }
+    const errBody = await plainRes.text().catch(() => '');
+    log.warn('Telegram plain-text fallback also failed', { status: plainRes.status, body: errBody });
+    return null;
+  }
+
+  // Non-400 HTTP error — throw so the caller does not silently swallow it.
+  const errBody = await res.text().catch(() => '');
+  throw new Error(`Telegram sendMessage HTTP ${res.status}: ${errBody}`);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,38 +334,23 @@ registerChannelAdapter('telegram', {
             const messageThreadId = tidParts[1] ? parseInt(tidParts[1], 10) : undefined;
 
             const rawText = (content.markdown as string) || (content.text as string);
-            const text = sanitizeTelegramLegacyMarkdown(rawText);
-            try {
-              const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: chatId,
-                  ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
-                  text,
-                  parse_mode: 'Markdown',
-                  reply_to_message_id: telegramMsgId,
-                  allow_sending_without_reply: true,
-                }),
-              });
-              if (res.ok) {
-                const json = (await res.json()) as {
-                  result?: { message_id?: number; chat?: { id?: number | string } };
-                };
-                if (json.result?.message_id) {
-                  const resultChatId = json.result.chat?.id ?? chatId;
-                  return `${resultChatId}:${json.result.message_id}`;
-                }
-                return undefined;
-              }
-              const errBody = await res.text().catch(() => '');
-              log.warn('Telegram reply send failed, falling back to normal send', {
-                status: res.status,
-                body: errBody,
-              });
-            } catch (err) {
-              log.warn('Telegram reply send error, falling back to normal send', { err });
+            // sendTelegramMessage throws on network errors (HttpError) so they
+            // propagate up instead of falling through to bridge.deliver, which
+            // would invoke the adapter's HTML path and silently render HTML tags
+            // as literals when Telegram rejects the plain-text fallback request.
+            const msgId = await sendTelegramMessage(token, {
+              chat_id: chatId!,
+              text: rawText,
+              ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+              reply_to_message_id: telegramMsgId,
+              allow_sending_without_reply: true,
+            });
+            if (msgId !== null) {
+              return msgId;
             }
+            // null: HTML + plain-text both failed with 400 — fall through to
+            // bridge.deliver, which retries without reply threading.
+            log.warn('Telegram reply send failed (400), falling back to normal send');
           }
         }
 
@@ -342,6 +396,32 @@ registerChannelAdapter('telegram', {
             log.warn('Telegram sendVoice error', { err: voiceErr });
           }
           return undefined;
+        }
+
+        // For plain text messages (no operation, no special type, no file
+        // attachments) send directly via sendTelegramMessage to bypass the
+        // adapter's internal HTML-to-plain-text fallback, which renders HTML
+        // tags as visible literals when a transient network error occurs.
+        if (
+          !content.operation &&
+          content.type !== 'ask_question' &&
+          !(message.files && message.files.length > 0) &&
+          (typeof content.text === 'string' || typeof content.markdown === 'string')
+        ) {
+          const rawText = (content.markdown as string) || (content.text as string);
+          if (rawText) {
+            const tid = threadId ?? platformId;
+            const tidParts = tid.replace(/^telegram:/, '').split(':');
+            const chatId = tidParts[0]!;
+            const messageThreadId = tidParts[1] ? parseInt(tidParts[1], 10) : undefined;
+            return (
+              (await sendTelegramMessage(token, {
+                chat_id: chatId,
+                text: rawText,
+                ...(messageThreadId ? { message_thread_id: messageThreadId } : {}),
+              })) ?? undefined
+            );
+          }
         }
 
         return bridge.deliver(platformId, threadId, message);
