@@ -371,6 +371,12 @@ async function processQuery(
   initialBatchIds: string[],
   prompt: string,
 ): Promise<QueryResult> {
+  // Provider-agnostic query lifecycle signals for the host observer.
+  // claude.ts also emits these from within translateEvents(), but emitting
+  // here covers non-Claude providers and gives an earlier query_start
+  // timestamp (before the SDK subprocess even spawns).
+  process.stderr.write('observer:query_start=1\n');
+
   let queryContinuation: string | undefined;
   let clearContinuation = false;
   let done = false;
@@ -527,6 +533,7 @@ async function processQuery(
   } finally {
     done = true;
     clearInterval(pollHandle);
+    process.stderr.write('observer:query_done=1\n');
     // Drain at query boundary: mark all follow-ups pushed mid-turn completed now
     // that the query has ended (normally or via exception). Deferring this from
     // the push site means a container crash leaves them in 'processing' state,

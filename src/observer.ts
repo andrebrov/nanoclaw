@@ -240,6 +240,14 @@ export function startSessionObserver(
           stopWatchdog();
           if (statusCfg) void sendToStatus('✅ Done');
           break;
+
+        case 'query_done':
+          // Provider-agnostic end-of-query boundary from poll-loop.ts.
+          // Stops the watchdog for providers that don't emit a 'result' event.
+          // For Claude, the 'result' case above already stopped it.
+          void setStage('composing');
+          stopWatchdog();
+          break;
       }
     },
 
