@@ -318,6 +318,69 @@ function resolveProviderContribution(
   return { provider, contribution };
 }
 
+const KNOWLEDGE_RAW_README = `# Knowledge Ingest — \`raw/\`
+
+Drop source material here for compilation into the structured wiki.
+
+## Supported file types
+
+| Extension | Contents |
+|-----------|----------|
+| \`.url\`    | A single URL per file. The compiler fetches and summarises the page. |
+| \`.md\`     | Raw markdown or plain prose — structured into wiki articles. |
+| \`.txt\`    | Plain text (transcripts, notes, paste-ins). |
+| \`.json\`   | Structured data (Granola transcripts, CRM exports, etc.). |
+
+## Naming convention
+
+Use a descriptive, date-prefixed name so files sort chronologically and their
+purpose is obvious without opening them:
+
+\`\`\`
+YYYY-MM-DD_<topic-slug>.<ext>
+\`\`\`
+
+Examples:
+
+\`\`\`
+2026-04-28_csc-generation-research.md
+2026-04-28_finsi-icp-algorithm.url
+2026-04-28_sales-call-transcript.txt
+2026-04-28_crm-export.json
+\`\`\`
+
+The date prefix is **required** for new files. Omitting it is fine for
+one-off or test files, but the compiler will process dated files first.
+
+## After compilation
+
+Compiled files are moved to \`processed/\` by the compiler. Do not delete
+or modify files in \`processed/\` — they are the audit trail.
+
+## How to add material
+
+Any agent can write files here directly. From inside a container:
+
+\`\`\`bash
+# Drop a URL for later compilation
+echo "https://example.com/article" > /workspace/global/knowledge/raw/2026-04-28_article.url
+
+# Drop a transcript
+cp /tmp/transcript.txt /workspace/global/knowledge/raw/2026-04-28_call-transcript.txt
+\`\`\`
+
+The compiler (separate service) scans this directory periodically and
+processes any unhandled files.
+`;
+
+function initKnowledgeDir(knowledgeDir: string): void {
+  const rawDir = path.join(knowledgeDir, 'raw');
+  const processedDir = path.join(rawDir, 'processed');
+  if (!fs.existsSync(processedDir)) fs.mkdirSync(processedDir, { recursive: true });
+  const readme = path.join(rawDir, 'README.md');
+  if (!fs.existsSync(readme)) fs.writeFileSync(readme, KNOWLEDGE_RAW_README);
+}
+
 function buildMounts(
   agentGroup: AgentGroup,
   session: Session,
@@ -377,6 +440,13 @@ function buildMounts(
   const globalDir = path.join(GROUPS_DIR, 'global');
   if (!fs.existsSync(globalDir)) fs.mkdirSync(globalDir, { recursive: true });
   mounts.push({ hostPath: globalDir, containerPath: '/workspace/global', readonly: true });
+
+  // Knowledge ingest — writable nested mount on top of the RO global dir.
+  // Agents drop raw source material here; the compiler (separate process)
+  // picks it up, compiles it into the wiki, then moves files to raw/processed/.
+  const knowledgeDir = path.join(globalDir, 'knowledge');
+  initKnowledgeDir(knowledgeDir);
+  mounts.push({ hostPath: knowledgeDir, containerPath: '/workspace/global/knowledge', readonly: false });
 
   // Per-agent memory namespace — read-write, scoped to this agent group.
   // Lives under data/agent-memory/ NOT under groups/global/ so it is never

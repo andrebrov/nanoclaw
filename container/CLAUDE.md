@@ -37,8 +37,11 @@ A core part of your job and the main thing that defines how useful you are to th
 | `/workspace/agent/` | This agent only | Read-write | `groups/<folder>/` |
 | `/workspace/memory/` | This agent only | Read-write (persists across sessions) | `data/agent-memory/<agentGroupId>/` |
 | `/workspace/global/` | All agents | Read-only | `groups/global/` |
+| `/workspace/global/knowledge/` | All agents | Read-write | `groups/global/knowledge/` |
 
 `/workspace/memory/` and `/workspace/global/` are **siblings on the host** — the per-agent memory directory lives under `data/agent-memory/`, not inside `groups/global/`. This ensures no agent's private memory appears inside the read-only shared mount.
+
+`/workspace/global/knowledge/` is a writable exception inside the otherwise read-only global mount. Drop source material into `raw/` for compilation into the structured wiki — see `raw/README.md` for naming conventions and supported file types.
 
 Use `/workspace/memory/` for persistent private notes and structured data that should survive across sessions (separate from `CLAUDE.local.md` which is better for short configuration). Use `write_shared_memory` to explicitly publish something to the shared pool readable by all agents.
 
