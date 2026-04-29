@@ -158,6 +158,59 @@ describe('edit_message', () => {
   });
 });
 
+describe('send_message cross-chat destination resolution', () => {
+  function seedCrossChat(): void {
+    getInboundDb()
+      .prepare(
+        `INSERT INTO destinations (name, display_name, type, channel_type, platform_id)
+         VALUES ('finsi-team', 'Finsi Team', 'channel', 'telegram', '-1003709333849')`,
+      )
+      .run();
+    getInboundDb()
+      .prepare(
+        `INSERT OR REPLACE INTO session_routing (id, channel_type, platform_id, thread_id)
+         VALUES (1, 'telegram', 'tg-dm-123', NULL)`,
+      )
+      .run();
+  }
+
+  it('resolves destination by display name (human-readable title)', async () => {
+    seedCrossChat();
+    const result = await sendMessage.handler({ to: 'Finsi Team', text: 'Hello group' });
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].channel_type).toBe('telegram');
+    expect(out[0].platform_id).toBe('-1003709333849');
+  });
+
+  it('resolves destination by raw platform ID', async () => {
+    seedCrossChat();
+    const result = await sendMessage.handler({ to: '-1003709333849', text: 'Hello by ID' });
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].channel_type).toBe('telegram');
+    expect(out[0].platform_id).toBe('-1003709333849');
+  });
+
+  it('resolves destination by canonical name (unchanged behaviour)', async () => {
+    seedCrossChat();
+    const result = await sendMessage.handler({ to: 'finsi-team', text: 'Hello by slug' });
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].platform_id).toBe('-1003709333849');
+  });
+
+  it('returns Unknown destination error for completely unknown name', async () => {
+    seedCrossChat();
+    const result = await sendMessage.handler({ to: 'no-such-chat', text: 'Hello?' });
+    expect(result.isError).toBe(true);
+    expect((result.content[0] as { text: string }).text).toContain('Unknown destination');
+  });
+});
+
 describe('send_message default inReplyTo', () => {
   function seedSessionRouting(channelType = 'telegram', platformId = 'tg-chat-123'): void {
     getInboundDb()

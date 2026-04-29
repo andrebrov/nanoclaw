@@ -47,8 +47,28 @@ export function getAllDestinations(): DestinationEntry[] {
 }
 
 export function findByName(name: string): DestinationEntry | undefined {
-  const row = getInboundDb().prepare('SELECT * FROM destinations WHERE name = ?').get(name) as DestRow | undefined;
-  return row ? rowToEntry(row) : undefined;
+  const db = getInboundDb();
+
+  // Fast path: exact match on canonical name.
+  const exact = db.prepare('SELECT * FROM destinations WHERE name = ?').get(name) as DestRow | undefined;
+  if (exact) return rowToEntry(exact);
+
+  // Fallback: case-insensitive match on display_name or name so agents can
+  // address a chat by its human-readable title (e.g. "Finsi Team") even though
+  // the canonical key is the normalized slug (e.g. "finsi-team").
+  const byLabel = db
+    .prepare(
+      'SELECT * FROM destinations WHERE lower(name) = lower(?) OR (display_name IS NOT NULL AND lower(display_name) = lower(?))',
+    )
+    .get(name, name) as DestRow | undefined;
+  if (byLabel) return rowToEntry(byLabel);
+
+  // Fallback: match by raw platform_id for channel destinations so agents can
+  // address a chat by its platform identifier (e.g. Telegram chat ID "-100370…").
+  const byPlatformId = db.prepare("SELECT * FROM destinations WHERE type = 'channel' AND platform_id = ?").get(name) as
+    | DestRow
+    | undefined;
+  return byPlatformId ? rowToEntry(byPlatformId) : undefined;
 }
 
 /**
