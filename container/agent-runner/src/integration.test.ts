@@ -187,6 +187,7 @@ async function runPollLoopWithTimeout(provider: MockProvider, signal: AbortSigna
   return Promise.race([
     runPollLoop({
       provider,
+      providerName: 'mock',
       cwd: '/tmp',
     }),
     new Promise<void>((_, reject) => {

@@ -14,7 +14,8 @@ import Database from 'better-sqlite3';
 import { DATA_DIR } from '../src/config.js';
 import { readEnvFile } from '../src/env.js';
 import { log } from '../src/log.js';
-import { pingCliAgent } from './lib/agent-ping.js';
+import { pingCliAgent, type PingResult } from './lib/agent-ping.js';
+import { getLaunchdLabel, getSystemdUnit } from '../src/install-slug.js';
 import {
   getPlatform,
   getServiceManager,
@@ -45,10 +46,13 @@ export async function run(_args: string[]): Promise<void> {
   let runningFromPath: string | null = null;
   const mgr = getServiceManager();
 
+  const launchdLabel = getLaunchdLabel(projectRoot);
+  const systemdUnit = getSystemdUnit(projectRoot);
+
   if (mgr === 'launchd') {
     try {
       const output = execSync('launchctl list', { encoding: 'utf-8' });
-      const line = output.split('\n').find((l) => l.includes('com.nanoclaw'));
+      const line = output.split('\n').find((l) => l.includes(launchdLabel));
       if (line) {
         const pidField = line.trim().split(/\s+/)[0];
         if (pidField !== '-' && pidField) {
@@ -67,11 +71,11 @@ export async function run(_args: string[]): Promise<void> {
   } else if (mgr === 'systemd') {
     const prefix = isRoot() ? 'systemctl' : 'systemctl --user';
     try {
-      execSync(`${prefix} is-active nanoclaw`, { stdio: 'ignore' });
+      execSync(`${prefix} is-active ${systemdUnit}`, { stdio: 'ignore' });
       service = 'running';
       try {
         const pidStr = execSync(
-          `${prefix} show nanoclaw -p MainPID --value`,
+          `${prefix} show ${systemdUnit} -p MainPID --value`,
           { encoding: 'utf-8' },
         ).trim();
         const pid = Number(pidStr);
@@ -86,7 +90,7 @@ export async function run(_args: string[]): Promise<void> {
         const output = execSync(`${prefix} list-unit-files`, {
           encoding: 'utf-8',
         });
-        if (output.includes('nanoclaw')) {
+        if (output.includes(systemdUnit)) {
           service = 'stopped';
         }
       } catch {
@@ -216,22 +220,22 @@ export async function run(_args: string[]): Promise<void> {
 
   // 7. End-to-end: ping the CLI agent and confirm it replies. Only run if
   // everything upstream looks healthy, since a broken socket would just hang.
-  let agentPing: 'ok' | 'no_reply' | 'socket_error' | 'skipped' = 'skipped';
+  let agentPing: 'ok' | 'no_reply' | 'socket_error' | 'auth_error' | 'skipped' = 'skipped';
   if (service === 'running' && registeredGroups > 0) {
     log.info('Pinging CLI agent');
     agentPing = await pingCliAgent();
     log.info('Agent ping result', { agentPing });
   }
 
-  // Determine overall status
-  const status =
-    service === 'running' &&
-    credentials !== 'missing' &&
-    anyChannelConfigured &&
-    registeredGroups > 0 &&
-    (agentPing === 'ok' || agentPing === 'skipped')
-      ? 'success'
-      : 'failed';
+  // Determine overall status. A CLI-only install is valid when the local
+  // agent round-trip succeeds; messaging app credentials are optional.
+  const status = determineVerifyStatus({
+    service,
+    credentials,
+    anyChannelConfigured,
+    registeredGroups,
+    agentPing,
+  });
 
   log.info('Verification complete', { status, channelAuth });
 
@@ -249,6 +253,25 @@ export async function run(_args: string[]): Promise<void> {
   });
 
   if (status === 'failed') process.exit(1);
+}
+
+export function determineVerifyStatus(input: {
+  service: 'not_found' | 'stopped' | 'running' | 'running_other_checkout';
+  credentials: string;
+  anyChannelConfigured: boolean;
+  registeredGroups: number;
+  agentPing: PingResult | 'skipped';
+}): 'success' | 'failed' {
+  const cliAgentResponds = input.agentPing === 'ok';
+  const hasUsableChannel = input.anyChannelConfigured || cliAgentResponds;
+
+  return input.service === 'running' &&
+    input.credentials !== 'missing' &&
+    hasUsableChannel &&
+    input.registeredGroups > 0 &&
+    (cliAgentResponds || input.agentPing === 'skipped')
+    ? 'success'
+    : 'failed';
 }
 
 /**

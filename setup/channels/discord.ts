@@ -27,9 +27,11 @@ import * as p from '@clack/prompts';
 import k from 'kleur';
 
 import * as setupLog from '../logs.js';
+import { brightSelect } from '../lib/bright-select.js';
 import { confirmThenOpen } from '../lib/browser.js';
 import { askOperatorRole } from '../lib/role-prompt.js';
 import { ensureAnswer, fail, runQuietChild } from '../lib/runner.js';
+import { accentGreen, brandBody, note } from '../lib/theme.js';
 
 const DEFAULT_AGENT_NAME = 'Nano';
 const DISCORD_API = 'https://discord.com/api/v10';
@@ -46,15 +48,27 @@ interface AppInfo {
 }
 
 export async function runDiscordChannel(displayName: string): Promise<void> {
-  if (!(await askHasBotToken())) {
+  const hasBot = await askHasBotToken();
+  if (!hasBot) {
     await walkThroughBotCreation();
   }
+  // Even users who said "yes" often can't find the token on demand — the
+  // Dev Portal resets it if you don't store it, and people forget which
+  // app it belongs to. A quick reminder before the paste prompt is cheap.
+  showTokenLocationReminder(hasBot);
 
   const token = await collectDiscordToken();
   const botUsername = await validateDiscordToken(token);
   const app = await fetchApplicationInfo(token);
 
   const ownerUserId = await resolveOwnerUserId(app.owner);
+
+  // Before inviting: do they have a server to invite into? Walkthrough if
+  // not — a fresh Discord account without a server makes the invite page a
+  // dead end.
+  if (!(await askHasDiscordServer())) {
+    await walkThroughServerCreation();
+  }
 
   await promptInviteBot(app.applicationId, botUsername);
 
@@ -129,7 +143,7 @@ export async function runDiscordChannel(displayName: string): Promise<void> {
 
 async function askHasBotToken(): Promise<boolean> {
   const answer = ensureAnswer(
-    await p.select({
+    await brightSelect({
       message: 'Do you already have a Discord bot?',
       options: [
         { value: 'yes', label: 'Yes, I have a bot token ready' },
@@ -142,7 +156,7 @@ async function askHasBotToken(): Promise<boolean> {
 
 async function walkThroughBotCreation(): Promise<void> {
   const url = 'https://discord.com/developers/applications';
-  p.note(
+  note(
     [
       "You'll create a Discord bot in the Developer Portal. It's free and takes about a minute.",
       '',
@@ -165,10 +179,83 @@ async function walkThroughBotCreation(): Promise<void> {
   );
 }
 
+function showTokenLocationReminder(hasExistingBot: boolean): void {
+  // If we just walked them through creating a bot, they're staring at the
+  // token. If they came in with an existing one, they may still need a nudge
+  // to find it — tokens in the Dev Portal aren't visible after first reveal,
+  // and "Reset Token" issues a new one.
+  if (hasExistingBot) {
+    note(
+      [
+        "Where to find your bot token:",
+        '',
+        '  1. discord.com/developers/applications → pick your app',
+        '  2. "Bot" tab → "Reset Token" (the old one stops working)',
+        '  3. Copy the new token',
+      ].join('\n'),
+      'Reminder',
+    );
+  }
+}
+
+async function askHasDiscordServer(): Promise<boolean> {
+  const answer = ensureAnswer(
+    await brightSelect({
+      message: 'Do you have a Discord server you can add the bot to?',
+      options: [
+        { value: 'yes', label: 'Yes, I have a server' },
+        { value: 'no', label: "No, walk me through creating one" },
+      ],
+    }),
+  );
+  setupLog.userInput('discord_has_server', String(answer));
+  return answer === 'yes';
+}
+
+async function walkThroughServerCreation(): Promise<void> {
+  // Discord doesn't have a stable deep-link for "create server" so we open
+  // the web client and rely on the + button being visible. The steps below
+  // are the same whether they're in the desktop app or the browser.
+  const url = 'https://discord.com/channels/@me';
+  note(
+    [
+      "A Discord server is just a private space for you and the bot. Free and takes 30 seconds.",
+      '',
+      '  1. In Discord, click the "+" at the bottom of the server list',
+      '  2. Choose "Create My Own" → "For me and my friends"',
+      '  3. Give it any name (e.g. "NanoClaw")',
+      '',
+      k.dim(url),
+    ].join('\n'),
+    'Create a Discord server',
+  );
+  await confirmThenOpen(url, 'Press Enter to open Discord');
+
+  ensureAnswer(
+    await p.confirm({
+      message: "Server created?",
+      initialValue: true,
+    }),
+  );
+}
+
 async function collectDiscordToken(): Promise<string> {
+  const existing = process.env.DISCORD_BOT_TOKEN?.trim();
+  if (existing && /^[A-Za-z0-9._-]{50,}$/.test(existing)) {
+    const reuse = ensureAnswer(await p.confirm({
+      message: `Found an existing Discord bot token (${existing.slice(0, 10)}…). Use it?`,
+      initialValue: true,
+    }));
+    if (reuse) {
+      setupLog.userInput('discord_token', 'reused-existing');
+      return existing;
+    }
+  }
+
   const answer = ensureAnswer(
     await p.password({
       message: 'Paste your bot token',
+      clearOnError: true,
       validate: (v) => {
         const t = (v ?? '').trim();
         if (!t) return 'Token is required';
@@ -312,14 +399,14 @@ async function resolveOwnerUserId(
     }
   } else {
     p.log.info(
-      "Your bot is owned by a Developer Team, so we need your Discord user ID directly.",
+      brandBody("Your bot is owned by a Developer Team, so we need your Discord user ID directly."),
     );
   }
   return await promptForUserIdWithDevMode();
 }
 
 async function promptForUserIdWithDevMode(): Promise<string> {
-  p.note(
+  note(
     [
       "To get your Discord user ID:",
       '',
@@ -357,7 +444,7 @@ async function promptInviteBot(
     `&scope=bot` +
     `&permissions=${INVITE_PERMISSIONS}`;
 
-  p.note(
+  note(
     [
       `@${botUsername} needs to share a server with you before it can DM you.`,
       '',
@@ -433,7 +520,7 @@ async function resolveAgentName(): Promise<string> {
   }
   const answer = ensureAnswer(
     await p.text({
-      message: 'What should your assistant be called?',
+      message: `What should your ${accentGreen('assistant')} be called?`,
       placeholder: DEFAULT_AGENT_NAME,
       defaultValue: DEFAULT_AGENT_NAME,
     }),

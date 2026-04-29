@@ -15,6 +15,9 @@ import {
   clearTurnSourceRouting,
   getTurnSendInvoked,
   clearTurnSendInvoked,
+  clearContinuation,
+  migrateLegacyContinuation,
+  setContinuation,
 } from './db/session-state.js';
 import { scheduleSnapshotWrite, clearSnapshot } from './db/session-snapshot.js';
 import {
@@ -40,6 +43,12 @@ function generateId(): string {
 
 export interface PollLoopConfig {
   provider: AgentProvider;
+  /**
+   * Name of the provider (e.g. "claude", "codex", "opencode"). Used to key
+   * the stored continuation per-provider so flipping providers doesn't
+   * resurrect a stale id from a different backend.
+   */
+  providerName: string;
   cwd: string;
   systemContext?: {
     instructions?: string;
@@ -60,8 +69,9 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
   // Resume the agent's prior session from a previous container run if one
   // was persisted. The continuation is opaque to the poll-loop — the
   // provider decides how to use it (Claude resumes a .jsonl transcript,
-  // other providers may reload a thread ID, etc.).
-  let continuation: string | undefined = getStoredSessionId();
+  // other providers may reload a thread ID, etc.). Keyed per-provider so
+  // a Codex thread id never gets handed to Claude or vice versa.
+  let continuation: string | undefined = migrateLegacyContinuation(config.providerName);
 
   if (continuation) {
     log(`Resuming agent session ${continuation}`);
@@ -140,6 +150,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
         continuation = undefined;
         clearStoredSessionId();
         clearSnapshot();
+        clearContinuation(config.providerName);
         writeMessageOut({
           id: generateId(),
           kind: 'chat',
@@ -213,14 +224,14 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     const processingIds = ids.filter((id) => !commandIds.includes(id) && !skippedSet.has(id));
     let queryError: unknown = null;
     try {
-      const result = await processQuery(query, routing, processingIds, prompt);
+      const result = await processQuery(query, routing, processingIds, prompt, config.providerName);
       if (result.clearContinuation) {
         log('Clearing continuation anchor (thinking-only result)');
         continuation = undefined;
         clearStoredSessionId();
       } else if (result.continuation && result.continuation !== continuation) {
         continuation = result.continuation;
-        setStoredSessionId(continuation);
+        setContinuation(config.providerName, continuation);
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -231,7 +242,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
       if (continuation && config.provider.isSessionInvalid(err)) {
         log(`Stale session detected (${continuation}) — clearing for retry`);
         continuation = undefined;
-        clearStoredSessionId();
+        clearContinuation(config.providerName);
       }
 
       // Single automatic retry with a fresh session.
@@ -243,7 +254,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
           systemContext: config.systemContext,
           isScheduledTask: keep.every((m) => m.kind === 'task'),
         });
-        const retryResult = await processQuery(retryQuery, routing, processingIds, prompt);
+        const retryResult = await processQuery(retryQuery, routing, processingIds, prompt, config.providerName);
         if (retryResult.clearContinuation) {
           continuation = undefined;
           clearStoredSessionId();
@@ -370,6 +381,7 @@ async function processQuery(
   routing: RoutingContext,
   initialBatchIds: string[],
   prompt: string,
+  providerName: string,
 ): Promise<QueryResult> {
   // Provider-agnostic query lifecycle signals for the host observer.
   // claude.ts also emits these from within translateEvents(), but emitting
@@ -456,7 +468,7 @@ async function processQuery(
         // container died between `init` and `result`, the SDK session was
         // effectively orphaned and the next message started a blank
         // Claude session with no prior context.
-        setStoredSessionId(event.continuation);
+        setContinuation(providerName, event.continuation);
       } else if (event.type === 'result') {
         // Write the reply to messages_out BEFORE marking the batch completed
         // in processing_ack. If the container crashes between the two writes,

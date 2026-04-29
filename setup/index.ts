@@ -17,6 +17,7 @@ const STEPS: Record<
   'pair-telegram': () => import('./pair-telegram.js'),
   groups: () => import('./groups.js'),
   'whatsapp-auth': () => import('./whatsapp-auth.js'),
+  'signal-auth': () => import('./signal-auth.js'),
   mounts: () => import('./mounts.js'),
   service: () => import('./service.js'),
   verify: () => import('./verify.js'),

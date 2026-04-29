@@ -58,6 +58,8 @@ export interface InboundEvent {
      * See InboundMessage.isMention for the full explanation.
      */
     isMention?: boolean;
+    /** True when the source is a group/channel thread, false for DMs. */
+    isGroup?: boolean;
   };
   replyTo?: DeliveryAddress;
 }

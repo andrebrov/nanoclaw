@@ -412,10 +412,15 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
       }
     } else if (!engages && agent.ignored_message_policy === 'accumulate') {
       // Accumulate ONLY when the engage_mode declined — never when access
-      // or scope gates denied. A policy-denied user's message must not
-      // leak into the agent's session context just because some other
-      // agent on the same MG happens to have accumulate set; the access
-      // gate already recorded a dropped_messages row for the refusal.
+      // or scope gates denied. Accumulate stores the message as silent
+      // context, but a policy-denied user's message must not leak into
+      // the agent's session context just because some other agent on the
+      // same MG happens to have accumulate set; those refusals are
+      // security decisions about an untrusted sender, and silently
+      // storing their message (which also stages their attachments to
+      // disk via writeSessionMessage → extractAttachmentFiles) is exactly
+      // what the gate is meant to prevent. The access gate already
+      // recorded a dropped_messages row for the refusal above.
       await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, false);
       accumulatedCount++;
     } else {

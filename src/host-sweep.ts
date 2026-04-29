@@ -236,13 +236,21 @@ async function sweepSession(session: Session): Promise<void> {
       return;
     }
 
-    const alive = isContainerRunning(session.id);
     let hadFailure = false;
 
-    // 3. Crashed-container cleanup: processing rows left behind get retried.
-    if (!alive && outDb) {
-      hadFailure = resetStuckProcessingRows(inDb, outDb, session, 'container not running');
+    // 3. Wake a container if work is due and nothing is running. Ordered
+    // before the crashed-container cleanup so a fresh container gets a chance
+    // to clean its own orphan processing_ack rows on startup (see
+    // container/agent-runner/src/db/connection.ts). Otherwise the reset path
+    // would keep bumping process_after into the future, dueCount would stay 0,
+    // and the wake would never fire.
+    const dueCount = countDueMessages(inDb);
+    if (dueCount > 0 && !isContainerRunning(session.id)) {
+      log.info('Waking container for due messages', { sessionId: session.id, count: dueCount });
+      await wakeContainer(session);
     }
+
+    const alive = isContainerRunning(session.id);
 
     // 4. Running-container SLA: absolute ceiling + per-claim stuck rules.
     if (alive && outDb) {
@@ -250,21 +258,21 @@ async function sweepSession(session: Session): Promise<void> {
       if (killed) hadFailure = true;
     }
 
+    // 5. Crashed-container cleanup: processing rows left behind get retried.
+    // Only fires when wake in step 3 didn't pick up the work (no due messages,
+    // or wake failed). resetStuckProcessingRows itself is idempotent — it
+    // skips messages already scheduled for a future retry, and only returns
+    // true when actual work was done so the circuit breaker doesn't trip on
+    // stale processing_ack rows alone.
+    if (!alive && outDb) {
+      const didWork = resetStuckProcessingRows(inDb, outDb, session, 'container not running');
+      if (didWork) hadFailure = true;
+    }
+
     if (hadFailure) {
       recordGroupFailure(agentGroup.folder, session.session_name, agentGroup.name);
     } else {
       resetGroupFailures(agentGroup.folder, session.session_name);
-    }
-
-    // 5. Wake a container if new work is due, nothing is running, and not in cooldown.
-    const dueCount = countDueMessages(inDb);
-    if (
-      dueCount > 0 &&
-      !isContainerRunning(session.id) &&
-      !isGroupInCooldown(agentGroup.folder, session.session_name)
-    ) {
-      log.info('Waking container for due messages', { sessionId: session.id, count: dueCount });
-      await wakeContainer(session);
     }
 
     // 6. Recurrence fanout for completed recurring tasks.
@@ -352,9 +360,15 @@ function resetStuckProcessingRows(
   if (claims.length === 0) return false;
 
   let didWork = false;
+  const now = Date.now();
   for (const { message_id } of claims) {
     const msg = getMessageForRetry(inDb, message_id, 'pending');
     if (!msg) continue;
+
+    // Already rescheduled for a future retry — don't bump tries again. The
+    // wake path (sweep step 2) will fire when process_after elapses and a
+    // fresh container will clean the orphan claim on startup.
+    if (msg.processAfter && Date.parse(msg.processAfter) > now) continue;
 
     if (msg.tries >= MAX_TRIES) {
       markMessageFailed(inDb, msg.id);

@@ -7,6 +7,7 @@
 import path from 'path';
 
 import { DATA_DIR } from './config.js';
+import { enforceStartupBackoff, resetCircuitBreaker } from './circuit-breaker.js';
 import { migrateGroupsToClaudeLocal } from './claude-md-compose.js';
 import { backfillAllowedCapabilities } from './container-config.js';
 import { initDb } from './db/connection.js';
@@ -62,6 +63,9 @@ import { initChannelAdapters, teardownChannelAdapters, getChannelAdapter } from 
 async function main(): Promise<void> {
   log.info('NanoClaw starting');
 
+  // 0. Circuit breaker — backoff on rapid restarts
+  await enforceStartupBackoff();
+
   // 1. Init central DB
   const dbPath = path.join(DATA_DIR, 'v2.db');
   const db = initDb(dbPath);
@@ -100,6 +104,7 @@ async function main(): Promise<void> {
             content: JSON.stringify(message.content),
             timestamp: message.timestamp,
             isMention: message.isMention,
+            isGroup: message.isGroup,
           },
         }).catch((err) => {
           log.error('Failed to route inbound message', { channelType: adapter.channelType, err });
@@ -209,8 +214,15 @@ async function shutdown(signal: string): Promise<void> {
   }
   stopDeliveryPolls();
   stopHostSweep();
-  await teardownChannelAdapters();
-  process.exit(0);
+  try {
+    await teardownChannelAdapters();
+  } finally {
+    // Always reset on graceful shutdown — even if teardown threw, we got here
+    // via SIGTERM/SIGINT, not a crash, so the next start shouldn't be counted
+    // as one.
+    resetCircuitBreaker();
+    process.exit(0);
+  }
 }
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
