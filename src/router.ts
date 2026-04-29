@@ -608,9 +608,22 @@ async function deliverToAgent(
     startTypingRefresh(session.id, session.agent_group_id, event.channelType, event.platformId, event.threadId);
     // Start observer: 👀 reaction + watchdog. Use the original event channel
     // (not deliveryAddr) so reactions land on the message the user sent.
+    //
+    // Suppress 👀 (and all reaction cycle emojis) when a match-all pattern
+    // ('engage_pattern=.') engages on a group message the bot was not
+    // explicitly addressed in. In multi-bot group chats this otherwise
+    // produces a 👀 on every message — including bot-to-bot conversations
+    // that have nothing to do with this agent. Exceptions:
+    //   • DMs (is_group=0) — always react, it's a direct conversation
+    //   • @mention — the bot was explicitly addressed
+    //   • Non-match-all patterns — engagement already implies a trigger hit
+    //   • Main agent group (folder='main') — primary bot, react to everything
+    const isMatchAll = agent.engage_mode === 'pattern' && (agent.engage_pattern ?? '.') === '.';
+    const shouldReact =
+      mg.is_group === 0 || event.message.isMention === true || !isMatchAll || agentGroup.folder === 'main';
     startSessionObserver(
       session,
-      event.message.id,
+      shouldReact ? event.message.id : null,
       event.channelType,
       event.platformId,
       event.threadId,
