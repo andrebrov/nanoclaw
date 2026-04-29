@@ -162,7 +162,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
     setupConfig.onMetadata(platformId, undefined, thread.isDM === false);
   }
 
-  async function messageToInbound(message: ChatMessage, isMention: boolean): Promise<InboundMessage> {
+  async function messageToInbound(message: ChatMessage, isMention: boolean, isGroup: boolean): Promise<InboundMessage> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const serialized = message.toJSON() as Record<string, any>;
 
@@ -235,6 +235,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       content: serialized,
       timestamp: message.metadata.dateSent.toISOString(),
       isMention,
+      isGroup,
     };
   }
 
@@ -269,14 +270,18 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       chat.onSubscribedMessage(async (thread, message) => {
         emitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
-        await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, message.isMention === true));
+        await setupConfig.onInbound(
+          channelId,
+          thread.id,
+          await messageToInbound(message, message.isMention === true, thread.isDM === false),
+        );
       });
 
       // @mention in an unsubscribed thread — SDK-confirmed bot mention.
       chat.onNewMention(async (thread, message) => {
         emitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
-        await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true));
+        await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true, thread.isDM === false));
       });
 
       // DMs — by definition addressed to the bot. Thread id flows through
@@ -292,7 +297,7 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
           sender: (message.author as any)?.fullName ?? (message.author as any)?.userId ?? 'unknown',
           threadId: thread.id,
         });
-        await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true));
+        await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, true, false));
       });
 
       // Plain messages in unsubscribed threads.
@@ -308,7 +313,11 @@ export function createChatSdkBridge(config: ChatSdkBridgeConfig): ChannelAdapter
       chat.onNewMessage(/./, async (thread, message) => {
         emitMetadata(thread);
         const channelId = adapter.channelIdFromThreadId(thread.id);
-        await setupConfig.onInbound(channelId, thread.id, await messageToInbound(message, false));
+        await setupConfig.onInbound(
+          channelId,
+          thread.id,
+          await messageToInbound(message, false, thread.isDM === false),
+        );
       });
 
       // Handle button clicks (ask_user_question)

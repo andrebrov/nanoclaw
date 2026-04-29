@@ -46,6 +46,8 @@ export interface InboundEvent {
   channelType: string;
   platformId: string;
   threadId: string | null;
+  /** True when the message originates from a group/channel (not a DM). */
+  isGroup?: boolean;
   message: {
     id: string;
     kind: 'chat' | 'chat-sdk';
@@ -81,6 +83,8 @@ export interface InboundMessage {
    * router falls back to text-match against agent_group_name.
    */
   isMention?: boolean;
+  /** True when the message originates from a group/channel (not a DM). */
+  isGroup?: boolean;
 }
 
 /** A file attachment to deliver alongside a message. */

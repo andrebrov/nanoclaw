@@ -19,11 +19,12 @@
  */
 import { getChannelAdapter } from './channels/channel-registry.js';
 import { gateCommand } from './command-gate.js';
-import { getAgentGroup } from './db/agent-groups.js';
+import { getAgentGroup, getAgentGroupByFolder } from './db/agent-groups.js';
 import { getDb } from './db/connection.js';
 import { recordDroppedMessage } from './db/dropped-messages.js';
 import {
   createMessagingGroup,
+  createMessagingGroupAgent,
   getMessagingGroupAgents,
   getMessagingGroupWithAgentCount,
 } from './db/messaging-groups.js';
@@ -214,17 +215,17 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
   let mg: MessagingGroup;
   let agentCount: number;
   if (!found) {
-    // No messaging_groups row. Auto-create only when the message warrants
-    // attention (the bot was addressed — @mention or DM). Plain chatter in
-    // channels we merely sit in stays silent — no row, no DB writes.
-    if (!isMention) return;
+    // No messaging_groups row. For group chats, auto-create on any message
+    // (chatbot mode — no @mention required). For DMs or unknown channel types,
+    // only auto-create when the bot was explicitly addressed (@mention / DM).
+    if (!isMention && !event.isGroup) return;
     const mgId = `mg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     mg = {
       id: mgId,
       channel_type: event.channelType,
       platform_id: event.platformId,
       name: null,
-      is_group: 0,
+      is_group: event.isGroup ? 1 : 0,
       unknown_sender_policy: 'request_approval',
       denied_at: null,
       created_at: new Date().toISOString(),
@@ -234,8 +235,41 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
       id: mgId,
       channelType: event.channelType,
       platformId: event.platformId,
+      isGroup: mg.is_group,
     });
-    agentCount = 0;
+
+    if (mg.is_group === 1) {
+      // Auto-wire new group chats to the Main agent group in chatbot mode.
+      // Any message triggers a reply — no manual approval or DB wiring needed.
+      const mainGroup = getAgentGroupByFolder('main');
+      if (mainGroup) {
+        const mgaId = `mga-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        createMessagingGroupAgent({
+          id: mgaId,
+          messaging_group_id: mgId,
+          agent_group_id: mainGroup.id,
+          engage_mode: 'pattern',
+          engage_pattern: '.',
+          sender_scope: 'all',
+          ignored_message_policy: 'drop',
+          session_mode: 'shared',
+          priority: 0,
+          created_at: new Date().toISOString(),
+        });
+        log.info('Auto-wired new group chat to Main', {
+          messagingGroupId: mgId,
+          agentGroupId: mainGroup.id,
+        });
+        agentCount = 1;
+      } else {
+        log.warn('Auto-wire skipped — no agent group with folder="main" found', {
+          messagingGroupId: mgId,
+        });
+        agentCount = 0;
+      }
+    } else {
+      agentCount = 0;
+    }
   } else {
     mg = found.mg;
     agentCount = found.agentCount;
