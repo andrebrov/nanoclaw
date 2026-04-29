@@ -1,85 +1,74 @@
 ---
 name: welcome
-description: Introduce yourself to a newly connected channel. Triggered automatically when a channel is first wired. Send a friendly greeting and brief overview of what you can do.
+description: Introduces the agent to a newly connected channel by sending a warm greeting, listing available commands, explaining supported features, and providing example prompts to guide the user. Use when onboarding a new channel, introducing the agent for the first time, handling a first message, or setting up a new channel connection. Relevant for terms like 'introduce', 'new channel setup', 'onboarding', 'first message', 'channel wired', or 'getting started'.
 ---
 
-# /welcome — Channel Onboarding (Updated)
+# /welcome — Channel Onboarding
 
-You've just been connected to a new user. This your time to shine and make a strong first impression. Introduce yourself and guide the user through what you can do. you got this!
+You've just been connected to a new user. Introduce yourself and guide them through what you can do.
 
 ## What to do
 
 1. Send a short, warm greeting using `send_message`
 2. State your name (from your system prompt / CLAUDE.md)
-3. Signal that you're capable of a lot — but don't list everything upfront. Be intriguing, not encyclopedic
+3. Signal broad capability without listing everything upfront
 4. Ask: would they like to explore what you can do, or jump straight into something?
 
-**If they want to explore:** drip-feed one capability at a time. Briefly explain it, offer to demo a compelling example or let them try it. Never dump a full list.
+**If they want to explore:** reveal one capability at a time (see order below). Keep each reveal to 2–4 sentences, offer a demo or let them try it.
 
 **If they want to jump in:** just go.
 
 ---
 
-## Capabilities to reveal (in order)
+## Example opening messages
 
-Reveal these one at a time, in this sequence. Each should be 2–4 sentences max.
+**Casual (Telegram/Discord):**
+> Hey! I'm [Name] — your AI agent. I can do a lot more than answer questions. Want a quick tour, or shall we dive straight in?
 
-### 1. Memory & Context Over Time
-You remember things across conversations — projects, preferences, people, decisions. Users don't have to re-explain context every session. The more they work with you, the more situationally aware you become.
+**Professional (Slack/Teams):**
+> Hi there — I'm [Name], your connected AI agent. I'm set up and ready to help. Would you like a brief overview of what I can do, or is there something specific you'd like to tackle?
 
-### 2. Spawning Persistent Agents (`create_agent`)
-You can spin up other named agents — a Researcher, a Builder, a Calendar agent — each with their own memory, workspace, and personality. They're addressable destinations: you delegate, they work, they report back. These aren't one-shot tasks; they accumulate context across sessions.
+---
 
-### 3. Scheduled & Background Tasks
-You can run tasks on a schedule — daily briefings, monitors that alert only when something matters, recurring reminders. For bigger jobs, you can spin up an agent that works in the background while the conversation continues.
+## Capabilities to reveal (in order, one at a time)
 
-### 4. Research & Web Browsing
-You can browse the web like a person — read articles, pull live data, summarize reports, compare products, answer questions that aren't in your training data. Ask me "what's the latest on X" or "find the best Y for Z" and I'll actually look it up. Very powerful when combined with scheduled tasks.
-
-### 5. Code & Building Things
-You can write, debug, and deploy full applications — scripts, APIs, frontend sites. You can spin up a dev server, test in a real browser, and deploy to production (e.g. Vercel). Concept to live URL.
-
-### 6. Interactive UI
-You can send structured cards and multiple-choice buttons directly into the chat — not just plain text. Useful for decisions, presenting options, or surfacing results cleanly.
-
-### 7. Files & Artifacts
-You can produce real deliverables — reports, PDFs, charts, generated images — and send them as downloadable files in chat, not just pasted text.
-
-### 8. Self-Customization
-You can add new tools and MCP servers to yourself if a capability isn't built in. You can extend your own toolkit when the task requires it.
+1. **Memory & Context Over Time** — Remembers projects, preferences, and decisions across sessions.
+2. **Spawning Persistent Agents (`create_agent`)** — Spins up named sub-agents with their own memory and workspace.
+3. **Scheduled & Background Tasks** — Runs tasks on a schedule or in the background while conversation continues.
+4. **Research & Web Browsing** — Browses the web live for current data beyond training knowledge.
+5. **Code & Building Things** — Writes, debugs, and deploys full applications from script to live URL.
+6. **Interactive UI** — Sends structured cards and multiple-choice buttons directly into chat.
+7. **Files & Artifacts** — Produces and delivers real files (reports, PDFs, charts, images) as attachments.
+8. **Self-Customization** — Can add new tools and MCP servers to extend its own capabilities.
 
 ---
 
 ## Trust & Control — always include these
 
-After the capabilities tour (or woven in naturally), cover these two points. Frame them positively — users stay in control.
+**Approvals:** Sensitive actions (installing packages, adding MCP servers) require explicit user approval before proceeding — nothing happens automatically.
 
-### Approvals
-Sensitive actions — installing packages, adding MCP servers — require the user's explicit approval before you proceed. They'll get a prompt; nothing happens automatically. They can also add credentials to the OneCLI agent vault that require human-in-the-loop approval.
-
-### Access Control
-The user owns who can talk to you. Adding you to a new group or sharing a bot link with someone triggers an approval request on their end. Nobody interacts with you without their say-so.
+**Access Control:** The user controls who can interact with the agent. Adding it to a new group or sharing a bot link triggers an approval request — nobody gets access without the user's say-so.
 
 ---
 
-## How to interact — always mention this
+## Interaction model — always mention this
 
-There are no special commands. Users just talk naturally. If they want something done, they say so. That's it.
+No special commands. Users just talk naturally. If they want something done, they say so.
 
 ---
 
 ## Wrapping up
 
-After the tour, finish with an open invitation. Ask if they want help with something specific. Tell them they can share any generally what they're working on and any challenges they have currently and you can suggest ways you could help.
+Close with an open invitation. Ask what they're working on and any challenges they're facing — offer to suggest ways you can help.
 
 ---
 
 ## Tone
 
-Warm, confident, inviting. Make the user feel like they just unlocked something powerful. Match the channel vibe: casual for Telegram/Discord, slightly more professional for Slack/Teams.
+Warm, confident, inviting. Casual for Telegram/Discord; slightly more professional for Slack/Teams.
 
 ## Important
 
-- Scan your available MCP tools and skills before starting — know what you have, but keep it in your back pocket
-- Never overwhelm with a full capability list. Discovery should feel like unwrapping, not reading a manual
-- Confirmations and corrections from the user during onboarding are feedback — save them to memory for future sessions
+- Scan available MCP tools and skills before starting — know what you have, keep it in reserve
+- Never overwhelm with a full capability list; reveal capabilities one at a time
+- Save any corrections or preferences the user expresses during onboarding to memory for future sessions

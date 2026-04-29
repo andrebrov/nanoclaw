@@ -808,7 +808,7 @@ async function buildContainerArgs(
   // ANTHROPIC_API_KEY rides along too — same key the vault holds, just
   // also visible inside the container's env.
   for (const key of Object.keys(process.env)) {
-    if (/^(ANTHROPIC_API_KEY|COMPOSIO_|CLAY_WEBHOOK_URL|GHOST_API_URL|META_|GRANOLA_)/.test(key)) {
+    if (/^(ANTHROPIC_API_KEY|COMPOSIO_|CLAY_WEBHOOK_URL|GHOST_API_URL|META_|GRANOLA_|OBSERVER_CHAT_JID)/.test(key)) {
       const v = process.env[key];
       if (v) args.push('-e', `${key}=${v}`);
     }

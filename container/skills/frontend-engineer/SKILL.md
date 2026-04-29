@@ -1,6 +1,6 @@
 ---
 name: frontend-engineer
-description: Pro frontend engineering discipline. Enforces build-test-verify workflow for every web project. Never declare done until the site is built, tested, responsive, accessible, and visually verified in a real browser. Use alongside vercel-cli for production-quality deployments.
+description: "Runs builds, executes tests, checks responsive layouts across breakpoints, audits accessibility compliance, and captures browser screenshots for visual verification on web projects. Use when building websites, creating React or Next.js apps, writing HTML/CSS/JS, deploying to Vercel, checking responsiveness or accessibility, verifying a frontend deployment, or working with Tailwind, TypeScript, or component libraries. Enforces a strict build-test-verify workflow: never declares done until the site builds cleanly, passes checks, and is visually verified in a real browser across desktop and tablet viewports."
 ---
 
 # Frontend Engineer
@@ -23,43 +23,14 @@ Every frontend task follows this sequence. Do not skip steps.
 
 ### 2. Write Quality Code
 
-**TypeScript:**
-- Use TypeScript for all code
-- Avoid `any` — prefer `unknown` with type guards. If `any` is genuinely the simplest correct approach (e.g. third-party lib interop), use it sparingly
-- Annotate return types; explicit interfaces for all props and API responses
+**Key non-obvious conventions:**
 
-**React / Next.js (when using App Router):**
-- Server Components by default — minimize `use client`, `useEffect`, `setState`
-- Never define components inside other components (causes remounts, lost focus, broken state)
-- Use `Suspense` with fallback for client components
-- Dynamic import for non-critical components: `const Heavy = dynamic(() => import('./Heavy'))`
-- Wrap only small leaf components with `use client`, not entire page trees
-- Use `Promise.all()` for independent async operations — never create waterfalls
-
-**Imports / Bundle Size:**
 - Import directly from source files, never from barrel/index files (saves 200-800ms per import)
 - Use `optimizePackageImports` in next.config for icon/UI libraries (lucide-react, @mui/material, etc.)
-- Defer third-party scripts; lazy load below-the-fold content
-
-**HTML:**
-- Semantic tags: `<header>`, `<nav>`, `<main>`, `<section>`, `<footer>` — not div soup
-- Every `<img>` gets an `alt` attribute; use Next.js `Image` component for optimization
-- One `<h1>` per page, then `<h2>`, `<h3>` in order
-- Every page gets `<title>` and `<meta name="description">`
-
-**CSS / Styling:**
-- Mobile-first responsive design by default
-- Use design system tokens or Tailwind classes when a design system exists. For standalone projects, establish consistent values early and reuse them
-- Prefer the design scale over arbitrary values — but if the design genuinely calls for a specific value, use it
-- Consistent spacing across similar elements (don't mix p-3, p-4, p-5 on the same content type)
+- Server Components by default in App Router — minimize `use client`, `useEffect`, `setState`; wrap only small leaf components
+- Consistent loading/error/empty states across the whole app — don't mix spinners, skeletons, and shimmer
 - Smooth transitions on interactive elements (200-300ms, use transform/opacity for GPU acceleration)
-- Aim for 4.5:1 contrast ratio for text (WCAG AA)
-
-**Consistency:**
-- Similar pages must follow the same layout pattern
-- Loading states are consistent everywhere (don't mix spinners, skeletons, and shimmer)
-- Error states follow one pattern across the app
-- Empty states look the same everywhere
+- Consistent spacing across similar elements — don't mix `p-3`, `p-4`, `p-5` on the same content type
 
 ### 3. Build Before Deploying
 
@@ -96,7 +67,7 @@ agent-browser screenshot tablet.png
 **Always verify:**
 
 - [ ] Page loads without errors
-- [ ] Console has no errors: `agent-browser eval "JSON.stringify(window.__errors || [])"`
+- [ ] Console has no errors: `agent-browser eval "JSON.stringify(window.__errors || [])"` 
 - [ ] No horizontal scrollbars or layout overflow
 
 **Verify when relevant to the change:**
@@ -143,10 +114,8 @@ Keep iterating until it looks professional. If after 3 iterations the same issue
 
 - Building a component from scratch when a similar one exists in the codebase
 - Using different spacing across the same content type
-- Leaving `console.log` in production code
-- Importing entire libraries for one function (e.g., all of lodash for `debounce`)
 - Suppressing warnings or disabling lint rules to make builds pass
-- Defining components inside other components
+- Defining components inside other components (causes remounts, lost focus, broken state)
 
 ## Reporting
 

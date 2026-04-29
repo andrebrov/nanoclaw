@@ -45,6 +45,18 @@ interface StatusChannelConfig {
   statusThreadId?: string | null;
 }
 
+function parseObserverEnv(): StatusChannelConfig | null {
+  const jid = process.env.OBSERVER_CHAT_JID;
+  if (!jid) return null;
+  const colonIdx = jid.indexOf(':');
+  if (colonIdx <= 0) return null;
+  return {
+    statusChannelType: jid.slice(0, colonIdx),
+    statusChannelId: jid.slice(colonIdx + 1),
+    statusThreadId: null,
+  };
+}
+
 // ── Observer handle ─────────────────────────────────────────────────────────
 
 export interface SessionObserverHandle {
@@ -87,7 +99,11 @@ export function startSessionObserver(
   destroySessionObserver(session.id);
 
   const cfg = readContainerConfig(agentGroupFolder);
-  const statusCfg = cfg.observer ?? null;
+  // Fall back to the host-wide OBSERVER_CHAT_JID env var when a group hasn't
+  // declared its own `observer` block. Format: "channel_type:platform_id"
+  // (e.g. "telegram:-4938565950"). One env var configures every group at
+  // once; a per-group override in container.json still wins.
+  const statusCfg = cfg.observer ?? parseObserverEnv();
 
   let sentReply = false;
   let queryStartMs: number | null = null;
@@ -162,8 +178,16 @@ export function startSessionObserver(
     if (nextPingMs !== undefined && elapsed >= nextPingMs) {
       const secs = Math.round(elapsed / 1000);
       const text = `${emoji} Still working… (${secs}s in, ${toolCount} tools so far)`;
-      void sendToMain(text);
-      if (statusCfg) void sendToStatus(text);
+      // When a status channel is configured, route the watchdog there only —
+      // operators using a back channel don't want progress pings cluttering
+      // the chat where the user is waiting for the actual answer. Without a
+      // status channel, fall back to posting in the main chat so the user
+      // still gets a "yes, alive" signal.
+      if (statusCfg) {
+        void sendToStatus(text);
+      } else {
+        void sendToMain(text);
+      }
       pingsFired++;
     }
     watchdogTimer = setTimeout(tick, WATCHDOG_TICK_MS);
@@ -219,8 +243,14 @@ export function startSessionObserver(
         case 'thinking': {
           void setStage('thinking');
           if (statusCfg && typeof value === 'string' && value) {
-            const preview = value.length > 300 ? value.slice(0, 300) + '…' : value;
-            void sendToStatus(`💭 ${preview}`);
+            // Send the full thinking block — the chat-sdk-bridge's
+            // maxTextLength splits at paragraph/line boundaries, so long
+            // monologues land as multiple sequential messages instead of a
+            // single mid-sentence truncation. The 300-char preview cap
+            // here was a defense-in-depth from before the bridge gained
+            // splitting; with it, you lose the actual reasoning the back
+            // channel is supposed to surface.
+            void sendToStatus(`💭 ${value}`);
           }
           break;
         }
