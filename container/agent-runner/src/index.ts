@@ -29,6 +29,7 @@ import { fileURLToPath } from 'url';
 import { loadConfig } from './config.js';
 import { buildSystemPromptAddendum } from './destinations.js';
 import { readSnapshot } from './db/session-snapshot.js';
+import { buildWikiBriefing } from './wiki-briefing.js';
 // Providers barrel — each enabled provider self-registers on import.
 // Provider skills append imports to providers/index.ts.
 import './providers/index.js';
@@ -96,6 +97,15 @@ async function main(): Promise<void> {
       `for persisted context:\n\n` +
       `${snapshot.trim()}\n` +
       `</session-snapshot>`;
+  }
+
+  // Wiki briefing: if a shared knowledge wiki exists at
+  // /workspace/global/knowledge/wiki/INDEX.md, inject the most relevant
+  // articles as a <knowledge-base> block so the agent starts sessions with
+  // pre-compiled domain knowledge rather than re-discovering it each time.
+  const wikiBriefing = buildWikiBriefing(config.assistantName || '', config.groupName || '');
+  if (wikiBriefing) {
+    log(`Wiki briefing injected (${(wikiBriefing.match(/###\s/g) || []).length} article(s))`);
   }
 
   // Discover additional directories mounted at /workspace/extra/*
@@ -180,7 +190,7 @@ async function main(): Promise<void> {
   await runPollLoop({
     provider,
     cwd: CWD,
-    systemContext: { instructions: instructions + checkpointAddendum + snapshotAddendum },
+    systemContext: { instructions: instructions + wikiBriefing + checkpointAddendum + snapshotAddendum },
   });
 }
 
