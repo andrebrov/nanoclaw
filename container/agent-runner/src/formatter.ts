@@ -91,24 +91,29 @@ export interface RoutingContext {
 /**
  * Extract routing context from a batch of messages.
  *
- * Uses the LAST message's routing fields, not the first. In threaded
- * platforms (Telegram forum-mode supergroups), session resolution
- * collapses topics into one session but messages_in.thread_id keeps
- * the per-message topic id. A batch can therefore mix topics — the
- * user fired one message in topic A, then a follow-up in topic B
- * before the agent woke. Replying into topic A leaves topic B silent;
- * replying into topic B (the most recent context) at least lands the
- * answer where the user is currently looking. Per-topic fan-out would
- * be even better but requires the agent to opt in via inReplyTo on
- * each <message> block, which the agent already knows how to do.
+ * Channel/thread routing (platformId, channelType, threadId) uses the LAST
+ * message. In threaded platforms (Telegram forum-mode supergroups), session
+ * resolution collapses topics into one session but messages_in.thread_id keeps
+ * the per-message topic id. A batch can therefore mix topics — the user fired
+ * one message in topic A, then a follow-up in topic B before the agent woke.
+ * Replying into topic A leaves topic B silent; replying into topic B (the most
+ * recent context) at least lands the answer where the user is currently looking.
+ *
+ * inReplyTo uses the FIRST trigger=1 message (the message that specifically
+ * addressed/woke the agent), not the last message overall. In a busy multi-bot
+ * group chat, subsequent bot messages can accumulate after the triggering
+ * @-mention before the agent runs; threading the reply to the last message
+ * would attach the response to a different bot's message rather than to the
+ * one that actually prompted this response.
  */
 export function extractRouting(messages: MessageInRow[]): RoutingContext {
   const last = messages[messages.length - 1];
+  const firstTrigger = messages.find((m) => m.trigger === 1);
   return {
     platformId: last?.platform_id ?? null,
     channelType: last?.channel_type ?? null,
     threadId: last?.thread_id ?? null,
-    inReplyTo: last?.id ?? null,
+    inReplyTo: firstTrigger?.id ?? last?.id ?? null,
   };
 }
 

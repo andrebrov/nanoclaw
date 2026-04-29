@@ -145,6 +145,30 @@ describe('routing', () => {
     expect(routing.threadId).toBe('thread-456');
     expect(routing.inReplyTo).toBe('m1');
   });
+
+  it('inReplyTo uses first trigger=1 message, not last, in a multi-bot batch', () => {
+    // Simulate a busy group chat: m1 (trigger=0 context), m2 (trigger=1, the
+    // @-mention that addressed this bot), m3 (trigger=0, a subsequent bot
+    // message that landed before the agent ran). inReplyTo must be m2 — the
+    // message the user is waiting for a reply to — not m3.
+    getInboundDb()
+      .prepare(
+        `INSERT INTO messages_in (id, seq, kind, timestamp, status, trigger, platform_id, channel_type, thread_id, content)
+         VALUES
+           ('m1', 1, 'chat', datetime('now'), 'pending', 0, 'grp-1', 'telegram', null, '{"text":"earlier chatter"}'),
+           ('m2', 2, 'chat', datetime('now'), 'pending', 1, 'grp-1', 'telegram', null, '{"text":"@MythicalClawBot help"}'),
+           ('m3', 3, 'chat', datetime('now'), 'pending', 0, 'grp-1', 'telegram', null, '{"text":"another bot reply"}')`,
+      )
+      .run();
+
+    const messages = getPendingMessages();
+    const routing = extractRouting(messages);
+    // Channel routing should use the last message (m3)
+    expect(routing.platformId).toBe('grp-1');
+    expect(routing.channelType).toBe('telegram');
+    // inReplyTo must be m2 (first trigger=1), not m3 (last overall)
+    expect(routing.inReplyTo).toBe('m2');
+  });
 });
 
 describe('mock provider', () => {
