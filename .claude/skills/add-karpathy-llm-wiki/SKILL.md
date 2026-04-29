@@ -63,40 +63,43 @@ curl -sLo sources/filename.pdf "<url>"
 If the document is a webpage, then claude can use fetch or `agent-browser` to open the page and extract full text if available. The container skill and CLAUDE.md should note this so claude gets full content for sources rather than summaries.
 
 
-## Step 5: Optional lint schedule
+## Step 5: Install lint.sh and set up a schedule
 
-AskUserQuestion: "Want periodic wiki health checks?"
+Install the wiki linting script, then optionally schedule it to run weekly.
 
-1. **Weekly**
-2. **Monthly**
-3. **Skip** — lint manually
-
-If yes, create a NanoClaw scheduled task that runs in the wiki group. This is NOT a Claude Code cron job — it's a NanoClaw group task that runs in the agent container. Insert it into the SQLite database:
+### 5a. Install lint.sh
 
 ```bash
-pnpm exec tsx -e "
-const Database = require('better-sqlite3');
-const { CronExpressionParser } = require('cron-parser');
-const db = new Database('store/messages.db');
-const interval = CronExpressionParser.parse('<cron-expr>', { tz: process.env.TZ || 'UTC' });
-const nextRun = interval.next().toISOString();
-db.prepare('INSERT INTO scheduled_tasks (id, group_folder, chat_jid, prompt, schedule_type, schedule_value, context_mode, next_run, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
-  'wiki-lint',
-  '<group_folder>',
-  '<chat_jid>',
-  'Run a wiki lint pass per the wiki container skill. Check for contradictions, orphan pages, stale content, missing cross-references, and gaps. Report findings and offer to fix issues.',
-  'cron',
-  '<cron-expr>',
-  'group',
-  nextRun,
-  'active',
-  new Date().toISOString()
-);
-db.close();
-"
+cp "${CLAUDE_SKILL_DIR}/scripts/lint.sh" groups/global/knowledge/scripts/lint.sh
+chmod +x groups/global/knowledge/scripts/lint.sh
 ```
 
-Use the group's `folder` and `chat_jid` from the registered groups table. Cron expressions: `0 10 * * 0` (weekly Sunday 10am) or `0 10 1 * *` (monthly 1st at 10am).
+The script is now available inside every agent container at `/workspace/global/knowledge/scripts/lint.sh`.
+
+### 5b. Smoke test
+
+Run a quick check to confirm the script works (requires at least one compiled article in `knowledge/wiki/`):
+
+```bash
+bash groups/global/knowledge/scripts/lint.sh --knowledge-dir groups/global/knowledge
+```
+
+Reports appear in `groups/global/knowledge/lint/`.
+
+### 5c. Optional: weekly schedule
+
+AskUserQuestion: "Want lint to run automatically every week?"
+
+1. **Yes — weekly (Sundays at 2am)**
+2. **Skip — I'll run it manually**
+
+If yes, ask the wiki agent to set up the schedule. Send it a message like:
+
+> "Schedule the wiki lint to run every Sunday at 2am. Use: bash /workspace/global/knowledge/scripts/lint.sh --knowledge-dir /workspace/global/knowledge"
+
+The agent will use its `schedule` MCP tool to create the recurring task. After each run the script writes reports to `/workspace/global/knowledge/lint/` and prints a `LINT_SUMMARY:` line — the agent will relay that summary to the group chat so you can see issues at a glance.
+
+On-demand: any agent can run `bash /workspace/global/knowledge/scripts/lint.sh` directly.
 
 
 ## Step 6: Set up the compilation engine
@@ -111,6 +114,7 @@ Create `knowledge/raw/` and `knowledge/wiki/` in the agent's global workspace ho
 mkdir -p groups/global/knowledge/raw/processed
 mkdir -p groups/global/knowledge/wiki
 mkdir -p groups/global/knowledge/scripts
+mkdir -p groups/global/knowledge/lint
 ```
 
 ### 6b. Install the compilation script
