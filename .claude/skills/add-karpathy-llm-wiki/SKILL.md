@@ -98,7 +98,74 @@ db.close();
 
 Use the group's `folder` and `chat_jid` from the registered groups table. Cron expressions: `0 10 * * 0` (weekly Sunday 10am) or `0 10 1 * *` (monthly 1st at 10am).
 
-## Step 6: Build and restart
+
+## Step 6: Set up the compilation engine
+
+Install `compile.sh` — the automated batch compiler that transforms `knowledge/raw/` documents into structured wiki articles in `knowledge/wiki/`.
+
+### 6a. Create the knowledge directory structure
+
+Create `knowledge/raw/` and `knowledge/wiki/` in the agent's global workspace host directory (`groups/global/`). This makes the knowledge base accessible to all agent groups as a read-only shared mount:
+
+```bash
+mkdir -p groups/global/knowledge/raw/processed
+mkdir -p groups/global/knowledge/wiki
+mkdir -p groups/global/knowledge/scripts
+```
+
+### 6b. Install the compilation script
+
+```bash
+cp "${CLAUDE_SKILL_DIR}/scripts/compile.sh" groups/global/knowledge/scripts/compile.sh
+chmod +x groups/global/knowledge/scripts/compile.sh
+```
+
+The script is now available inside every agent container at `/workspace/global/knowledge/scripts/compile.sh`.
+
+### 6c. Test on sample input
+
+Drop a sample file into `groups/global/knowledge/raw/` and run a quick smoke test (requires `claude` CLI on the host):
+
+```bash
+echo "Test note: Claude is an AI assistant made by Anthropic." > groups/global/knowledge/raw/test-note.txt
+bash groups/global/knowledge/scripts/compile.sh --knowledge-dir groups/global/knowledge
+```
+
+Verify `groups/global/knowledge/wiki/` contains a new `.md` file and `groups/global/knowledge/wiki/INDEX.md` has an entry.
+
+### 6d. Optional: session-end hook (auto-compile after each session)
+
+To compile automatically after every NanoClaw session, add a `SessionEnd` hook in `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash groups/global/knowledge/scripts/compile.sh --knowledge-dir groups/global/knowledge",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 6e. Optional: daily 3am schedule
+
+Ask the wiki agent to set up a daily compilation schedule. Send it a message like:
+
+> "Schedule the wiki compilation to run every day at 3am. Use: bash /workspace/global/knowledge/scripts/compile.sh --knowledge-dir /workspace/global/knowledge"
+
+The agent will use its `schedule` MCP tool to create the recurring task.
+
+On-demand: any agent can run `bash /workspace/global/knowledge/scripts/compile.sh` directly.
+
+## Step 7: Build and restart
 
 ```bash
 pnpm run build
