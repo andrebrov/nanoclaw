@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 178 (<= 500)",
+        "details": {
+          "line_count": 178,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'angel-outreach'",
+        "details": {
+          "value": "angel-outreach",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (602 chars)",
+        "details": {
+          "length": 602
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 6636
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "angel-outreach",
+    "skillDescription": "Runs the 5-touch angel investor warm-up sequence for Andrei, targeting contacts from the Post Demo Day Fundraising Angels Attio list. Warms up relationships before asking for investment through a drip campaign of personalised follow-up emails, processing one batch every 4 days and sending drafts for Andrei's approval via Telegram. Use when running angel investor outreach, processing an investor email batch, drafting follow-up sequences, or when Andrei needs to review investor drip campaign drafts. Keywords: angel outreach, investor emails, fundraising drip campaign, warm-up sequence, Attio list."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: runs a 5-touch warm-up sequence, targets contacts from a specific Attio list, processes batches every 4 days, sends drafts for approval via Telegram. Very detailed and actionable."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes excellent natural keywords users would say: 'angel outreach', 'investor emails', 'fundraising drip campaign', 'warm-up sequence', 'Attio list', 'investor email batch', 'follow-up sequences'. Good coverage of variations a user like Andrei would naturally use."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (runs 5-touch angel investor warm-up sequence, processes batches, sends drafts via Telegram) and 'when' (explicit 'Use when...' clause covering angel investor outreach, processing batches, drafting follow-ups, and reviewing drip campaign drafts)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a very specific niche: a particular fundraising sequence for a named person (Andrei), targeting a specific Attio list, with a defined cadence and approval workflow via Telegram. Extremely unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that is highly specific, includes explicit trigger guidance with a 'Use when...' clause, and provides rich natural keywords. It clearly defines the workflow (5-touch sequence, 4-day batches, Telegram approval) and is distinctive enough to avoid conflicts with other skills. The only minor note is that it's quite long and person-specific, but this serves its purpose well for disambiguation.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly detailed and most content earns its place given the complexity of the multi-step outreach process. However, some sections could be tightened — the touch-by-touch email guidelines are somewhat verbose with style instructions Claude could infer, and the sequence overview table partially duplicates the detailed touch descriptions below."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with specific API endpoints, exact CLI commands, concrete code for tracker management, specific Attio list IDs, word count limits per touch, exact email formatting templates, and Telegram message formats. Nearly everything is copy-paste ready with clear parameterization."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 8-step process is clearly sequenced with explicit validation checkpoints: checking for replies before proceeding (Step 2), reading existing threads before writing (Step 3, marked CRITICAL), bounce checking, and the entire draft-then-approve-via-Telegram flow serves as a human-in-the-loop validation gate. Error recovery is addressed (replied → stop sequence, bounced → skip)."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-structured with clear headers and a logical flow, but it's a long monolithic document (~180 lines of content). The detailed touch templates, tracker code, and Attio update logic could be split into referenced files. For a skill of this complexity, some progressive disclosure into sub-files would improve navigability."
+        }
+      },
+      "overall_assessment": "This is a strong, highly actionable skill with excellent workflow clarity and concrete executable guidance throughout. Its main weakness is that it's a lengthy single document that could benefit from splitting detailed touch templates and tracker management into referenced sub-files. The content is mostly efficient but has some redundancy between the overview table and the detailed touch descriptions.",
+      "suggestions": [
+        "Consider splitting the detailed touch template guidelines (Touch 1-5) into a separate TOUCH_TEMPLATES.md file referenced from the main skill, keeping only the overview table inline.",
+        "The tracker management code (Steps 1 and 7) could be extracted to a referenced utility file to reduce the main skill's length."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

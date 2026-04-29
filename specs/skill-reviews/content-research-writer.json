@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 80
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 82 (<= 500)",
+        "details": {
+          "line_count": 82,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'content-research-writer'",
+        "details": {
+          "value": "content-research-writer",
+          "length": 23
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (250 chars)",
+        "details": {
+          "length": 250
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4264
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "content-research-writer",
+    "skillDescription": "Writing partner that helps research, outline, draft, and refine content while maintaining the user's voice and style. Use when writing blog posts, articles, newsletters, thought leadership pieces, case studies, or getting section-by-section feedback."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'research, outline, draft, and refine content' along with specific content types like 'blog posts, articles, newsletters, thought leadership pieces, case studies.' Also mentions 'maintaining the user's voice and style' and 'section-by-section feedback.'"
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'blog posts', 'articles', 'newsletters', 'thought leadership pieces', 'case studies', 'draft', 'outline', 'feedback', 'writing'. These are terms users would naturally use when requesting writing help."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (research, outline, draft, refine content while maintaining voice/style) and 'when' with an explicit 'Use when...' clause listing specific content types and the feedback trigger scenario."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 2,
+          "reasoning": "While it specifies content types well, 'writing partner' is fairly broad and could overlap with other writing-related skills (e.g., copywriting, technical writing, email drafting). The content types help narrow it but 'draft and refine content' is still somewhat general."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific actions (research, outline, draft, refine) and provides an explicit 'Use when' clause with multiple natural trigger terms. The main weakness is that the writing domain is broad enough that it could potentially conflict with more specialized writing skills. The description also correctly uses third person voice.",
+      "suggestions": []
+    },
+    "weightedScore": 2.8499999999999996,
+    "normalizedScore": 0.9249999999999998
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is moderately efficient but includes some unnecessary elaboration. The hook examples (Step 4) and section feedback examples (Step 5) are useful but verbose — the SaaS-specific examples could be shorter or moved to a reference file. Some steps like 'Understand the Writing Project' list things Claude would naturally ask about."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "The skill provides concrete examples for hooks and section feedback (Step 4 and 5 are genuinely actionable with before/after rewrites), but most other steps are descriptive checklists rather than executable instructions. Steps 1, 3, 6, and 8 describe what to do at a high level without showing how (no specific tool calls, no concrete commands for research, no example of voice matching)."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The numbered steps provide a clear sequence, and the 'Writing Workflows' section at the bottom gives useful workflow variants. However, there are no validation checkpoints or feedback loops — no step says 'confirm with the user before proceeding' or 'if the outline is rejected, iterate.' For a collaborative writing process where user approval gates each phase, this is a notable gap."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "The skill appropriately references external files (voice-and-tone.md, CITATIONS.md, LinkedIn templates) for detailed content, keeping the main skill as an overview. References are one level deep and clearly signaled with file paths. The content is well-structured with clear section headers."
+        }
+      },
+      "overall_assessment": "This is a reasonably well-structured writing partner skill with good examples in the hook and feedback sections, and appropriate use of external file references. Its main weaknesses are that several steps remain at the checklist/description level rather than providing concrete, executable guidance, and the collaborative workflow lacks explicit user-confirmation checkpoints between phases. The SaaS-specific examples are helpful but make the skill somewhat verbose for a general writing partner.",
+      "suggestions": [
+        "Add explicit user-confirmation gates between major phases (e.g., 'Present outline and wait for approval before drafting; if rejected, iterate on specific sections') to improve workflow clarity.",
+        "Make Step 3 (Conduct Research) more actionable by specifying which tools to use (e.g., web_search) and showing a concrete example of how to present research findings to the user.",
+        "Trim Step 1 to just the non-obvious items — Claude naturally gathers topic, audience, and tone; focus instead on project-specific constraints the user might forget to mention."
+      ]
+    },
+    "weightedScore": 2.15,
+    "normalizedScore": 0.575
+  }
+}

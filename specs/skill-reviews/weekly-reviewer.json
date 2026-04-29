@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 65 (<= 500)",
+        "details": {
+          "line_count": 65,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'weekly-reviewer'",
+        "details": {
+          "value": "weekly-reviewer",
+          "length": 15
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (232 chars)",
+        "details": {
+          "length": 232
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2052
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "weekly-reviewer",
+    "skillDescription": "Compiles GTM activity into a structured review or morning brief by reading project files, then produces a planning document with priorities. Use when the user asks for a morning brief, weekly review, \"plan my week,\" or status recap."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 2,
+          "reasoning": "Names the domain (GTM activity review/planning) and some actions (reading project files, producing a planning document with priorities), but the actions are somewhat general—'compiles activity' and 'produces a planning document' lack the granularity of listing multiple distinct concrete operations."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural trigger terms that users would actually say: 'morning brief,' 'weekly review,' 'plan my week,' 'status recap.' These are varied and cover common phrasings a user might use."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (compiles GTM activity into a structured review/brief, produces a planning document with priorities) and 'when' (explicit 'Use when' clause with specific trigger scenarios)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "The combination of GTM-specific context, morning brief/weekly review framing, and project file reading creates a clear niche that is unlikely to conflict with generic planning or document skills."
+        }
+      },
+      "overall_assessment": "This is a solid description that clearly communicates both what the skill does and when to use it, with good natural trigger terms. The main weakness is that the capability description could be more specific about the concrete actions performed (e.g., what project files are read, what the planning document contains beyond 'priorities'). Overall it performs well for skill selection purposes.",
+      "suggestions": [
+        "Add more specific concrete actions to boost specificity, e.g., 'summarizes pipeline updates, flags overdue tasks, highlights key metrics' instead of the general 'compiles GTM activity.'"
+      ]
+    },
+    "weightedScore": 2.8,
+    "normalizedScore": 0.8999999999999999
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The skill is lean and efficient. It doesn't explain what a morning brief or weekly review is conceptually—it jumps straight into the process with specific file paths and concrete steps. Every section earns its place."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "The skill provides specific file paths and a clear output template, which is good. However, the actual steps are descriptive rather than executable—'count files in [path]' and 'check for new leads' lack concrete commands or code snippets (e.g., shell commands to count files, or specific patterns to look for in files)."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The process is clearly sequenced for each variant (morning brief, weekly review, Friday review) with numbered steps. The verification checklist at the end serves as an explicit validation checkpoint ensuring metrics are real, priorities are ranked, and files are saved appropriately."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "For a skill of this size and scope, the content is well-organized into clear sections (When to Use, Process with sub-variants, Output Format, Verification) without being monolithic. No unnecessary nesting or external references needed for this single-purpose skill."
+        }
+      },
+      "overall_assessment": "This is a well-structured, concise skill that clearly defines when to trigger, what data to gather, and what output to produce. Its main weakness is that the data-gathering steps are descriptive rather than providing executable commands (e.g., `ls | wc -l` for counting files, or specific grep patterns). The verification checklist is a strong addition that ensures output quality.",
+      "suggestions": [
+        "Add concrete shell commands or code snippets for data gathering steps (e.g., `find /workspace/extra/finsi-workflows/prospecting/outreach/ -type f | wc -l` for counting outreach files) to make the skill fully executable rather than descriptive."
+      ]
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  }
+}

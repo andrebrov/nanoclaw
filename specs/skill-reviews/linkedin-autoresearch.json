@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 82
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 390 (<= 500)",
+        "details": {
+          "line_count": 390,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'linkedin-autoresearch'",
+        "details": {
+          "value": "linkedin-autoresearch",
+          "length": 21
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (356 chars)",
+        "details": {
+          "length": 356
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 16578
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "linkedin-autoresearch",
+    "skillDescription": "Autonomous LinkedIn outreach optimizer inspired by Karpathy's autoresearch. Generates message variants, sends via HeyReach campaigns, monitors reply rates, classifies responses, keeps winning copy, discards underperformers, and iterates. Use when Andrei wants to improve LinkedIn reply rates, A/B test outreach copy, or run LinkedIn campaigns via HeyReach."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: generates message variants, sends via HeyReach campaigns, monitors reply rates, classifies responses, keeps winning copy, discards underperformers, and iterates."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural trigger terms users would say: 'LinkedIn', 'outreach', 'reply rates', 'A/B test', 'outreach copy', 'HeyReach', 'campaigns'. These cover the domain well and match how a user would phrase requests."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (generates variants, sends campaigns, monitors replies, classifies responses, iterates) and 'when' with an explicit 'Use when...' clause specifying three trigger scenarios."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: LinkedIn outreach optimization specifically via HeyReach, tied to a specific user (Andrei). The combination of LinkedIn + HeyReach + A/B testing outreach copy is unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific capabilities (message variant generation, campaign sending, reply monitoring, response classification, iterative optimization) and provides explicit trigger guidance via a 'Use when...' clause. The description is concise yet comprehensive, with natural trigger terms and a highly distinctive niche that minimizes conflict risk.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 1,
+          "reasoning": "The skill is extremely verbose at ~350+ lines. It repeats the DTC Brand Gate nearly verbatim in both Mode 1 and Mode 2. It explains concepts Claude can infer (what positive/negative replies mean, basic A/B testing logic), includes lengthy tables and templates that could be in referenced files, and contains specific account IDs and personal emails that bloat the content."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides fully executable commands (heyreach-tool with specific arguments), concrete message templates with character limits, specific file paths, exact classification criteria, scoring formulas, and copy-paste ready bash commands. Every step has concrete, actionable guidance."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The optimize loop has 8 clearly sequenced steps with explicit validation checkpoints (DTC Brand Gate as mandatory verification, 48-72 hour wait period, classify-then-score decision framework, keep/discard/evolve criteria). The feedback loop back to Step 1 is explicit. Each mode has a clear numbered process."
+        },
+        "progressive_disclosure": {
+          "score": 1,
+          "reasoning": "This is a monolithic wall of text with everything inline. The DTC Brand Gate is duplicated rather than referenced. Message templates, file structures, classification tables, and the full HeyReach command reference are all embedded when they should be in separate referenced files. The context files are referenced but the skill's own content is not split appropriately."
+        }
+      },
+      "overall_assessment": "The skill excels at actionability and workflow clarity — every step is concrete, executable, and well-sequenced with proper validation gates and feedback loops. However, it is severely bloated: the DTC Brand Gate is duplicated verbatim, message templates and command references should be in separate files, and classification criteria over-explain concepts Claude already understands. The monolithic structure undermines usability in a context window.",
+      "suggestions": [
+        "Extract the DTC Brand Gate into a single referenced file (e.g., dtc-gate.md) and reference it from both Mode 1 and Mode 2 instead of duplicating ~30 lines of criteria.",
+        "Move message templates to a separate file (e.g., variants/starting-templates.md) and the HeyReach command reference to a separate file (e.g., heyreach-commands.md), keeping only a brief summary inline.",
+        "Remove explanatory content Claude already knows — e.g., the reply classification table with examples like 'This sounds interesting, can you tell me more?' and the basic A/B testing concept explanations.",
+        "Trim the architecture ASCII diagram and mode descriptions to essential information only; the current format uses significant tokens on formatting that doesn't add instructional value."
+      ]
+    },
+    "weightedScore": 2.1,
+    "normalizedScore": 0.55
+  }
+}

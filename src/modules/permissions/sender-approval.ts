@@ -88,11 +88,10 @@ export async function requestSenderApproval(input: RequestSenderApprovalInput): 
 
   const approvalId = generateId();
   const senderDisplay = senderName && senderName.length > 0 ? senderName : senderIdentity;
-  const originName = originMg?.name ?? `a ${originChannelType} channel`;
+  const originName = originMg?.name ?? originMg?.platform_id ?? 'an unfamiliar chat';
 
   const title = '👤 New sender';
   const question = `${senderDisplay} wants to talk to your agent in ${originName}. Allow?`;
-  const options = normalizeOptions(APPROVAL_OPTIONS);
 
   createPendingSenderApproval({
     id: approvalId,
@@ -103,8 +102,6 @@ export async function requestSenderApproval(input: RequestSenderApprovalInput): 
     original_message: JSON.stringify(event),
     approver_user_id: target.userId,
     created_at: new Date().toISOString(),
-    title,
-    options_json: JSON.stringify(options),
   });
 
   const adapter = getDeliveryAdapter();
@@ -129,7 +126,7 @@ export async function requestSenderApproval(input: RequestSenderApprovalInput): 
         questionId: approvalId,
         title,
         question,
-        options,
+        options: APPROVAL_OPTIONS,
       }),
     );
     log.info('Unknown-sender approval card delivered', {

@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 87
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 127 (<= 500)",
+        "details": {
+          "line_count": 127,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'frontend-engineer'",
+        "details": {
+          "value": "frontend-engineer",
+          "length": 17
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (612 chars)",
+        "details": {
+          "length": 612
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4067
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "frontend-engineer",
+    "skillDescription": "Runs builds, executes tests, checks responsive layouts across breakpoints, audits accessibility compliance, and captures browser screenshots for visual verification on web projects. Use when building websites, creating React or Next.js apps, writing HTML/CSS/JS, deploying to Vercel, checking responsiveness or accessibility, verifying a frontend deployment, or working with Tailwind, TypeScript, or component libraries. Enforces a strict build-test-verify workflow: never declares done until the site builds cleanly, passes checks, and is visually verified in a real browser across desktop and tablet viewports."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: runs builds, executes tests, checks responsive layouts across breakpoints, audits accessibility compliance, captures browser screenshots for visual verification. Also describes the workflow enforcement pattern."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural terms users would say: 'websites', 'React', 'Next.js', 'HTML/CSS/JS', 'Vercel', 'responsiveness', 'accessibility', 'Tailwind', 'TypeScript', 'component libraries', 'frontend deployment'. These are all terms users would naturally use when requesting help with web development tasks."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (runs builds, executes tests, checks layouts, audits accessibility, captures screenshots) and 'when' with an explicit 'Use when...' clause listing specific trigger scenarios like building websites, creating React/Next.js apps, deploying to Vercel, checking responsiveness or accessibility."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 2,
+          "reasoning": "While the build-test-verify workflow and browser screenshot verification are distinctive, the broad web development scope (React, Next.js, HTML/CSS/JS, Tailwind, TypeScript) could overlap with general web development or coding skills. The description covers a very wide surface area that might conflict with more focused frontend or deployment skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific capabilities and provides comprehensive trigger terms covering the web development ecosystem. The explicit 'Use when...' clause and the workflow enforcement description add valuable context. The main weakness is the broad scope which could create overlap with other web development or coding skills, though the emphasis on the build-test-verify workflow and visual verification helps differentiate it.",
+      "suggestions": []
+    },
+    "weightedScore": 2.8499999999999996,
+    "normalizedScore": 0.9249999999999998
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "Generally efficient but includes some unnecessary guidance that Claude already knows (e.g., 'You are a senior frontend engineer', 'You do not cut corners', explaining what Server Components are). The coding conventions section mixes genuinely non-obvious tips (barrel imports, optimizePackageImports) with basic best practices Claude would already follow."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable commands throughout — build commands, dev server startup, browser verification with specific tool invocations (agent-browser), deployment commands, and concrete checklists. The code blocks are copy-paste ready with real tool names and flags."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Excellent multi-step workflow with clear sequencing (1-6), explicit validation checkpoints (build must pass before deploy, visual verification is mandatory before declaring done, production verification after deploy), and a well-defined iteration/feedback loop with a clear exit condition (3 iterations max)."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is well-structured with clear headers and logical sections, but everything is in a single monolithic file. The coding conventions, anti-patterns, and verification checklists could be split into referenced files. For a skill of this length (~100+ lines), some progressive disclosure to separate files would improve scannability."
+        }
+      },
+      "overall_assessment": "This is a strong, actionable skill with an excellent build-test-verify workflow that includes explicit validation gates and feedback loops. The main weaknesses are moderate verbosity (some identity/motivational framing and basic advice Claude doesn't need) and all content being inline rather than split across files for a skill of this length. The concrete commands, checklists, and iteration protocol are particularly well done.",
+      "suggestions": [
+        "Remove the persona framing ('You are a senior frontend engineer. You do not cut corners.') and the 'Core Rule' section — these waste tokens on motivation rather than instruction; the mandatory verification step in the workflow already enforces this.",
+        "Consider extracting the coding conventions and anti-patterns into a separate CONVENTIONS.md file, referenced from the main skill, to keep SKILL.md focused on the workflow."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

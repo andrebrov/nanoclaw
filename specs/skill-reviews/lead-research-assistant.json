@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 83
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 103 (<= 500)",
+        "details": {
+          "line_count": 103,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'lead-research-assistant'",
+        "details": {
+          "value": "lead-research-assistant",
+          "length": 23
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (265 chars)",
+        "details": {
+          "length": 265
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 3063
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "lead-research-assistant",
+    "skillDescription": "Identifies high-quality leads by analyzing your business, searching for target companies, and providing actionable contact strategies. Use when finding potential customers, building outreach lists, identifying target accounts, or researching companies matching ICP."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'analyzing your business', 'searching for target companies', 'providing actionable contact strategies'. These describe a clear multi-step workflow with distinct capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'leads', 'potential customers', 'outreach lists', 'target accounts', 'ICP', 'researching companies'. Good coverage of sales/marketing vocabulary variations."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('Identifies high-quality leads by analyzing your business, searching for target companies, and providing actionable contact strategies') and when ('Use when finding potential customers, building outreach lists, identifying target accounts, or researching companies matching ICP')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Occupies a clear niche in lead generation and sales prospecting. The combination of ICP analysis, company search, and contact strategies is distinct and unlikely to conflict with general research or CRM skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates its purpose, lists concrete actions, includes natural trigger terms, and has an explicit 'Use when' clause. The only minor issue is the use of second person ('your business'), which per the rubric guidelines should be penalized, but the description is otherwise well-constructed and distinctive. The trigger terms cover a good range of sales/marketing terminology that users would naturally use.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill includes some unnecessary sections like 'When to Use' which largely repeats the description, and the process steps 1 ('Understand the Product/Service') explain things Claude already knows how to do. However, the ICP reference, output format, and tool commands are genuinely useful additions."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "The output format template and Attio CRM commands are concrete and actionable, but the core research process (steps 1-3) is vague and descriptive rather than instructive — 'Search for companies matching criteria' and 'Look for signals' don't specify how to actually perform these searches. The scoring system mentions factors but provides no rubric for how to weight them."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "Steps are listed in a logical sequence (understand → research → score → output → next steps), but there are no validation checkpoints — no step to verify lead quality, cross-check data accuracy, or confirm scoring consistency. For a workflow that feeds into CRM and outreach, missing validation caps this at 2."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "The skill appropriately references external files (icp.md, templates directory, existing research directory) with clear paths, keeps the main content as an overview, and doesn't nest references more than one level deep. Navigation is well-signaled."
+        }
+      },
+      "overall_assessment": "This skill provides a reasonable framework for lead research with good progressive disclosure and a useful output template, but suffers from vague process steps that describe what to do without specifying how. The ICP quick reference and tool commands (Attio, Granola) are valuable concrete additions, but the core research methodology lacks specificity and validation checkpoints.",
+      "suggestions": [
+        "Make the research step actionable by specifying concrete search queries or workflows, e.g., 'Search web for \"[industry] companies series A 2024\" or use Crunchbase filters: funding stage=A-C, revenue=$1M-$50M'",
+        "Add a scoring rubric with specific point allocations (e.g., 'ICP match: 0-3 pts, buying signals: 0-3 pts, budget indicators: 0-2 pts, timing: 0-2 pts') instead of just listing factors",
+        "Add a validation step after research, e.g., 'Verify: Does the company match at least 3 ICP criteria? If anti-ICP signals found, discard and note reason. Cross-check revenue/funding data across 2+ sources.'"
+      ]
+    },
+    "weightedScore": 2.15,
+    "normalizedScore": 0.575
+  }
+}

@@ -1,0 +1,155 @@
+{
+  "review": {
+    "reviewScore": 81
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 115 (<= 500)",
+        "details": {
+          "line_count": 115,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'skill-improver'",
+        "details": {
+          "value": "skill-improver",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (254 chars)",
+        "details": {
+          "length": 254
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4413
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "skill-improver",
+    "skillDescription": "Weekly self-improvement - researches current best practices for each skill domain, compares against existing skill instructions, and proposes concrete improvements. Use when improving agent capabilities or when the scheduled weekly improvement task runs."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 2,
+          "reasoning": "Names the domain (self-improvement of skills) and describes some actions ('researches current best practices', 'compares against existing skill instructions', 'proposes concrete improvements'), but these are somewhat abstract and process-oriented rather than concrete, measurable actions like the score-3 examples."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes some relevant terms like 'self-improvement', 'best practices', 'skill domain', 'improving agent capabilities', and 'weekly improvement task', but these are somewhat niche/internal terms. Missing natural user phrases like 'update skills', 'optimize prompts', 'review skill quality', or 'skill maintenance'."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (researches best practices, compares against existing instructions, proposes improvements) and 'when' (explicitly states 'Use when improving agent capabilities or when the scheduled weekly improvement task runs')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "This is a very specific niche — meta-level self-improvement of skill files on a weekly schedule. It's unlikely to conflict with other skills since it targets internal skill maintenance rather than any user-facing task domain."
+        }
+      },
+      "overall_assessment": "The description is functionally complete with clear 'what' and 'when' clauses and occupies a distinct niche. Its main weakness is that the actions described are somewhat abstract (researches, compares, proposes) rather than listing concrete outputs or artifacts, and the trigger terms could be broader to capture more natural user phrasings.",
+      "suggestions": [
+        "Add more concrete output descriptions, e.g., 'generates diff-based improvement proposals for skill markdown files' to increase specificity.",
+        "Expand trigger terms with natural variations like 'update skills', 'skill maintenance', 'optimize agent prompts', 'review skill quality' to improve discoverability."
+      ]
+    },
+    "weightedScore": 2.5,
+    "normalizedScore": 0.75
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is reasonably efficient but includes some redundancy — the full list of search queries by domain is quite verbose and could be condensed. The message templates and process steps are mostly justified, though some instructions like 'not vague improve X' explain things Claude already understands."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides highly concrete, actionable guidance: specific file paths to read, exact search queries to run, a copy-pasteable message template with clear formatting, and a specific output file path with naming convention. Each step tells Claude exactly what to do."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 6-step process is clearly sequenced and logical: read all skills → research → compare → send proposals individually → save report → summarize. The quality rules at the end serve as validation criteria, and the 'only propose changes you're confident about' and 'skip skills where current approach matches best practice' act as decision checkpoints."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-structured with clear headers and sections, but it's a monolithic file that could benefit from splitting — the full list of search queries by domain and the detailed message template could be referenced externally. For a skill of this length (~100 lines of substantive content), some inline detail is acceptable but the search queries section is particularly bulky."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill that clearly guides Claude through a weekly self-improvement workflow. Its main strength is the concrete, step-by-step process with specific file paths, search queries, and message templates. Its main weakness is verbosity — particularly the exhaustive search query lists and some unnecessary explanatory text that could be trimmed to save tokens.",
+      "suggestions": [
+        "Condense the search queries section — provide 1-2 example queries per domain rather than 3-4, since Claude can generate appropriate search queries from the domain context.",
+        "Remove explanatory phrases like 'not vague improve X' and 'not theory' that describe what NOT to do — Claude understands these constraints from the positive framing alone."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

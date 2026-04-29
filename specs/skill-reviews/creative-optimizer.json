@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 94
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 172 (<= 500)",
+        "details": {
+          "line_count": 172,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'creative-optimizer'",
+        "details": {
+          "value": "creative-optimizer",
+          "length": 18
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (411 chars)",
+        "details": {
+          "length": 411
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 5718
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "creative-optimizer",
+    "skillDescription": "Analyzes paid media creative performance, detects ad fatigue signals, and recommends new creative tests and rotation strategies for digital advertising campaigns. Use when the user asks about ad fatigue, declining CTR or ROAS, creative rotation, why ads are underperforming, which creatives to refresh or pause, what ad creative to test next, or how to improve creative performance across paid social platforms."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'analyzes paid media creative performance', 'detects ad fatigue signals', 'recommends new creative tests and rotation strategies'. These are clear, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural terms users would say: 'ad fatigue', 'declining CTR or ROAS', 'creative rotation', 'ads are underperforming', 'creatives to refresh or pause', 'ad creative to test next', 'creative performance', 'paid social platforms'. These are highly natural phrases a marketer would use."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (analyzes creative performance, detects fatigue, recommends tests/rotation) and 'when' with an explicit 'Use when...' clause listing multiple specific trigger scenarios."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Occupies a very clear niche around paid media creative performance and ad fatigue specifically. The domain-specific terminology (CTR, ROAS, creative rotation, paid social) makes it highly unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that hits all the marks. It provides specific concrete actions, comprehensive natural trigger terms that marketers would actually use, explicit 'Use when' guidance with multiple scenarios, and occupies a distinct niche in paid media creative analysis. No meaningful improvements needed.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly detailed and mostly earns its length given the complexity of the workflow, but some sections include unnecessary elaboration (e.g., listing 'ideal additions' data, explaining what fatigue signals mean conceptually). The creative pattern analysis section describes categories Claude could infer. Overall mostly efficient but could be tightened."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides a concrete fatigue index formula with specific thresholds, explicit winner/loser criteria (CTR percentiles, ROAS cutoffs), a specific output structure with example markdown, exact file paths for reading and writing, and a concrete Telegram message template. Highly actionable and copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear 10-step sequential workflow with explicit validation in Step 2 (data validation with specific checks and a gate before continuing), fatigue tier thresholds as decision checkpoints, and a structured progression from data loading through analysis to report generation and notification. The validation step properly gates the workflow."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "The skill provides a clear overview workflow in the main file while pointing to external references (testing framework, report template, decision framework, config) at one level deep with explicit file paths. Content is appropriately split between the main skill and supporting files."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill that provides a clear 10-step workflow for creative performance analysis with concrete formulas, thresholds, and output templates. Its main strength is the specificity of guidance — from the fatigue index formula to exact file paths and message templates. Minor verbosity in some descriptive sections prevents a perfect conciseness score, but overall the content is strong and well-organized.",
+      "suggestions": []
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  }
+}

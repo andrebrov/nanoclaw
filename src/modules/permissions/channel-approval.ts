@@ -101,26 +101,13 @@ export async function requestChannelApproval(input: RequestChannelApprovalInput)
     return;
   }
 
-  const isGroup = event.message?.isGroup ?? originMg?.is_group === 1;
-
-  // Extract sender name from the event content for a human-readable card.
-  let senderName: string | undefined;
-  try {
-    const parsed = JSON.parse(event.message.content) as Record<string, unknown>;
-    senderName = (parsed.senderName ?? parsed.sender) as string | undefined;
-  } catch {
-    // non-critical — fall through to generic wording
-  }
+  const originName = originMg?.name ?? originMg?.platform_id ?? 'an unfamiliar chat';
+  const isGroup = originMg?.is_group === 1;
 
   const title = isGroup ? '📣 Bot mentioned in new chat' : '💬 New direct message';
   const question = isGroup
-    ? senderName
-      ? `${senderName} mentioned your agent in a ${originChannelType} channel. Wire it to ${target.name} and let it engage?`
-      : `Your agent was mentioned in a ${originChannelType} channel. Wire it to ${target.name} and let it engage?`
-    : senderName
-      ? `${senderName} DM'd your agent on ${originChannelType}. Wire it to ${target.name} and let it respond?`
-      : `Someone DM'd your agent on ${originChannelType}. Wire it to ${target.name} and let it respond?`;
-  const options = normalizeOptions(APPROVAL_OPTIONS);
+    ? `Your agent was mentioned in ${originName} on ${originChannelType}. Wire it to ${target.name} and let it engage?`
+    : `Someone DM'd your agent on ${originChannelType} (${originName}). Wire it to ${target.name} and let it respond?`;
 
   createPendingChannelApproval({
     messaging_group_id: messagingGroupId,
@@ -128,8 +115,6 @@ export async function requestChannelApproval(input: RequestChannelApprovalInput)
     original_message: JSON.stringify(event),
     approver_user_id: delivery.userId,
     created_at: new Date().toISOString(),
-    title,
-    options_json: JSON.stringify(options),
   });
 
   const adapter = getDeliveryAdapter();
@@ -154,7 +139,7 @@ export async function requestChannelApproval(input: RequestChannelApprovalInput)
         questionId: messagingGroupId,
         title,
         question,
-        options,
+        options: normalizeOptions(APPROVAL_OPTIONS),
       }),
     );
     log.info('Channel registration card delivered', {

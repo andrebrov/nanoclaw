@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 80
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 99 (<= 500)",
+        "details": {
+          "line_count": 99,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'alex-hormozi-pitch'",
+        "details": {
+          "value": "alex-hormozi-pitch",
+          "length": 18
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (230 chars)",
+        "details": {
+          "length": 230
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 3170
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "alex-hormozi-pitch",
+    "skillDescription": "Creates compelling offers and pitches using Alex Hormozi's frameworks from \"$100M Offers.\" Use when crafting irresistible value propositions, structuring pricing/guarantees, writing sales copy, or developing partnership proposals."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: creating offers/pitches, crafting value propositions, structuring pricing/guarantees, writing sales copy, and developing partnership proposals. These are distinct, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'offers', 'pitches', 'value propositions', 'pricing', 'guarantees', 'sales copy', 'partnership proposals', 'Hormozi', '$100M Offers'. These cover a good range of terms a user seeking this skill would naturally use."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (creates offers and pitches using Hormozi's frameworks) and 'when' (explicit 'Use when' clause covering crafting value propositions, structuring pricing/guarantees, writing sales copy, or developing partnership proposals)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "The specific reference to Alex Hormozi's frameworks and '$100M Offers' creates a very clear niche. While 'sales copy' could overlap with general copywriting skills, the Hormozi framework anchoring makes this highly distinctive and unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates what the skill does, when to use it, and anchors itself to a specific methodology (Hormozi's $100M Offers framework). It uses third person voice correctly, includes natural trigger terms, and has an explicit 'Use when' clause with multiple specific scenarios. The description is concise yet comprehensive.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is reasonably efficient but includes some content Claude would already know or could infer. The 'When to Use' section largely restates the description. The Finsi-specific section adds significant length for a single company's use case, which may or may not be warranted depending on context. Some framework explanations (like the Value Equation components) are somewhat verbose."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "The skill provides templates and frameworks that are somewhat actionable (fill-in-the-blank pitch templates, step-by-step offer creation process), but lacks concrete executable examples showing full input→output transformations. The templates are useful but closer to pseudocode-level guidance than fully worked examples showing how Claude should transform a user request into a complete pitch."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The 'How to Create an Offer' section provides a clear 8-step sequence, which is good. However, there are no validation checkpoints or feedback loops — no guidance on how to verify the offer is compelling, how to iterate if the value stack doesn't work, or when to revisit earlier steps. For a creative/strategic task this is less critical than for destructive operations, but some quality checks would improve it."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is reasonably well-structured with clear headers and sections, but it's all inline in a single file. The Finsi-specific section could be split into a separate file. There are no references to external files for deeper dives on individual frameworks (e.g., guarantee types, naming formula). For a skill of this length (~100 lines), some separation would improve organization."
+        }
+      },
+      "overall_assessment": "This skill provides a solid overview of Hormozi's frameworks with useful templates and a clear structure. Its main weaknesses are the lack of concrete input→output examples showing Claude how to transform a user's request into a finished pitch, and the mixing of general frameworks with Finsi-specific content in a single file. The workflow is sequential but lacks iteration/validation guidance.",
+      "suggestions": [
+        "Add a complete worked example showing a user request and the full pitch output Claude should produce, demonstrating the end-to-end workflow from dream outcome identification through final pitch.",
+        "Move the Finsi-specific section to a separate file (e.g., FINSI_OFFER.md) and reference it from the main skill, keeping the SKILL.md focused on the general framework.",
+        "Add a brief validation step in the 'How to Create an Offer' workflow, such as 'Review against the Value Equation — does each solution increase dream outcome/likelihood or decrease time/effort?'",
+        "Trim the 'When to Use' section since it largely restates what's obvious from the skill title and description."
+      ]
+    },
+    "weightedScore": 2,
+    "normalizedScore": 0.5
+  }
+}

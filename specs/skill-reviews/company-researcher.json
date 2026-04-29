@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 130 (<= 500)",
+        "details": {
+          "line_count": 130,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'company-researcher'",
+        "details": {
+          "value": "company-researcher",
+          "length": 18
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (232 chars)",
+        "details": {
+          "length": 232
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 5204
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "company-researcher",
+    "skillDescription": "Researches a company and produces a standardized prospect profile with ICP fit score, tech stack, key contacts, and recommended outreach strategy. Use when the user asks to research a company, evaluate a prospect, or assess ICP fit."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: researches a company, produces a standardized prospect profile, ICP fit score, tech stack, key contacts, and recommended outreach strategy."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'research a company', 'evaluate a prospect', 'assess ICP fit'. Terms like 'prospect', 'company', 'ICP fit' are natural sales/BD vocabulary."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what (researches a company, produces prospect profile with ICP fit score, tech stack, key contacts, outreach strategy) and when (explicit 'Use when' clause with three trigger scenarios)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Occupies a clear niche in sales prospecting and company research with distinct triggers like 'ICP fit', 'prospect profile', and 'outreach strategy' that are unlikely to conflict with general research or other skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific deliverables (prospect profile, ICP fit score, tech stack, key contacts, outreach strategy), includes an explicit 'Use when' clause with natural trigger terms, and occupies a distinct niche in sales prospecting. It uses proper third-person voice and is concise without being vague.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly detailed and most content earns its place (buying signal scoring tables, specific tool commands, output template). However, the extensive signal scoring system with all point values and thresholds is quite lengthy and could potentially be offloaded to a reference file. The 'When to Use' section with keyword examples is somewhat unnecessary for Claude."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with specific tool commands (composio-tool attio, mcp__granola__get_meetings, composio-tool gmail), exact file paths, concrete scoring criteria with point values, specific LinkedIn search patterns, and a complete output template. Nearly everything is copy-paste ready or directly executable."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear numbered sequence from checking existing research → internal sources → web research → signal scoring → ICP scoring → saving output. Includes a verification checklist at the end that serves as validation, with specific checks like 'All data points have sources' and 'Not found used for missing data (not fabricated)'. The signal scoring has explicit thresholds with corresponding actions."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "References external config files (icp.md, research-template.md, voice-and-tone.md) which is good, but the buying signal scoring system is extremely detailed inline when it could be in a separate reference file. The output template is also quite long inline. The skill would benefit from moving the signal scoring tables and output template to referenced files."
+        }
+      },
+      "overall_assessment": "This is a strong, highly actionable skill with excellent workflow clarity and concrete tool commands. Its main weakness is that the inline buying signal scoring system and output template make it quite long, which could be better handled through progressive disclosure to separate reference files. The verification checklist is a notable strength that ensures output quality.",
+      "suggestions": [
+        "Move the detailed buying signal scoring tables (categories, point values, recency multipliers, thresholds) to a separate reference file like `config/buying-signals.md` and reference it from the main skill",
+        "Consider whether the output template needs to be inline given that `templates/research-template.md` is already referenced as a context file — either remove the inline template or remove the context file reference to avoid duplication"
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 85
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 222 (<= 500)",
+        "details": {
+          "line_count": 222,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'response-classifier'",
+        "details": {
+          "value": "response-classifier",
+          "length": 19
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (287 chars)",
+        "details": {
+          "length": 287
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 8329
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "response-classifier",
+    "skillDescription": "Monitors inbound email replies and LinkedIn messages, auto-classifies them (interested, objection, question, not-interested, OOO), and routes to the appropriate follow-up action. Runs every 30 minutes via scheduled task. Use when the user asks to check for replies or classify responses."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: monitors inbound email replies and LinkedIn messages, auto-classifies them with explicit categories (interested, objection, question, not-interested, OOO), routes to follow-up actions, and runs on a schedule."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes some natural keywords like 'email replies', 'LinkedIn messages', 'classify responses', and 'check for replies', but misses common variations users might say such as 'inbox', 'lead responses', 'outreach replies', 'sales responses', or 'response handling'."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what (monitors email/LinkedIn, auto-classifies into categories, routes to follow-up) and when ('Use when the user asks to check for replies or classify responses'), with an explicit trigger clause."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: inbound reply monitoring across email and LinkedIn with specific classification categories and scheduled execution. Unlikely to conflict with generic email or messaging skills."
+        }
+      },
+      "overall_assessment": "This is a strong description that clearly articulates specific capabilities (monitoring, classifying with named categories, routing) and includes an explicit 'Use when' clause. The main weakness is that trigger terms could be broader to capture more natural user phrasings around sales outreach and lead management workflows.",
+      "suggestions": [
+        "Expand trigger terms to include natural variations like 'inbox', 'lead responses', 'outreach replies', 'sales responses', or 'prospect replies' to improve discoverability."
+      ]
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is quite long (~200+ lines) with some repetition—e.g., the Attio update commands are shown multiple times across sections, and the Telegram message templates, while useful, add bulk. However, most content is genuinely instructive and not explaining things Claude already knows. It could be tightened by consolidating repeated patterns."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with specific CLI commands (composio-tool, instantly-tool), exact field names and JSON payloads for Attio updates, concrete classification tables with example phrases, and copy-paste-ready Telegram message templates. Every step has executable guidance."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The workflow is clearly sequenced (scan → classify → route → dedup → summarize) with explicit validation via confidence levels, dedup checks, and clear branching logic per classification type. The feedback loop for low-confidence classifications (flag for manual review) and the rule to never auto-send (always draft) serve as safety checkpoints."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is entirely inline in one monolithic file with no references to external documentation. The classification table, all six routing workflows, tracker update details, and rules are all in one document. The Attio update pattern and Telegram templates could be split into referenced files to reduce the main skill's length."
+        }
+      },
+      "overall_assessment": "This is a highly actionable and well-structured workflow skill with clear sequencing, concrete commands, and good safety guardrails (draft-only replies, dedup checks, confidence flagging). Its main weakness is length and some repetition—the Attio update pattern appears multiple times and the six routing sub-workflows could benefit from being referenced rather than fully inline. Overall it's a strong operational skill that could be tightened for token efficiency.",
+      "suggestions": [
+        "Extract the repeated Attio update pattern into a shared reference section or separate file, and reference it from each routing sub-workflow instead of repeating the full command each time.",
+        "Consider moving the detailed routing workflows (Interested, Objection, Question, etc.) into a separate ROUTING.md file, keeping only a summary table with classification → action mapping in the main skill."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

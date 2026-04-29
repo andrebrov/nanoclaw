@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 169 (<= 500)",
+        "details": {
+          "line_count": 169,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'tweet-curator'",
+        "details": {
+          "value": "tweet-curator",
+          "length": 13
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (588 chars)",
+        "details": {
+          "length": 588
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 7059
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "tweet-curator",
+    "skillDescription": "Finds tweets about e-commerce, DTC brands, and physical subscription businesses that Andrei can engage with to build his X/Twitter presence. Surfaces engagement opportunities with suggested reply angles. Use when Andrei wants to monitor Twitter/X for tweet engagement opportunities, find DTC or e-commerce conversations to join, discover social media posts about subscription businesses, or needs suggested replies for social selling and building his X presence. Relevant keywords: tweet engagement, social media monitoring, Twitter, DTC brands, subscription commerce, e-commerce threads."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple concrete actions: finds tweets about specific topics, surfaces engagement opportunities, provides suggested reply angles. These are specific, actionable capabilities rather than vague language."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural terms users would say: 'tweet engagement', 'Twitter/X', 'DTC brands', 'e-commerce', 'subscription businesses', 'social selling', 'social media monitoring', 'suggested replies'. Includes both formal and colloquial variations."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (finds tweets, surfaces engagement opportunities, suggests reply angles) and 'when' with an explicit 'Use when...' clause listing multiple trigger scenarios like monitoring Twitter, finding DTC conversations, and needing suggested replies."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: Twitter/X engagement specifically for e-commerce/DTC/subscription businesses for a specific person (Andrei). The combination of social media monitoring + DTC focus + reply suggestions creates a unique profile unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific capabilities, provides explicit trigger guidance via a 'Use when...' clause, and includes a comprehensive set of natural keywords. The description is well-scoped to a distinct niche (Twitter engagement for DTC/e-commerce) making it easily distinguishable from other skills. The only minor note is the person-specific reference to 'Andrei' which is appropriate for a personal skill but doesn't detract from quality.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is reasonably well-structured but includes some unnecessary verbosity — e.g., the long lists of search queries that could be more compact, and explanations of filtering criteria that are somewhat obvious. The secondary topic rotation list is extensive but justified given the domain. Some tightening is possible (e.g., the include/exclude criteria could be more concise)."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides fully executable bash and Python code for searching, deduplication, and tracker management. Search queries are copy-paste ready, the tweet link construction is explicitly specified with field mapping instructions, and the output format is concrete with a clear template. Very little ambiguity in what Claude should do."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The workflow is clearly sequenced (Search → Deduplicate → Evaluate/Filter → Validate → Output) with explicit validation checkpoints. Step 3 is a dedicated validation pass with a feedback loop (if fewer than 5 valid tweets, run additional searches and repeat). The deduplication step prevents duplicate outputs across runs. This is a well-structured multi-step process."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is all inline in a single file, which makes it quite long. The key accounts section is left as a placeholder with no external reference, and the extensive search query lists and filtering criteria could potentially be split into referenced files. However, the section headers provide reasonable navigation within the document."
+        }
+      },
+      "overall_assessment": "This is a well-crafted, highly actionable skill with a clear multi-step workflow, explicit validation checkpoints, and concrete executable code. Its main weakness is length — the inline search query lists, detailed include/exclude criteria, and topic rotation lists make it verbose for a single SKILL.md file. The content could benefit from splitting reference material (search queries, key accounts, filtering criteria) into separate files.",
+      "suggestions": [
+        "Move the extensive search query lists and secondary topic rotation into a separate reference file (e.g., QUERIES.md) to reduce the main skill's token footprint.",
+        "Condense the include/exclude filtering criteria into a more compact checklist format — several items are intuitive enough that Claude doesn't need detailed explanation (e.g., 'exclude political content')."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

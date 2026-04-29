@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 86
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 106 (<= 500)",
+        "details": {
+          "line_count": 106,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'skill-analytics'",
+        "details": {
+          "value": "skill-analytics",
+          "length": 15
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (204 chars)",
+        "details": {
+          "length": 204
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 3880
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "skill-analytics",
+    "skillDescription": "Analyzes agent run data to show which skills are used most, success rates, run durations, and trends. Use when the user asks 'how are my agents doing', 'skill analytics', 'agent stats', or 'ROI tracking'."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: analyzing agent run data, showing skill usage frequency, success rates, run durations, and trends. These are concrete, measurable outputs."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural trigger phrases users would actually say: 'how are my agents doing', 'skill analytics', 'agent stats', 'ROI tracking'. These cover conversational and keyword-based queries well."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (analyzes agent run data to show skill usage, success rates, durations, trends) and 'when' (explicit 'Use when' clause with specific trigger phrases)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Targets a clear niche of agent run analytics and skill usage metrics. The specific domain of agent/skill analytics with terms like 'agent stats' and 'ROI tracking' makes it unlikely to conflict with general data analysis or other skills."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill description that clearly communicates its purpose, lists specific capabilities, and provides explicit trigger guidance with natural user phrases. It follows the recommended pattern of stating what it does followed by a 'Use when' clause with concrete examples. The description is concise without being vague, and occupies a distinct niche that minimizes conflict risk.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is mostly efficient but includes some unnecessary content. The cost estimation section with pricing tiers and rough per-run estimates adds bulk that could be condensed into a small table. The 'When to Use' section is somewhat redundant with the frontmatter description. However, the SQL queries and output format are dense and useful."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable SQL queries for multiple analytics scenarios, a concrete output format template, specific thresholds for flagging issues (>20% error rate, >50x/day), and fallback approaches (Python if sqlite3 unavailable, IPC if DB not mounted). Copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The skill presents multiple data access paths (IPC, snapshot file, direct DB) but doesn't clearly sequence them as a decision tree or workflow. There's no explicit validation step — e.g., checking if the query returned data, handling empty tables, or verifying the agent_runs table exists before running queries. For a data retrieval and reporting task, the lack of error handling/validation gaps is notable."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is reasonably structured with clear sections, but the cost estimation and multiple SQL queries make the file longer than ideal for a single SKILL.md. The SQL queries and cost estimation tables could be split into referenced files. No external references are used despite the content length warranting it."
+        }
+      },
+      "overall_assessment": "This is a solid, actionable skill with executable SQL queries and a well-defined output format. Its main weaknesses are the lack of a clear decision workflow for choosing between data access methods and missing validation/error-handling steps. The cost estimation section adds useful but somewhat verbose content that could be more concise or split out.",
+      "suggestions": [
+        "Add an explicit decision flowchart or ordered steps for data access: 1) Check if DB is mounted → 2) If not, try IPC → 3) If not, check snapshot file, with validation at each step",
+        "Add validation steps: check if agent_runs table exists, handle empty result sets gracefully, verify data freshness before reporting",
+        "Move the cost estimation details and extended SQL queries into a referenced file (e.g., ANALYTICS_REFERENCE.md) to keep SKILL.md leaner"
+      ]
+    },
+    "weightedScore": 2.3,
+    "normalizedScore": 0.6499999999999999
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "review": {
+    "reviewScore": 88
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 160 (<= 500)",
+        "details": {
+          "line_count": 160,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description",
+            "allowed-tools"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'agent-browser'",
+        "details": {
+          "value": "agent-browser",
+          "length": 13
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (229 chars)",
+        "details": {
+          "length": 229
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' contains 1 token(s)",
+        "details": {
+          "tokens": [
+            "Bash(agent-browser:*)"
+          ]
+        }
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4532
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "agent-browser",
+    "skillDescription": "Browse the web for any task — research topics, read articles, interact with web apps, fill forms, take screenshots, extract data, and test web pages. Use whenever a browser would be useful, not just when the user explicitly asks."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'research topics, read articles, interact with web apps, fill forms, take screenshots, extract data, and test web pages.' This covers a comprehensive range of browser-related capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'browse the web', 'research', 'articles', 'web apps', 'fill forms', 'screenshots', 'extract data', 'test web pages', 'browser'. These cover a wide range of natural user language for web browsing tasks."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (browse the web for various tasks with specific examples) and 'when' ('Use whenever a browser would be useful, not just when the user explicitly asks'). The 'when' clause is explicit and even broadens the trigger beyond explicit requests."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 2,
+          "reasoning": "While 'browse the web' and 'browser' are fairly distinct triggers, the breadth of the description ('research topics', 'extract data', 'fill forms') could overlap with skills focused on research, data extraction, or form processing that don't involve a browser. The scope is intentionally broad which increases conflict risk."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates both capabilities and usage triggers. It lists numerous concrete actions and includes an explicit 'Use when' clause that helpfully broadens activation beyond explicit user requests. The main weakness is its intentional breadth, which could cause overlap with more specialized skills for research, data extraction, or form filling.",
+      "suggestions": []
+    },
+    "weightedScore": 2.8499999999999996,
+    "normalizedScore": 0.9249999999999998
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The content is lean and efficient throughout. It uses terse command references without explaining what a browser is or how CLI tools work. Every section serves as a quick-reference with no padding or unnecessary explanation."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Every command is concrete, copy-paste ready, and uses real syntax with specific flags and arguments. The examples show complete workflows with actual commands rather than pseudocode or abstract descriptions."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The core workflow section provides a clear 4-step sequence, and the form submission example demonstrates a complete flow. However, there are no explicit validation/error-handling checkpoints — no guidance on what to do if a snapshot returns unexpected results, if a click fails, or if navigation doesn't complete as expected."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-organized with clear section headers and logical grouping, but it's a fairly long monolithic file. The extensive command reference (navigation, interactions, get, wait, cookies, etc.) could be split into a separate REFERENCE.md, keeping SKILL.md focused on the core workflow and most common commands."
+        }
+      },
+      "overall_assessment": "This is a strong, well-structured command reference that excels at conciseness and actionability — every command is concrete and copy-paste ready with no unnecessary explanation. Its main weaknesses are the lack of error handling/validation guidance in workflows (what happens when things go wrong?) and the fact that the extensive command catalog could benefit from being split into a separate reference file to keep the main skill focused.",
+      "suggestions": [
+        "Add error handling guidance to the core workflow: what to do if a snapshot returns no interactive elements, if a click doesn't trigger navigation, or if a wait times out.",
+        "Consider moving the detailed command reference sections (cookies, storage, JavaScript, semantic locators, authentication) into a separate REFERENCE.md and linking to it from the main skill."
+      ]
+    },
+    "weightedScore": 2.5999999999999996,
+    "normalizedScore": 0.7999999999999998
+  }
+}

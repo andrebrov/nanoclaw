@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 87
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 88 (<= 500)",
+        "details": {
+          "line_count": 88,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'self-customize'",
+        "details": {
+          "value": "self-customize",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (264 chars)",
+        "details": {
+          "length": 264
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 5510
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "self-customize",
+    "skillDescription": "Customize your own agent — add capabilities, install packages, add MCP servers, edit code or CLAUDE.md. Use when the user asks you to add a feature, install a tool, or modify how you work. For non-trivial code changes, delegate to a builder agent via create_agent."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'add capabilities, install packages, add MCP servers, edit code or CLAUDE.md' and mentions delegating to a builder agent via create_agent for non-trivial changes."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'add a feature', 'install a tool', 'modify how you work', 'install packages', 'add MCP servers', 'CLAUDE.md'. These cover common variations of how users would request agent customization."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('add capabilities, install packages, add MCP servers, edit code or CLAUDE.md') and when ('Use when the user asks you to add a feature, install a tool, or modify how you work') with explicit trigger guidance."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 2,
+          "reasoning": "While 'MCP servers' and 'CLAUDE.md' are distinctive triggers, phrases like 'edit code' and 'add a feature' are quite broad and could overlap with general coding or development skills. The meta-level nature (modifying the agent itself) helps but isn't perfectly delineated."
+        }
+      },
+      "overall_assessment": "This is a strong description that clearly communicates the skill's purpose (agent self-customization) with specific actions and explicit trigger guidance. The main weakness is potential overlap with general coding skills due to broad terms like 'edit code' and 'add a feature', though the meta-context of modifying the agent itself provides some natural distinction. The use of second person ('your own agent', 'you to add') slightly detracts but the overall clarity compensates.",
+      "suggestions": [
+        "Narrow the trigger language to reduce conflict risk — e.g., replace 'edit code' with 'edit agent configuration' and clarify that 'add a feature' refers specifically to agent capabilities, not user project features."
+      ]
+    },
+    "weightedScore": 2.8499999999999996,
+    "normalizedScore": 0.9249999999999998
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The content is mostly efficient but includes some unnecessary sections like the 'Diff Size Limits — Why' rationale block, which explains reasoning Claude doesn't need. The builder agent instructions template is useful but the justification paragraph could be cut. Overall decent but not maximally lean."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete, executable guidance throughout: specific tool calls with parameter examples (create_agent, send_to_agent, install_packages, add_mcp_server), complete builder agent prompt template ready to use, and two detailed end-to-end examples with specific commands and file paths."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The decision tree at the top clearly routes different change types to different workflows. The builder agent workflow has explicit numbered steps with validation (review builder's summary, confirm with user). The examples walk through complete sequences including approval gates and restart checkpoints."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is well-structured with clear sections and a decision tree, but everything is inline in a single file. The builder agent instructions template is a large block that could be referenced externally. For a skill of this length (~100 lines of substantive content), it's borderline but the inline builder prompt and rationale section make it slightly monolithic."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill that provides clear decision trees and concrete examples for self-customization workflows. Its main weakness is moderate verbosity — the 'Diff Size Limits — Why' rationale section and some explanatory text could be trimmed since Claude doesn't need to understand the reasoning behind review practices. The progressive disclosure could be improved by extracting the builder agent template to a separate file.",
+      "suggestions": [
+        "Remove or drastically shorten the 'Diff Size Limits — Why' section — Claude doesn't need the rationale, just the limits themselves (already stated in the builder instructions).",
+        "Extract the builder agent instructions template into a separate file (e.g., BUILDER_PROMPT.md) and reference it from the main skill to reduce inline bulk."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 251 (<= 500)",
+        "details": {
+          "line_count": 251,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'linkedin-dm'",
+        "details": {
+          "value": "linkedin-dm",
+          "length": 11
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (577 chars)",
+        "details": {
+          "length": 577
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 9998
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "linkedin-dm",
+    "skillDescription": "Send personalized LinkedIn direct messages to a list of existing 1st-degree connections via browser automation. Use when the user wants to message LinkedIn connections with AI-personalized outreach — e.g. nurturing leads, following up after events, reconnecting with contacts, or announcing something. Takes a data file (CSV/TSV) or plain list with connection names and companies, asks for outreach context/goal, generates a tailored message per person, and sends each one via browser automation. Handles message compose flow, character limits, and incremental status tracking."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: sending personalized LinkedIn DMs, taking CSV/TSV data files, asking for outreach context, generating tailored messages per person, handling message compose flow, character limits, and incremental status tracking."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural trigger terms users would say: 'LinkedIn', 'direct messages', 'connections', 'outreach', 'nurturing leads', 'following up after events', 'reconnecting with contacts', 'CSV', 'browser automation'. Includes concrete use case phrases like 'message LinkedIn connections'."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (send personalized LinkedIn DMs via browser automation, generate tailored messages from data files) and 'when' with an explicit 'Use when' clause listing specific scenarios like nurturing leads, following up after events, reconnecting with contacts, or announcing something."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive — the combination of LinkedIn direct messaging, browser automation, personalized outreach from CSV/TSV data, and specific use cases like lead nurturing creates a very clear niche that is unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly articulates what the skill does (send personalized LinkedIn DMs via browser automation using data files), when to use it (with explicit trigger scenarios like lead nurturing and event follow-ups), and how it works (CSV input, AI-generated messages, compose flow handling). It uses third-person voice throughout and includes rich, natural trigger terms that users would actually say.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is reasonably well-structured but includes some unnecessary verbosity — e.g., explaining why two messages are sent ('Mirrors how a human would actually message'), the follow-up strategy section is extensive for what should be a separate skill, and the CRM tracking section is quite long with setup instructions that could be in a reference file. Some sections like the local sidecar JSON example and the full column-by-column table could be trimmed."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with concrete bash commands for Google Sheets operations, specific message templates with character targets, exact navigation paths (e.g., `linkedin.com/mynetwork/invite-connect/connections/`), a clear relationship hook hierarchy table, and executable examples throughout. The sending flow is step-by-step with specific actions at each point."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Excellent workflow clarity with a pre-flight checklist that must be completed before proceeding, a clear 10-step sending flow per person, explicit validation checkpoints (batch preview before sending, user approval of pitch, ready check), anti-detection rules as hard constraints, and status tracking for error recovery. The feedback loop of 'generate all → preview → approve → send' is well-defined."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The skill references `references/browser-workflow.md` for detailed browser automation steps, which is good progressive disclosure. However, the CRM tracking section is very long and could be split into a separate reference file. The follow-up strategy section describes a different skill's responsibility and adds bulk. The main file tries to contain too much inline detail for what could be separated."
+        }
+      },
+      "overall_assessment": "This is a well-crafted, highly actionable skill with excellent workflow clarity — the pre-flight checklist, batch preview step, and per-person sending flow are exemplary. Its main weakness is length: the CRM tracking section, follow-up strategy, and local sidecar fallback add significant bulk that could be offloaded to reference files. The relationship hook hierarchy and message structure sections are particularly strong and well-formatted.",
+      "suggestions": [
+        "Move the CRM Tracking section (sheet setup, column definitions, append commands, first-time setup) into a separate reference file like `references/crm-setup.md` and link to it from the main skill.",
+        "Remove or significantly trim the Follow-Up Strategy section — it describes a different skill's responsibility (as noted in the content itself: 'updated by follow-up skill') and adds ~20 lines of content that doesn't belong here."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

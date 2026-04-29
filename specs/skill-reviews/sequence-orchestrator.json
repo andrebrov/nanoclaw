@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 88
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 213 (<= 500)",
+        "details": {
+          "line_count": 213,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'sequence-orchestrator'",
+        "details": {
+          "value": "sequence-orchestrator",
+          "length": 21
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (332 chars)",
+        "details": {
+          "length": 332
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 6638
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "sequence-orchestrator",
+    "skillDescription": "Coordinates multi-channel outreach sequences across email, LinkedIn connect, and LinkedIn DM. Manages timed cadences (Day 0 email, Day 2 connect, Day 4 DM, Day 7 follow-up) tracked in a single Google Sheet. Use when the user wants to run coordinated outreach campaigns across multiple channels, or when the daily advance task fires."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: coordinates multi-channel outreach sequences, manages timed cadences with explicit day-by-day breakdown (Day 0 email, Day 2 connect, Day 4 DM, Day 7 follow-up), and tracks in a Google Sheet. Very concrete and actionable."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'outreach', 'email', 'LinkedIn connect', 'LinkedIn DM', 'cadences', 'follow-up', 'outreach campaigns', 'multiple channels', 'Google Sheet'. Good coverage of terms a user running sales/marketing outreach would naturally use."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (coordinates multi-channel outreach sequences, manages timed cadences tracked in Google Sheet) and 'when' (explicit 'Use when' clause covering coordinated outreach campaigns across multiple channels and daily advance task triggers)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive niche combining multi-channel outreach (email + LinkedIn), specific cadence timing, and Google Sheet tracking. Unlikely to conflict with generic email or LinkedIn skills due to the very specific coordinated campaign focus."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly articulates specific capabilities (multi-channel outreach coordination with explicit cadence timing), uses natural trigger terms users would employ, and includes an explicit 'Use when' clause. The description is concise yet comprehensive, with a distinct niche that minimizes conflict risk with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly long (~200 lines) and includes some content that could be tightened — e.g., the full 7-step cadence table, the complete column-by-column data model, and the Telegram message templates are verbose. However, most content is genuinely instructive and not explaining things Claude already knows. It's on the border of 1 and 2 but the specificity of the domain knowledge keeps it at 2."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides concrete, executable bash commands (gog sheets get/update, composio-tool gmail), specific column references, exact message formats, and clear step-by-step processes. The commands are copy-paste ready with placeholder patterns that are easy to fill in."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Multi-step processes are clearly sequenced with numbered steps. The daily advance workflow includes explicit validation (check for replies BEFORE advancing), skip logic for error conditions (bounced emails, unaccepted connections), and feedback loops (retry DM at Day 10 if not connected by Day 4). The 'Starting a New Sequence' and 'Daily Advance' workflows both have clear checkpoints including user approval before execution."
+        },
+        "progressive_disclosure": {
+          "score": 1,
+          "reasoning": "Everything is in a single monolithic file with no references to external documentation. The data model, all process workflows, skip logic, campaign summary templates, and rules are all inline. The content references other skills (outreach-manager, linkedin-connect, linkedin-dm) but doesn't link to them. Content like the full data model schema and message templates could be split into referenced files."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill with clear multi-step workflows, concrete commands, and thoughtful skip/error logic. Its main weakness is that it's a monolithic document (~200 lines) that would benefit from splitting the data model, message templates, and detailed sub-processes into referenced files. Some tightening of prose and template examples would improve token efficiency.",
+      "suggestions": [
+        "Split the detailed data model (column definitions), message templates (Telegram formats), and skip logic into separate referenced files to improve progressive disclosure and reduce the main file's token footprint.",
+        "Trim the Telegram message templates to a single example with a note like 'adapt format per channel' rather than showing full templates for both email and LinkedIn actions."
+      ]
+    },
+    "weightedScore": 2.4,
+    "normalizedScore": 0.7
+  }
+}

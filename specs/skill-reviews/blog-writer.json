@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 189 (<= 500)",
+        "details": {
+          "line_count": 189,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'blog-writer'",
+        "details": {
+          "value": "blog-writer",
+          "length": 11
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (245 chars)",
+        "details": {
+          "length": 245
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 8543
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "blog-writer",
+    "skillDescription": "Writes, formats, and publishes blog posts to the Finsi Ghost blog. Use when the user asks to write or publish a blog post, a scheduled task triggers blog creation, or keywords like \"blog post\", \"ghost\", \"finsi blog\", or \"publish article\" appear."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'Writes, formats, and publishes blog posts to the Finsi Ghost blog.' This clearly names three distinct actions (writing, formatting, publishing) and specifies the target platform."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'blog post', 'ghost', 'finsi blog', 'publish article', 'write', 'publish'. Good coverage of terms a user would naturally use when requesting blog-related tasks."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('Writes, formats, and publishes blog posts to the Finsi Ghost blog') and when ('Use when the user asks to write or publish a blog post, a scheduled task triggers blog creation, or keywords like...appear'). Explicit 'Use when' clause with multiple trigger scenarios."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive due to the specific platform ('Finsi Ghost blog') and specific action domain (blog publishing). Unlikely to conflict with other skills given the named platform and specific trigger terms like 'ghost' and 'finsi blog'."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill description that clearly communicates what the skill does, when to use it, and includes strong trigger terms. It follows the recommended pattern of listing concrete actions followed by an explicit 'Use when' clause with multiple trigger scenarios including keyword examples. The specificity of the platform (Finsi Ghost blog) makes it highly distinctive.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is quite long (~200+ lines) with extensive style guidance that is specific and earned (anti-patterns, voice rules), but some sections are verbose — the 'Author Background' and 'When to Use' sections explain things Claude could infer, and the anti-patterns list, while valuable, could be more compressed. The content pillars and persuasion techniques sections border on over-specification."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with exact bash commands for every ghost-tool operation, specific HTML formatting rules, concrete examples of opening patterns and verbal signatures, and a clear numbered process. The post-writing checks are specific and executable, not vague."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 6-step process is clearly sequenced (check posts → choose topic → research → write → publish → report) with explicit validation via the three-pass post-writing checks (surface scan, skeleton scan, soul check) plus a tightening pass. The feedback loop of checking recent posts before writing prevents duplication."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Everything is in a single file with no references to external documents. The Voice & Style section is extensive (~100 lines) and could be split into a separate STYLE_GUIDE.md with a summary in the main skill. The content is well-organized with clear headers, but the monolithic structure means the full anti-patterns list and style rules load every time."
+        }
+      },
+      "overall_assessment": "This is a strong, highly actionable skill with clear workflow sequencing and concrete tool commands. Its main weakness is length — the extensive voice/style guide and anti-pattern list, while valuable and specific, make the file heavy for every invocation. Splitting the style guide into a referenced file would significantly improve token efficiency without losing any guidance quality.",
+      "suggestions": [
+        "Extract the Voice & Style section (including AI Anti-Patterns and verbal signatures) into a separate STYLE_GUIDE.md and reference it from the main skill with a brief summary of key rules.",
+        "Remove the 'Author Background' section or compress it to a single line — Claude doesn't need the biographical context explained, just the voice persona details."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

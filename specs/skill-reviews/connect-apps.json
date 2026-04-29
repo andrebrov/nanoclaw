@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 72 (<= 500)",
+        "details": {
+          "line_count": 72,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'connect-apps'",
+        "details": {
+          "value": "connect-apps",
+          "length": 12
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (237 chars)",
+        "details": {
+          "length": 237
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 1800
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "connect-apps",
+    "skillDescription": "Connects Claude to 1000+ external apps via Composio to perform real actions like sending emails, creating issues, and posting messages. Use when the user wants to take actions in external services such as Gmail, Slack, GitHub, or Notion."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'sending emails, creating issues, and posting messages'. Also names the integration mechanism (Composio) and quantifies scope (1000+ external apps)."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'sending emails', 'creating issues', 'posting messages', plus specific service names like 'Gmail', 'Slack', 'GitHub', 'Notion', and general terms like 'external services' and 'external apps'."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('Connects Claude to 1000+ external apps via Composio to perform real actions like sending emails, creating issues, and posting messages') and when ('Use when the user wants to take actions in external services such as Gmail, Slack, GitHub, or Notion')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "The description carves out a clear niche around external service integrations via Composio, with specific service names as triggers. This is unlikely to conflict with skills focused on local file processing, code generation, or other non-integration tasks."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates what the skill does (connects to external apps to perform actions), provides concrete examples of actions and services, and includes an explicit 'Use when' clause with natural trigger terms. It uses proper third-person voice and is concise without being vague.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "Mostly efficient but includes some unnecessary filler like 'not just generate text about it' and the 'What You Can Do' table which largely restates obvious capabilities. The 'How It Works' section explains things Claude doesn't need to know."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete, copy-paste ready commands for installation and setup. The step-by-step quick start is fully executable with specific commands like `/plugin install composio-toolrouter` and `/composio-toolrouter:setup`."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear 3-step sequential workflow for setup with explicit instructions at each stage. The troubleshooting section provides error recovery guidance. For a plugin installation skill, this level of workflow clarity is appropriate and sufficient."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is reasonably structured with clear sections, but the supported apps list and 'What You Can Do' table add bulk that could be in a separate reference. No external file references are used despite the content being long enough to warrant them."
+        }
+      },
+      "overall_assessment": "This is a well-structured skill with strong actionability and clear workflow steps for getting started. Its main weaknesses are moderate verbosity—the 'What You Can Do' table, 'How It Works' explanation, and supported apps list pad the content without adding much value for Claude. The skill could be tightened by removing explanatory content Claude doesn't need and moving reference material to separate files.",
+      "suggestions": [
+        "Remove or significantly trim the 'What You Can Do' table and 'How It Works' section—Claude doesn't need examples of what external actions look like or an explanation of how tool routing works.",
+        "Move the 'Supported Apps' list to a separate APPS.md reference file and link to it, keeping SKILL.md focused on setup and usage instructions."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

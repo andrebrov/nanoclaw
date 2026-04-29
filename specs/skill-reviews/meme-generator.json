@@ -1,0 +1,155 @@
+{
+  "review": {
+    "reviewScore": 82
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 61 (<= 500)",
+        "details": {
+          "line_count": 61,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'meme-generator'",
+        "details": {
+          "value": "meme-generator",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (158 chars)",
+        "details": {
+          "length": 158
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2233
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "meme-generator",
+    "skillDescription": "Generates meme images from templates and sends them to Telegram. Uses memegen.link API (no auth required). Accepts a topic, mood, or specific top/bottom text."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple concrete actions: generates meme images from templates, sends them to Telegram, uses memegen.link API, accepts topic/mood/specific top/bottom text. These are specific, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes natural terms like 'meme', 'Telegram', 'top/bottom text', and 'memegen.link', but misses common user phrasings like 'make a meme', 'meme generator', 'funny image', or 'send meme'. Users might say these naturally but they aren't covered."
+        },
+        "completeness": {
+          "score": 2,
+          "reasoning": "The 'what' is well-covered (generates memes, sends to Telegram, uses memegen.link API), but there is no explicit 'Use when...' clause or equivalent trigger guidance telling Claude when to select this skill."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Very distinct niche combining meme generation with Telegram delivery using a specific API (memegen.link). Unlikely to conflict with other skills due to the unique combination of meme creation and Telegram messaging."
+        }
+      },
+      "overall_assessment": "The description is strong on specificity and distinctiveness, clearly identifying a unique skill that generates memes via memegen.link and sends them to Telegram. However, it lacks an explicit 'Use when...' clause, which caps completeness, and could benefit from more natural trigger terms that users would actually say when requesting memes.",
+      "suggestions": [
+        "Add a 'Use when...' clause such as 'Use when the user asks to make a meme, create a funny image, or send a meme to Telegram.'",
+        "Include additional natural trigger terms like 'make a meme', 'funny image', 'meme generator', or 'image macro' to improve keyword coverage."
+      ]
+    },
+    "weightedScore": 2.35,
+    "normalizedScore": 0.675
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "Every section earns its place: the API spec is minimal, the template table provides genuinely useful lookup data Claude wouldn't know, and there's no explanation of what memes are or how HTTP works. The notes section is tight and practical."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable curl commands, specific MCP tool invocation syntax, concrete URL patterns with encoding rules, and a ready-to-use template lookup table. The workflow steps are copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The 5-step workflow is clearly sequenced and logical, but lacks validation checkpoints — there's no step to verify the downloaded image is valid (not an error response), no error handling for failed downloads or invalid template IDs, and no feedback loop for retrying."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "For a skill of this size (~60 lines), the content is well-organized into logical sections (API, Templates, Workflow, Notes) without needing external files. The template browsing command serves as a natural pointer to discovering more options beyond the inline table."
+        }
+      },
+      "overall_assessment": "This is a well-crafted, concise skill that provides actionable guidance for meme generation with a clear API reference, useful template table, and executable commands. Its main weakness is the lack of validation/error handling in the workflow — no check that the downloaded file is actually a valid PNG rather than an error response, and no guidance on what to do if a template ID is invalid or the API is down.",
+      "suggestions": [
+        "Add a validation step after the curl download, e.g., check file size > 0 or verify it's a valid PNG before sending, and include a retry/fallback if the download fails.",
+        "Consider adding a brief error handling note: what happens if the template ID doesn't exist (API returns 404) and how to recover gracefully."
+      ]
+    },
+    "weightedScore": 2.75,
+    "normalizedScore": 0.875
+  }
+}

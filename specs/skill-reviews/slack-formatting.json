@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 95 (<= 500)",
+        "details": {
+          "line_count": 95,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'slack-formatting'",
+        "details": {
+          "value": "slack-formatting",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (149 chars)",
+        "details": {
+          "length": 149
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2282
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "slack-formatting",
+    "skillDescription": "Format messages for Slack using mrkdwn syntax. Use when responding to Slack channels (folder starts with \"slack_\" or JID contains slack identifiers)."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 2,
+          "reasoning": "Names the domain (Slack messaging) and a specific action (format messages using mrkdwn syntax), but doesn't list multiple concrete actions like formatting bold text, creating lists, handling code blocks, links, mentions, etc."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes 'Slack', 'mrkdwn', and 'slack_' folder prefix as trigger terms, but misses common user-facing terms like 'Slack message formatting', 'bold', 'italic', 'code blocks', 'Slack markdown', or 'Slack bot responses'. The JID reference is technical jargon."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (format messages for Slack using mrkdwn syntax) and 'when' (responding to Slack channels, folder starts with 'slack_' or JID contains slack identifiers) with explicit trigger conditions."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive — Slack mrkdwn formatting is a clear niche with specific triggers (slack_ folder prefix, JID identifiers) that are unlikely to conflict with other skills like general markdown formatting or other messaging platforms."
+        }
+      },
+      "overall_assessment": "The description is well-structured with clear 'what' and 'when' clauses, and occupies a distinct niche that minimizes conflict risk. However, it could benefit from listing more specific formatting actions (e.g., bold, links, code blocks, mentions) and including more natural user-facing trigger terms beyond the technical folder/JID identifiers.",
+      "suggestions": [
+        "Add specific formatting actions like 'bold, italic, code blocks, links, mentions, lists' to improve specificity.",
+        "Include more natural trigger terms users might say, such as 'Slack message', 'Slack formatting', 'Slack markdown', or 'Slack bot response'."
+      ]
+    },
+    "weightedScore": 2.5,
+    "normalizedScore": 0.75
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The content is lean and efficient. It's a reference-style skill that presents only what Claude needs to know — the syntax differences between standard Markdown and Slack mrkdwn. No unnecessary explanations of what Slack is or how messaging works."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete, copy-paste-ready syntax examples for every formatting element, a complete example message, and a clear 'What NOT to use' section with specific alternatives. The quick rules at the end serve as an actionable checklist."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "This is a single-task skill (formatting messages) with no multi-step destructive operations. The workflow is unambiguous: detect Slack context, then apply mrkdwn formatting rules. The detection step and formatting reference are clearly sequenced."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "For a skill under 50 lines of conceptual content, the organization is excellent — clear sections (detection, reference, anti-patterns, example, quick rules) with logical progression. No need for external file references given the scope."
+        }
+      },
+      "overall_assessment": "This is a well-crafted, concise skill that efficiently communicates Slack mrkdwn formatting rules. It excels at providing concrete syntax examples, a clear anti-pattern section showing what NOT to use (critical for Claude which defaults to standard Markdown), and a practical example message. The quick rules summary at the end provides an excellent at-a-glance reference.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  }
+}

@@ -10,8 +10,6 @@ import os from 'os';
 import path from 'path';
 
 import { log } from '../src/log.js';
-import { getLaunchdLabel, getSystemdUnit } from '../src/install-slug.js';
-import { cleanupUnhealthyPeers } from './peer-cleanup.js';
 import {
   commandExists,
   getPlatform,
@@ -54,19 +52,6 @@ export async function run(_args: string[]): Promise<void> {
 
   fs.mkdirSync(path.join(projectRoot, 'logs'), { recursive: true });
 
-  // Peer preflight — a crash-looping peer install (most often the legacy v1
-  // `com.nanoclaw` plist) will keep trashing this install's containers on
-  // every respawn via its own cleanupOrphans. Detect and unload any peer
-  // that's unhealthy before we install our service. Healthy peers are left
-  // alone now that container reaping is install-label-scoped.
-  const peerReport = cleanupUnhealthyPeers(projectRoot);
-  if (peerReport.unloaded.length > 0) {
-    log.warn('Unloaded unhealthy peer NanoClaw services', {
-      count: peerReport.unloaded.length,
-      labels: peerReport.unloaded.map((p) => p.label),
-    });
-  }
-
   if (platform === 'macos') {
     setupLaunchd(projectRoot, nodePath, homeDir);
   } else if (platform === 'linux') {
@@ -89,14 +74,11 @@ function setupLaunchd(
   nodePath: string,
   homeDir: string,
 ): void {
-  // Per-checkout service label so multiple NanoClaw installs can coexist
-  // without clobbering each other's plist.
-  const label = getLaunchdLabel(projectRoot);
   const plistPath = path.join(
     homeDir,
     'Library',
     'LaunchAgents',
-    `${label}.plist`,
+    'com.nanoclaw.plist',
   );
   fs.mkdirSync(path.dirname(plistPath), { recursive: true });
 
@@ -105,7 +87,7 @@ function setupLaunchd(
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>${label}</string>
+    <string>com.nanoclaw</string>
     <key>ProgramArguments</key>
     <array>
         <string>${nodePath}</string>
@@ -164,14 +146,13 @@ function setupLaunchd(
   let serviceLoaded = false;
   try {
     const output = execSync('launchctl list', { encoding: 'utf-8' });
-    serviceLoaded = output.includes(label);
+    serviceLoaded = output.includes('com.nanoclaw');
   } catch {
     // launchctl list failed
   }
 
   emitStatus('SETUP_SERVICE', {
     SERVICE_TYPE: 'launchd',
-    SERVICE_LABEL: label,
     NODE_PATH: nodePath,
     PROJECT_PATH: projectRoot,
     PLIST_PATH: plistPath,
@@ -244,15 +225,13 @@ function setupSystemd(
   homeDir: string,
 ): void {
   const runningAsRoot = isRoot();
-  const unitName = getSystemdUnit(projectRoot);
-  const unitFileName = `${unitName}.service`;
 
   // Root uses system-level service, non-root uses user-level
   let unitPath: string;
   let systemctlPrefix: string;
 
   if (runningAsRoot) {
-    unitPath = `/etc/systemd/system/${unitFileName}`;
+    unitPath = '/etc/systemd/system/nanoclaw.service';
     systemctlPrefix = 'systemctl';
     log.info('Running as root — installing system-level systemd unit');
   } else {
@@ -268,7 +247,7 @@ function setupSystemd(
     }
     const unitDir = path.join(homeDir, '.config', 'systemd', 'user');
     fs.mkdirSync(unitDir, { recursive: true });
-    unitPath = path.join(unitDir, unitFileName);
+    unitPath = path.join(unitDir, 'nanoclaw.service');
     systemctlPrefix = 'systemctl --user';
   }
 
@@ -349,7 +328,7 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
   }
 
   try {
-    execSync(`${systemctlPrefix} enable ${unitName}`, { stdio: 'ignore' });
+    execSync(`${systemctlPrefix} enable nanoclaw`, { stdio: 'ignore' });
   } catch (err) {
     log.error('systemctl enable failed', { err });
   }
@@ -360,7 +339,7 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
   // `restart` on a stopped unit is equivalent to `start`, so this is safe
   // as a first-install path too.
   try {
-    execSync(`${systemctlPrefix} restart ${unitName}`, { stdio: 'ignore' });
+    execSync(`${systemctlPrefix} restart nanoclaw`, { stdio: 'ignore' });
   } catch (err) {
     log.error('systemctl restart failed', { err });
   }
@@ -368,7 +347,7 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
   // Verify
   let serviceLoaded = false;
   try {
-    execSync(`${systemctlPrefix} is-active ${unitName}`, { stdio: 'ignore' });
+    execSync(`${systemctlPrefix} is-active nanoclaw`, { stdio: 'ignore' });
     serviceLoaded = true;
   } catch {
     // Not active
@@ -376,7 +355,6 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
 
   emitStatus('SETUP_SERVICE', {
     SERVICE_TYPE: runningAsRoot ? 'systemd-system' : 'systemd-user',
-    SERVICE_UNIT: unitName,
     NODE_PATH: nodePath,
     PROJECT_PATH: projectRoot,
     UNIT_PATH: unitPath,

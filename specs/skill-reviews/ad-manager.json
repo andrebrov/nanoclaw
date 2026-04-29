@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 85
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 411 (<= 500)",
+        "details": {
+          "line_count": 411,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'ad-manager'",
+        "details": {
+          "value": "ad-manager",
+          "length": 10
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (283 chars)",
+        "details": {
+          "length": 283
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 12612
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "ad-manager",
+    "skillDescription": "Instagram ad management automation for Finsi — pulls daily performance metrics, optimizes campaigns weekly, scrapes competitor ads, and sets up initial campaign structure. Invoked by scheduled tasks in four modes: daily-report, weekly-optimize, competitor-scrape, and campaign-setup."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: pulls daily performance metrics, optimizes campaigns weekly, scrapes competitor ads, and sets up initial campaign structure. Also names four distinct operational modes."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes relevant terms like 'Instagram', 'ad management', 'campaign', 'competitor ads', and 'performance metrics', but the trigger terms are oriented toward scheduled automation modes (daily-report, weekly-optimize, etc.) rather than natural user language. Missing common variations a user might say like 'ads', 'ad spend', 'ROAS', 'Facebook Ads Manager'."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (pulls metrics, optimizes campaigns, scrapes competitors, sets up campaigns) and 'when' (invoked by scheduled tasks in four named modes: daily-report, weekly-optimize, competitor-scrape, campaign-setup). The 'when' clause is explicit with clear trigger conditions."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive — scoped to a specific product ('Finsi'), a specific platform ('Instagram'), and specific automation modes. Very unlikely to conflict with other skills due to the narrow, well-defined niche."
+        }
+      },
+      "overall_assessment": "This is a strong description that clearly articulates specific capabilities and when the skill should be invoked. The four named modes provide excellent disambiguation. The main weakness is that trigger terms are geared toward automated/scheduled invocation rather than natural user language, which slightly limits discoverability if a user were to ask about Instagram ads in conversational terms.",
+      "suggestions": [
+        "Add natural user-facing trigger terms like 'Instagram ads', 'ad performance', 'ad spend', 'ROAS', or 'Meta ads' to improve discoverability beyond scheduled task invocation."
+      ]
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is quite long (~300 lines) and includes some redundant patterns (repeated cd/import/load_dotenv boilerplate across modes, repeated Telegram message format explanations). However, most content is genuinely instructive and mode-specific, so it's not egregiously verbose — just could be tightened significantly by extracting common patterns."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable throughout — provides executable Python code, specific bash commands, concrete KPI formulas, exact Telegram message templates, specific threshold values for anomaly detection (>30% CPA spike, >20% CTR drop, frequency >3), and clear file paths. Nearly everything is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Each mode has clearly numbered sequential steps with explicit validation checkpoints (e.g., campaign-setup Step 3 verifies created resources, weekly-optimize has approval gates before creating ads, all ads created PAUSED). Error handling, rate limiting, and budget safety rules are explicitly stated. The approval-gated activation flow is a strong feedback loop for destructive operations."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The skill references external files (scripts, copy variants, proof library) appropriately, but the SKILL.md itself is monolithic — all four modes are fully detailed inline rather than being split into separate files with summaries here. For a skill this long, the modes could be separate documents with the main file serving as an overview with navigation links."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill with clear workflows, safety guardrails, and concrete executable guidance across all four modes. Its main weakness is length — the monolithic structure with repeated boilerplate (import patterns, dotenv loading, cd commands) inflates token cost. Splitting mode details into separate files and extracting common patterns would significantly improve conciseness and progressive disclosure.",
+      "suggestions": [
+        "Extract each mode's detailed steps into separate files (e.g., daily-report.md, weekly-optimize.md) and keep SKILL.md as a concise overview with navigation links to each mode.",
+        "Factor out the repeated Python boilerplate (cd, import, load_dotenv pattern) into a single 'Common Setup' section referenced by all modes, rather than repeating it in every code block."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "review": {
+    "reviewScore": 95
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 62 (<= 500)",
+        "details": {
+          "line_count": 62,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'gh-issue'",
+        "details": {
+          "value": "gh-issue",
+          "length": 8
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (308 chars)",
+        "details": {
+          "length": 308
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2472
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "gh-issue",
+    "skillDescription": "File a GitHub issue against the nanoclaw repo to trigger an AI-fix run. Use when the user wants a code change to NanoClaw itself — bugs, features, refactors. The issue will get labeled `ai-fix`, a GitHub Action picks it up, Claude opens a PR, CI gates it, and after merge the droplet auto-syncs and restarts."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple concrete actions: filing a GitHub issue, triggering an AI-fix run, labeling with 'ai-fix', opening a PR via Claude, CI gating, and auto-syncing/restarting the droplet. Very specific about the workflow chain."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural trigger terms users would say: 'code change', 'bugs', 'features', 'refactors', 'GitHub issue', 'NanoClaw', 'PR'. These cover the common ways a user would describe wanting to modify the NanoClaw codebase."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (file a GitHub issue to trigger an AI-fix run with the full workflow described) and 'when' (explicit 'Use when the user wants a code change to NanoClaw itself — bugs, features, refactors')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive — scoped specifically to the 'nanoclaw' repo, the 'ai-fix' label workflow, and a very particular CI/CD pipeline. Unlikely to conflict with any other skill due to the unique repo name and workflow specificity."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly articulates a specific workflow (filing GitHub issues to trigger automated AI-fix runs), provides explicit trigger guidance with natural user language ('bugs, features, refactors'), and is highly distinctive due to its narrow scope on the nanoclaw repo. The description also helpfully explains the downstream effects of the action, giving Claude full context for when and why to use it.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "Every section earns its place: clear when-to-use/when-not-to-use boundaries, concise command syntax, and a well-structured example. No unnecessary explanations of concepts Claude already knows (like what GitHub issues are or how REST APIs work)."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides an exact executable command with the script path, clear parameter format, a detailed real-world example with proper bash invocation, and specific guidance on what to include in title and body fields. Copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The workflow is mostly clear (run script → get URL → send to user), but there's no explicit validation or error handling guidance — what if the script fails, returns an error, or the issue creation is rejected? For an operation that posts to an external API, some error handling guidance would strengthen this."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "For a focused single-purpose skill, the content is well-organized with clear sections (When to use, When NOT to use, How to use, Example). The skill appropriately keeps everything in one file since there's no need for external references, and the sections provide natural progressive disclosure."
+        }
+      },
+      "overall_assessment": "This is a well-crafted, focused skill that clearly defines its scope with good when-to/when-not-to boundaries, provides an executable command with a realistic example, and respects token budget throughout. The main gap is the absence of error handling or validation guidance for the API call, which slightly weakens workflow clarity. The example is particularly strong, showing both the command invocation and the expected user-facing response.",
+      "suggestions": [
+        "Add a brief error handling note (e.g., 'If the script exits non-zero, check stderr for the GitHub API error message and relay it to the user before retrying')."
+      ]
+    },
+    "weightedScore": 2.75,
+    "normalizedScore": 0.875
+  }
+}

@@ -13,21 +13,7 @@
  */
 import { spawn } from 'child_process';
 
-export type PingResult = 'ok' | 'no_reply' | 'socket_error' | 'auth_error';
-
-export function classifyPingResult(exitCode: number | null, stdout: string, stderr = ''): PingResult {
-  const output = `${stdout}\n${stderr}`;
-  if (
-    /Invalid bearer token/i.test(output) ||
-    /authentication[_ ]error/i.test(output) ||
-    /Failed to authenticate/i.test(output)
-  ) {
-    return 'auth_error';
-  }
-  if (exitCode === 2) return 'socket_error';
-  if (exitCode === 0 && stdout.trim().length > 0) return 'ok';
-  return 'no_reply';
-}
+export type PingResult = 'ok' | 'no_reply' | 'socket_error';
 
 export function pingCliAgent(timeoutMs = 30_000): Promise<PingResult> {
   return new Promise((resolve) => {
@@ -35,7 +21,6 @@ export function pingCliAgent(timeoutMs = 30_000): Promise<PingResult> {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
-    let stderr = '';
     let settled = false;
     const timer = setTimeout(() => {
       if (settled) return;
@@ -47,14 +32,13 @@ export function pingCliAgent(timeoutMs = 30_000): Promise<PingResult> {
     child.stdout.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf-8');
     });
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf-8');
-    });
     child.on('close', (code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(classifyPingResult(code, stdout, stderr));
+      if (code === 2) resolve('socket_error');
+      else if (code === 0 && stdout.trim().length > 0) resolve('ok');
+      else resolve('no_reply');
     });
     child.on('error', () => {
       if (settled) return;

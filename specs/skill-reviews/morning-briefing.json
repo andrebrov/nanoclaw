@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 86
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 158 (<= 500)",
+        "details": {
+          "line_count": 158,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'morning-briefing'",
+        "details": {
+          "value": "morning-briefing",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (266 chars)",
+        "details": {
+          "length": 266
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4275
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "morning-briefing",
+    "skillDescription": "Delivers a consolidated morning briefing pulling from all sources: calendar, email, Attio CRM pipeline, Granola meetings, LinkedIn DM replies, and Twitter engagement. Runs daily at 7 AM ET via scheduled task, or manually with 'morning briefing' or 'what did I miss'."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions and sources: calendar, email, Attio CRM pipeline, Granola meetings, LinkedIn DM replies, and Twitter engagement. Also specifies the output format (consolidated morning briefing) and timing (daily at 7 AM ET)."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural trigger terms users would say: 'morning briefing', 'what did I miss', plus specific source names (calendar, email, Attio CRM, Granola, LinkedIn, Twitter) that users might reference. These are highly natural phrases."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (delivers a consolidated morning briefing pulling from all listed sources) and 'when' (runs daily at 7 AM ET via scheduled task, or manually with 'morning briefing' or 'what did I miss'). Explicit trigger phrases are provided."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: a morning briefing aggregating specific named sources. The combination of sources and the specific trigger phrases ('morning briefing', 'what did I miss') make it very unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly communicates what the skill does (aggregates information from six named sources into a morning briefing), when it triggers (scheduled at 7 AM ET or via specific manual phrases), and uses natural language trigger terms. It is concise, specific, and highly distinctive with minimal conflict risk.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is reasonably efficient but has some verbosity — comments within code blocks explaining obvious things ('skip noise', 'do NOT cat the entire file'), and some sections like LinkedIn and Twitter are vague enough to be filler. The output template is useful but adds length. Overall mostly efficient with room to tighten."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete, executable bash commands for most data pulls, specific tool invocations (composio-tool, mcp__granola__get_meetings, mcp__nanoclaw__send_message), exact file paths, grep patterns for pipeline stats, and a complete output template. Claude can follow this without guessing."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The 8-step sequence is clearly numbered and ordered, and the 'compose ONE message' instruction is good. However, there are no validation checkpoints — no verification that data pulls succeeded before composing, no explicit error handling beyond 'skip silently'. The rule about not sending an empty briefing is a partial check but there's no mechanism to evaluate completeness before sending."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-structured with clear headers and sections, but it's a monolithic file (~120 lines of content) with no references to external files for details like outreach tracker schema, output format variations, or integration setup. The output template and pipeline stats could be split out for cleaner navigation."
+        }
+      },
+      "overall_assessment": "This is a solid, actionable skill with concrete commands and a clear output format that Claude can execute. Its main weaknesses are the lack of validation/error-handling checkpoints in the workflow (especially important for a multi-source aggregation task where individual pulls can fail) and some verbosity that could be trimmed. The monolithic structure works but could benefit from splitting the output template or integration details into referenced files.",
+      "suggestions": [
+        "Add an explicit validation step before composing the final message — e.g., track which sections returned data and verify at least N sections have content before proceeding to send.",
+        "Trim inline comments that explain obvious intent (e.g., '# skip noise', '# Count pipeline stats efficiently') to reduce token usage.",
+        "Consider extracting the output template into a separate TEMPLATE.md file referenced from the main skill, keeping the SKILL.md focused on the process logic."
+      ]
+    },
+    "weightedScore": 2.3,
+    "normalizedScore": 0.6499999999999999
+  }
+}

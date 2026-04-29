@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 264 (<= 500)",
+        "details": {
+          "line_count": 264,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'twitter-content'",
+        "details": {
+          "value": "twitter-content",
+          "length": 15
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (272 chars)",
+        "details": {
+          "length": 272
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 9643
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "twitter-content",
+    "skillDescription": "Generates Twitter/X content about retention, LTV, and subscription economics — sends drafts to Telegram for approval, then posts on approval. Mines Granola calls and researches articles for source material. Runs daily or manually with 'tweet', 'twitter content', 'X post'."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: generates Twitter/X content, sends drafts to Telegram for approval, posts on approval, mines Granola calls, researches articles. Very clear about the workflow and specific tools involved."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural trigger terms users would say: 'tweet', 'twitter content', 'X post'. Also includes domain-specific terms like 'retention', 'LTV', 'subscription economics', 'Telegram', and 'Granola calls' that help with matching."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what (generates Twitter/X content about specific topics, sends to Telegram, posts on approval, mines calls and articles) and when (runs daily or manually with explicit trigger terms 'tweet', 'twitter content', 'X post')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a very specific niche: Twitter content about retention/LTV/subscription economics with a Telegram approval workflow and Granola call mining. Extremely unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly communicates a specific, multi-step workflow with concrete actions, explicit trigger terms, and a well-defined domain niche. It covers what the skill does, when to use it, and includes enough distinctive details (Telegram approval, Granola calls, subscription economics) to avoid conflicts with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The style guide section is extensive and thorough but quite long — the anti-patterns list and format rules could be tightened. Some of this (like explaining what doesn't work on Twitter) is useful domain knowledge Claude wouldn't inherently know, but the sheer volume of writing advice pushes it toward verbose. The process steps themselves are reasonably lean."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable throughout: executable Python for the posting gate, specific CLI commands for Twitter and Granola, concrete tweet templates with real examples, exact Telegram message format with approval flow, and a JSON schema for tracking. Nearly everything is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 7-step process (0-6) is clearly sequenced with explicit gates (random skip → source mining → drafting → approval → posting → logging). The approval loop via Telegram serves as a validation checkpoint before any public posting, and the edit/re-approve feedback loop is explicitly described. State management and daily limits add additional safeguards."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The skill references external files appropriately (proof-library.md, tweet-curator-seen.json, state files) but the style guide section is a massive inline block that could be split into a separate reference file. The content calendar and rules sections are well-organized but the overall file is quite long for a SKILL.md overview."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill with a clear multi-step workflow, proper approval gates, and concrete examples throughout. Its main weakness is the lengthy inline style guide which, while containing genuinely useful domain-specific guidance, makes the file quite long and could benefit from being extracted into a separate reference document. The process steps, tooling commands, and approval flow are excellent.",
+      "suggestions": [
+        "Extract the detailed style guide (tone, format rules, anti-patterns, accounts to study) into a separate STYLE-GUIDE.md and reference it from the main skill — this would significantly improve conciseness and progressive disclosure.",
+        "Trim the 'writing patterns to avoid' list to the top 5-6 most important patterns, moving the full list to the extracted style guide file."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

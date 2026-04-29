@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 88
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 177 (<= 500)",
+        "details": {
+          "line_count": 177,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'linkedin-connect'",
+        "details": {
+          "value": "linkedin-connect",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (447 chars)",
+        "details": {
+          "length": 447
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 7442
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "linkedin-connect",
+    "skillDescription": "Send LinkedIn connection requests to a list of people via browser automation and track status in a CSV/TSV file. Use when the user wants to bulk-connect with a list of people on LinkedIn (founders, speakers, leads, etc.) from a spreadsheet or list containing LinkedIn profile URLs. Handles Connect button, Follow-mode profiles, already-connected detection, stale URL fallback via LinkedIn search and Google search, and incremental status tracking."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: sending connection requests, handling Connect button, Follow-mode profiles, already-connected detection, stale URL fallback via LinkedIn search and Google search, and incremental status tracking in CSV/TSV."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'LinkedIn connection requests', 'bulk-connect', 'founders, speakers, leads', 'spreadsheet', 'LinkedIn profile URLs', 'browser automation', 'CSV/TSV'. These cover a wide range of how users would naturally describe this task."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (send LinkedIn connection requests via browser automation, track status in CSV/TSV, handle edge cases) and 'when' (explicit 'Use when the user wants to bulk-connect with a list of people on LinkedIn from a spreadsheet or list containing LinkedIn profile URLs')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive niche combining LinkedIn, connection requests, browser automation, and bulk operations from spreadsheets. Very unlikely to conflict with other skills due to the specific combination of LinkedIn automation and CSV tracking."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly articulates specific capabilities, includes natural trigger terms, explicitly states both what the skill does and when to use it, and occupies a distinct niche. The description is comprehensive yet concise, covering edge cases like stale URLs and Follow-mode profiles without being verbose.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill includes some unnecessary verbosity — the Comment-First mode section with acceptance rate tracking and adaptive limits adds significant bulk that feels like strategic advice rather than actionable automation instructions. The pre-flight checklist is thorough but could be tighter. However, most sections earn their place with specific selectors, URLs, and status values."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "Provides concrete CSS selectors (`.artdeco-dropdown__content--is-open`), specific URL patterns for search, and executable Python for CSV setup. However, the actual browser tool calls are deferred to `references/browser-workflow.md` rather than shown inline, and the Comment-First mode lacks concrete implementation steps (e.g., how to find/comment on posts via browser automation). The connect patterns describe what to click but don't show the actual browser tool invocations."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The three-tier discovery flow is clearly sequenced with explicit escalation criteria (URL 404 → Google → LinkedIn search). The pre-flight checklist ensures prerequisites are met before starting. Rate limiting includes explicit validation (visit /feed/ between every profile), and the anti-detection section has clear error recovery (>3 consecutive 404s → pause). Status tracking provides a feedback loop for progress."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "The skill provides a clear overview with well-organized sections (pre-flight, discovery tiers, connect patterns, rate limiting) and appropriately defers detailed browser steps to `references/browser-workflow.md` — a single level of reference that is clearly signaled. The main file stays at the right level of abstraction for an overview."
+        }
+      },
+      "overall_assessment": "This is a well-structured skill with excellent workflow clarity and progressive disclosure. The three-tier discovery system, anti-detection measures, and status tracking are clearly defined. The main weaknesses are moderate verbosity (the Comment-First mode and acceptance rate tracking sections add bulk without corresponding automation detail) and incomplete actionability since the actual browser tool calls are deferred to a reference file rather than shown as executable examples inline.",
+      "suggestions": [
+        "Include at least one complete browser tool call example inline (e.g., the exact call for clicking the Connect button or navigating to /feed/) so the skill is partially executable without needing the reference file.",
+        "Trim or move the Comment-First mode and acceptance rate tracking sections to a reference file — they add ~30 lines of strategic advice that isn't core to the automation workflow and could be offered as an optional enhancement."
+      ]
+    },
+    "weightedScore": 2.4,
+    "normalizedScore": 0.7
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 111 (<= 500)",
+        "details": {
+          "line_count": 111,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'youtube-transcript'",
+        "details": {
+          "value": "youtube-transcript",
+          "length": 18
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (224 chars)",
+        "details": {
+          "length": 224
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2796
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "youtube-transcript",
+    "skillDescription": "Downloads transcripts (subtitles/captions) from YouTube videos using yt-dlp. Use when the user provides a YouTube URL and wants the transcript, asks to get captions or subtitles, or needs text content extracted from a video."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists a specific concrete action ('Downloads transcripts (subtitles/captions) from YouTube videos') and names the tool used ('yt-dlp'). The parenthetical clarification of subtitles/captions adds specificity."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural terms users would say: 'YouTube URL', 'transcript', 'captions', 'subtitles', 'text content extracted from a video'. These are all terms a user would naturally use when requesting this functionality."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (downloads transcripts/subtitles/captions from YouTube videos using yt-dlp) and 'when' (explicit 'Use when...' clause covering three trigger scenarios: YouTube URL with transcript request, captions/subtitles request, text extraction from video)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: YouTube transcript downloading via yt-dlp. The combination of YouTube-specific triggers and transcript/subtitle/caption terminology makes it very unlikely to conflict with other skills like general video processing or web scraping."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly communicates its purpose, uses natural trigger terms, and provides explicit guidance on when to use it. It follows the recommended pattern of stating capabilities followed by a 'Use when...' clause with multiple trigger scenarios. The description is concise yet comprehensive, and its specificity to YouTube transcripts makes it highly distinctive.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The 'When to Use' section is somewhat redundant since the skill description already covers this, and some tips are obvious (e.g., 'Most YouTube videos have auto-generated English subtitles'). However, the core workflow commands are lean and purposeful."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Every step has fully executable, copy-paste-ready bash commands and Python code. The VTT-to-text conversion script is complete and handles real-world edge cases like HTML entities and duplicate lines."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The workflow is clearly sequenced with numbered steps, a well-defined priority order (manual subs → auto subs → Whisper), explicit fallback logic, and a validation checkpoint (list available subs first before attempting download). The Whisper fallback includes a user confirmation gate."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-structured with clear sections and headers, but everything is inline in a single file. The Whisper fallback section and the VTT conversion script could potentially be separated, though for a skill of this size (~80 lines of meaningful content) it's borderline acceptable."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill with excellent actionability and workflow clarity. The step-by-step process with clear fallback logic and executable commands makes it immediately usable. Minor improvements could be made by trimming the 'When to Use' section and tightening a few explanatory lines to improve conciseness.",
+      "suggestions": [
+        "Remove or significantly trim the 'When to Use' section since the YAML description already covers trigger conditions, saving tokens.",
+        "Remove the 'Tips' section's obvious statements (e.g., 'Most YouTube videos have auto-generated English subtitles') and integrate the actionable tips (like --sub-langs en) directly into the relevant workflow steps."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

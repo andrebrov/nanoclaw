@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 84
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 212 (<= 500)",
+        "details": {
+          "line_count": 212,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'lead-discovery'",
+        "details": {
+          "value": "lead-discovery",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (322 chars)",
+        "details": {
+          "length": 322
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 9110
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "lead-discovery",
+    "skillDescription": "Discovers in-market accounts across Reddit, LinkedIn, and Twitter by scanning for buying signals (churn complaints, tool searches, competitor frustration, hiring/funding). Deduplicates against Attio, scores ICP fit, enriches contacts, and pushes qualified leads into the pipeline. Runs every 4 hours during business hours."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: scanning for buying signals across named platforms, deduplicating against Attio, scoring ICP fit, enriching contacts, and pushing qualified leads into the pipeline. Also specifies the types of buying signals (churn complaints, tool searches, competitor frustration, hiring/funding)."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'in-market accounts', 'Reddit', 'LinkedIn', 'Twitter', 'buying signals', 'churn complaints', 'competitor frustration', 'leads', 'pipeline', 'Attio', 'ICP fit', 'hiring/funding'. These cover a wide range of terms a user seeking social selling or lead generation would naturally use."
+        },
+        "completeness": {
+          "score": 2,
+          "reasoning": "The 'what' is thoroughly covered with specific actions and platforms. However, there is no explicit 'Use when...' clause or equivalent trigger guidance. The scheduling detail ('Runs every 4 hours during business hours') partially implies when, but it describes automation cadence rather than when Claude should select this skill. Per rubric guidelines, a missing 'Use when...' clause caps completeness at 2."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: social media buying signal detection across specific platforms (Reddit, LinkedIn, Twitter), integration with Attio CRM, and ICP scoring. This is unlikely to conflict with other skills due to its very specific domain and toolchain."
+        }
+      },
+      "overall_assessment": "This is a strong, highly specific description that clearly articulates what the skill does with concrete actions, named platforms, and specific signal types. Its main weakness is the absence of an explicit 'Use when...' clause, which would help Claude know exactly when to select this skill from a large pool. The description is well-written in third person and avoids vague language.",
+      "suggestions": [
+        "Add an explicit 'Use when...' clause, e.g., 'Use when the user asks about finding new leads, prospecting on social media, identifying buying signals, or managing the Attio pipeline.'"
+      ]
+    },
+    "weightedScore": 2.6500000000000004,
+    "normalizedScore": 0.8250000000000002
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly long but most content is actionable queries, commands, and specific logic. Some sections could be tightened (e.g., the extensive query lists and repeated emphasis on LinkedIn URL being mandatory), but there's relatively little fluff or explanation of concepts Claude already knows."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable throughout — provides exact search queries, specific CLI commands with arguments, executable Python code for tracker management, precise scoring formulas with point values, concrete Attio JSON payloads, and a complete Telegram message template. Nearly everything is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 8-step process is clearly sequenced with explicit validation checkpoints: dedup check before processing, Attio existence check before creating records, ICP scoring threshold (5/10) as a gate, Clay email verification wait-then-check loop, and heat thresholds determining pipeline action. Error recovery is addressed (PhantomBuster/Twitter API fallbacks)."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is a single monolithic file with no references to external documentation. At ~200+ lines, the extensive query lists (Reddit, LinkedIn, Twitter) and detailed Attio field schemas could be split into separate reference files. However, the section headers provide reasonable internal navigation."
+        }
+      },
+      "overall_assessment": "This is a strong, highly actionable skill with excellent workflow clarity and concrete executable guidance throughout. Its main weakness is length — the extensive query lists and detailed CRM payloads make it a large single file that could benefit from progressive disclosure via external references. The content is well-structured with clear sequencing, validation gates, and fallback strategies.",
+      "suggestions": [
+        "Extract the search query lists (Reddit, LinkedIn, Twitter) into a separate queries reference file to reduce the main skill's token footprint and make query updates easier.",
+        "Move the detailed Attio JSON payload examples into a separate ATTIO-SCHEMAS.md reference file, keeping only a brief example in the main skill."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

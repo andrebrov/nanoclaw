@@ -78,6 +78,25 @@ export function clearContinuation(providerName: string): void {
   deleteValue(continuationKey(providerName));
 }
 
+/**
+ * Provider-agnostic session id slot. Read/written by retry paths that
+ * track the last-known good session anchor independently of the
+ * per-provider continuation. Backed by the same legacy key the migration
+ * path consumes, so a `setStoredSessionId` written here gets adopted
+ * into the current provider's continuation slot on next container start.
+ */
+export function getStoredSessionId(): string | undefined {
+  return getValue(LEGACY_KEY);
+}
+
+export function setStoredSessionId(sessionId: string): void {
+  setValue(LEGACY_KEY, sessionId);
+}
+
+export function clearStoredSessionId(): void {
+  deleteValue(LEGACY_KEY);
+}
+
 const TURN_REPLY_TO_KEY = 'turn_reply_to';
 
 /**

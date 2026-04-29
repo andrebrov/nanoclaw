@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 81
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 71 (<= 500)",
+        "details": {
+          "line_count": 71,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'agent-mesh'",
+        "details": {
+          "value": "agent-mesh",
+          "length": 10
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (206 chars)",
+        "details": {
+          "length": 206
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2946
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "agent-mesh",
+    "skillDescription": "Share learnings across agents using write_shared_memory and /workspace/global/skills-discovered.md, send messages to all agents with broadcast, or hand off to the primary DM agent with the main destination."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'write_shared_memory', sharing learnings via a specific file path, 'broadcast' to all agents, and 'hand off to the primary DM agent'. These are concrete, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes some relevant terms like 'shared_memory', 'broadcast', 'hand off', 'agents', and 'DM agent', but these are more technical/internal terms rather than natural language a user would say. Missing common user-facing trigger terms like 'share information', 'communicate between agents', or 'coordinate'."
+        },
+        "completeness": {
+          "score": 2,
+          "reasoning": "The 'what' is well-covered (share learnings, broadcast messages, hand off to DM agent), but there is no explicit 'Use when...' clause or equivalent guidance on when Claude should select this skill. The when is only implied by the actions described."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with specific references to 'write_shared_memory', a concrete file path '/workspace/global/skills-discovered.md', 'broadcast', and 'primary DM agent'. This is clearly a multi-agent coordination skill that is unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "The description is strong on specificity and distinctiveness, clearly naming concrete tools and mechanisms for inter-agent communication. However, it lacks an explicit 'Use when...' clause, which caps completeness, and the trigger terms are more technical/internal rather than natural language users would employ. The description reads more like internal documentation than a selection guide.",
+      "suggestions": [
+        "Add an explicit 'Use when...' clause, e.g., 'Use when needing to share discoveries between agents, broadcast updates, or coordinate with the primary agent.'",
+        "Include more natural trigger terms that a user or orchestrating agent might use, such as 'coordinate agents', 'share information', 'inter-agent communication', or 'notify other agents'."
+      ]
+    },
+    "weightedScore": 2.35,
+    "normalizedScore": 0.675
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "Generally efficient but includes some unnecessary elaboration. Phrases like 'The shared pool at /workspace/global/ is readable by all agents' and explanations of when to read/write could be tightened. The cross-channel handoff section has some redundancy explaining destination naming conventions."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete, copy-paste ready code examples for both write_shared_memory and send_message calls, specific file paths, exact format templates for entries, and clear destination naming conventions (e.g., 'AyeAye' → 'ayeaye')."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "For this type of skill (coordination/communication patterns rather than destructive multi-step operations), the workflow is clear: check shared memory before acting, write after discovering, broadcast for corrections. The when-to-read and when-to-write sections provide unambiguous decision points."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "Content is well-organized into three distinct sections (Shared Knowledge, Broadcasting, Cross-Channel Handoff), each covering a single concern. The skill is under 80 lines and self-contained with no need for external references, and sections are clearly delineated with headers."
+        }
+      },
+      "overall_assessment": "This is a well-structured skill that provides actionable guidance for agent-to-agent communication patterns. Its strengths are concrete code examples, clear format templates, and logical organization into three distinct communication mechanisms. Minor verbosity in explanatory text and some redundancy in the handoff section prevent a perfect conciseness score.",
+      "suggestions": []
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  }
+}

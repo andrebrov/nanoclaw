@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 86
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 124 (<= 500)",
+        "details": {
+          "line_count": 124,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'vercel-cli'",
+        "details": {
+          "value": "vercel-cli",
+          "length": 10
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (147 chars)",
+        "details": {
+          "length": 147
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4798
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "vercel-cli",
+    "skillDescription": "Deploy apps to Vercel. Use when asked to deploy, ship, or publish a web application, or manage Vercel projects, domains, and environment variables."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 2,
+          "reasoning": "Names the domain (Vercel deployment) and mentions some actions (deploy, manage projects, domains, environment variables), but doesn't list comprehensive concrete actions like creating projects, checking deployment status, rolling back, etc."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural trigger terms users would say: 'deploy', 'ship', 'publish', 'web application', 'Vercel', 'domains', 'environment variables'. Good coverage of common variations for deployment-related requests."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (deploy apps to Vercel, manage projects/domains/env vars) and 'when' with an explicit 'Use when...' clause listing trigger scenarios."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Clearly scoped to Vercel specifically, which distinguishes it from generic deployment skills or other platform-specific deployment skills (e.g., AWS, Netlify). The mention of Vercel-specific concepts like projects and domains further narrows the niche."
+        }
+      },
+      "overall_assessment": "This is a solid skill description that clearly identifies its platform (Vercel), provides explicit trigger guidance via a 'Use when...' clause, and uses natural language terms users would employ. The main weakness is that the 'what' portion could be more specific about the concrete actions available beyond the high-level 'deploy apps' and 'manage' verbs.",
+      "suggestions": [
+        "Expand the capability list with more specific actions, e.g., 'Deploy apps to Vercel, check deployment status, configure custom domains, set environment variables, and manage project settings.'"
+      ]
+    },
+    "weightedScore": 2.8,
+    "normalizedScore": 0.8999999999999999
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "Generally efficient with good use of code blocks and tables, but the 'Building Websites' section is quite verbose with repeated warnings (HARD RULE at top, ⚠️ CRITICAL inline, multiple reminders about not skipping step 2). The auth explanation about OneCLI proxy token replacement is slightly over-explained."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Every section provides copy-paste ready commands with correct flags. The common errors table maps specific errors to specific fixes. The delegation workflow includes exact function calls with parameters. All commands are concrete and executable."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The deployment workflow has clear sequencing: verify auth → deploy → inspect/verify. The delegation workflow is explicitly two-step with validation (don't say 'it's working' until send_message is called). The auth section includes a clear recovery path if whoami fails."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is well-organized with clear section headers and a logical flow from auth → deploy → management → errors → delegation. However, the entire skill is monolithic — the Building Websites delegation section and the common errors table could reasonably be split into separate reference files, and there are no references to external docs."
+        }
+      },
+      "overall_assessment": "This is a solid, actionable skill with concrete commands and good workflow sequencing. Its main weakness is some verbosity in the delegation section where the same constraint (don't skip step 2, don't write frontend code yourself) is repeated multiple times in different phrasings. The content could benefit from splitting the delegation workflow into a separate file and trimming redundant warnings.",
+      "suggestions": [
+        "Consolidate the repeated warnings about delegation into a single clear statement rather than restating the rule at the top (HARD RULE), in the delegation section, and in the CRITICAL callout.",
+        "Consider moving the 'Building Websites — Delegate to Frontend Engineer' section to a separate DELEGATION.md file and linking to it, keeping SKILL.md focused on Vercel CLI operations."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

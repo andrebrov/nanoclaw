@@ -1,0 +1,161 @@
+{
+  "review": {
+    "reviewScore": 84
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 200 (<= 500)",
+        "details": {
+          "line_count": 200,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description",
+            "metadata"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'linkedin-followup'",
+        "details": {
+          "value": "linkedin-followup",
+          "length": 17
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (267 chars)",
+        "details": {
+          "length": 267
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "warning",
+        "message": "'metadata.version' is missing"
+      },
+      {
+        "name": "metadata_field",
+        "status": "warning",
+        "message": "'metadata' should map string keys to string values",
+        "details": {
+          "invalid_keys": [],
+          "invalid_values": [
+            "openclaw"
+          ]
+        }
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 6202
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 2,
+    "skillName": "linkedin-followup",
+    "skillDescription": "Manage LinkedIn outreach leads from Google Sheets — search by name, read live conversation threads, update status, and send contextual follow-up messages. Use after linkedin-dm to move leads through the pipeline (Sent → Replied → Call Scheduled → Demo Done → Closed)."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: search by name, read live conversation threads, update status, and send contextual follow-up messages. Also specifies the data source (Google Sheets) and the pipeline stages."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'LinkedIn', 'outreach', 'leads', 'Google Sheets', 'conversation threads', 'follow-up messages', 'pipeline', 'status', and specific stage names like 'Replied', 'Call Scheduled', 'Demo Done', 'Closed'."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what (manage LinkedIn outreach leads from Google Sheets with specific actions) and when ('Use after linkedin-dm to move leads through the pipeline'), providing explicit trigger guidance with a clear sequencing cue."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive — combines LinkedIn outreach, Google Sheets lead management, and a specific pipeline workflow. The reference to 'linkedin-dm' and the named pipeline stages create a clear niche unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong description that clearly articulates specific capabilities (search, read threads, update status, send follow-ups), identifies the tools involved (LinkedIn, Google Sheets), and provides explicit trigger guidance including sequencing with another skill. The pipeline stages add further distinctiveness and help Claude understand exactly when to apply this skill.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The schema table and conversation log format are useful reference material, but some sections are verbose — e.g., the pre-flight checklist explains things Claude should already know, and the 'Analyse the conversation' step spells out reasoning Claude can do natively. The sheet schema could be more compact."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable bash commands for gog sheets operations, concrete JavaScript for scraping LinkedIn threads and sending messages, specific column references, and exact command patterns. The code is copy-paste ready with clear placeholders."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "Mode 2 has a clear 7-step sequence with a human approval checkpoint before sending (Step 5), which is good. However, there are no validation/error-recovery steps — no checks for whether the message was actually sent, no handling of LinkedIn rate limits or failed sheet updates. Mode 3 is also truncated/incomplete, cutting off mid-sentence."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is structured with clear mode sections and internal anchor links, which helps navigation. However, it's a long monolithic file with no references to external files for detailed content (e.g., the Response Playbook is referenced but never shown). The content that is present could benefit from splitting the schema and playbook into separate reference files."
+        }
+      },
+      "overall_assessment": "This skill provides strong actionable guidance with executable code for LinkedIn follow-up management across multiple modes. Its main weaknesses are: the content is truncated (Mode 3 and the Response Playbook are incomplete), there are no error-handling or validation steps for destructive operations like sending messages and updating sheets, and the file is somewhat verbose for what could be more concisely expressed. The incomplete content significantly undermines its utility.",
+      "suggestions": [
+        "Complete the truncated Mode 3 (Batch Review) section and include the referenced Response Playbook, or explicitly link to a separate file containing it.",
+        "Add validation checkpoints after sending messages (verify send succeeded) and after sheet updates (verify data written correctly), with error recovery steps.",
+        "Compress the sheet schema table — consider a compact format like 'A:Date Sent, B:Person Name, ...' since Claude doesn't need a full HTML-style table for column mappings.",
+        "Move the detailed JavaScript scraping code and sheet schema into a referenced companion file to keep SKILL.md as a concise overview."
+      ]
+    },
+    "weightedScore": 2.3,
+    "normalizedScore": 0.6499999999999999
+  }
+}

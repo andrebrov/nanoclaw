@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 151 (<= 500)",
+        "details": {
+          "line_count": 151,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'clay-email-finder'",
+        "details": {
+          "value": "clay-email-finder",
+          "length": 17
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (214 chars)",
+        "details": {
+          "length": 214
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 5361
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "clay-email-finder",
+    "skillDescription": "Uploads contacts to Clay tables via webhook for enrichment and finds email addresses via Hunter.io. Use when the user wants to push leads to Clay, find email addresses, enrich contact data, or do batch CSV uploads."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'uploads contacts to Clay tables via webhook', 'finds email addresses via Hunter.io', 'batch CSV uploads', and 'enrich contact data'. These are clear, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'push leads to Clay', 'find email addresses', 'enrich contact data', 'batch CSV uploads', 'Hunter.io', 'webhook'. These cover common variations of how users would phrase requests."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (uploads contacts to Clay via webhook, finds emails via Hunter.io) and 'when' (explicit 'Use when' clause with multiple trigger scenarios: push leads, find emails, enrich contacts, batch CSV uploads)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with specific tool names (Clay, Hunter.io) and a clear niche (contact enrichment via specific platforms). Very unlikely to conflict with other skills due to the named services and specific workflow."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly identifies specific tools (Clay, Hunter.io), concrete actions (upload contacts, find emails, batch CSV uploads), and explicit trigger conditions. It uses proper third-person voice and provides enough detail for Claude to confidently select this skill when relevant without ambiguity.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is mostly efficient but has some redundancy — the env loading snippet appears twice (once in Configuration, once in the CSV upload section), and some instructions like 'Use company_domain instead of company name' are repeated multiple times across sections. However, it generally avoids explaining concepts Claude already knows."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides fully executable Python code for CSV uploads, dedup checks, and CLI commands with specific flags. Code is copy-paste ready with concrete examples, error handling tables, and specific file paths. The dedup cache implementation is detailed and complete."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The multi-step workflow is clearly sequenced: dedup checks (3 explicit checks) → upload → wait → verify in Attio. Validation checkpoints are explicit ('NEVER send without ALL THREE checks'), there's a feedback loop for checking enrichment results, and error recovery is covered in the error handling table."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is reasonably well-structured with clear section headers, but it's somewhat monolithic — the dedup logic, CLI reference, and post-upload verification could benefit from being split into separate referenced files. The inline code blocks are lengthy and make the skill harder to scan quickly."
+        }
+      },
+      "overall_assessment": "This is a solid, actionable skill with strong workflow clarity and excellent dedup safeguards that protect against costly duplicate enrichments. The main weaknesses are some redundancy (env loading repeated, domain-not-company-name emphasized 3+ times) and the monolithic structure that could benefit from splitting detailed code into referenced files. Overall it's a well-crafted skill that provides clear, executable guidance for a multi-step process with real financial consequences.",
+      "suggestions": [
+        "Remove the duplicated env-loading snippet — define it once in Configuration and reference it from the CSV upload section.",
+        "Consider extracting the detailed dedup logic into a separate DEDUP.md file and referencing it from the main skill, keeping only a brief summary inline."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

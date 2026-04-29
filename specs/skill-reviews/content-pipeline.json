@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 85
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 337 (<= 500)",
+        "details": {
+          "line_count": 337,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'content-pipeline'",
+        "details": {
+          "value": "content-pipeline",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (319 chars)",
+        "details": {
+          "length": 319
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 16455
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "content-pipeline",
+    "skillDescription": "Manages the LinkedIn content pipeline - mines Granola call transcripts for real stories, researches LTV/retention articles, drafts posts, and manages the backlog. Runs daily as a scheduled task or manually when user asks about content. Use when the user asks what to post next, wants a LinkedIn post, or says 'content'."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: mines Granola call transcripts for real stories, researches LTV/retention articles, drafts posts, manages the backlog. These are detailed, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'what to post next', 'LinkedIn post', 'content', 'backlog'. Also mentions domain-specific terms like 'Granola call transcripts', 'LTV/retention articles' that help with precise matching."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what (mines transcripts, researches articles, drafts posts, manages backlog) and when (daily scheduled task, when user asks about content, asks what to post next, wants a LinkedIn post, or says 'content') with explicit trigger guidance."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: LinkedIn content pipeline specifically tied to Granola call transcripts and LTV/retention topics. The combination of platform (LinkedIn), source material (Granola transcripts), and domain (LTV/retention) makes it very unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates specific capabilities, provides explicit trigger conditions, and occupies a distinct niche. It effectively combines the 'what' (mining transcripts, researching articles, drafting posts, managing backlog) with the 'when' (scheduled daily, user asks about content/posts). The description is concise yet comprehensive, using natural language triggers that users would actually say.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 1,
+          "reasoning": "This skill is extremely verbose at ~400+ lines. It over-explains concepts Claude already understands (what a hook is, how LinkedIn algorithm works, basic writing advice like 'use white space'). The banned patterns list alone is massive and could be condensed to a fraction. The voice-and-tone.md file is referenced but then the skill redundantly inlines extensive writing guidance."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides highly concrete, executable guidance: specific Python code for the posting gate, exact file paths, specific MCP tool names (mcp__granola__get_meetings, mcp__nanoclaw__send_message), complete draft metadata format, exact Telegram message templates, and specific search queries to use. Nearly everything is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 7-step process is clearly sequenced with explicit validation: Step 0 has a randomization gate with skip/proceed logic, Step 4 includes a 3-pass anti-pattern check and tightening pass, Step 5 saves with structured metadata, Step 6 sends for human review before publishing, and there's a comprehensive verification checklist at the end. The feedback loop (draft → Telegram review → approval → post) is well-defined."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The skill references external files well (voice-and-tone.md, templates, proof-library, backlog) but inlines an enormous amount of content that could be split into separate reference files — the banned patterns list, hook formula library, post type tables, and search topic lists could all be in referenced files. The SKILL.md itself is a monolithic wall despite having good section headers."
+        }
+      },
+      "overall_assessment": "This skill is highly actionable with excellent workflow clarity — the 7-step pipeline is well-sequenced with validation gates, human review checkpoints, and a comprehensive verification checklist. However, it is severely over-long, inlining extensive writing guidance (banned patterns, hook formulas, post rules) that should be in referenced files, and explaining concepts Claude already knows. The content would benefit enormously from splitting the inline reference material into separate files and trusting Claude's existing writing competence.",
+      "suggestions": [
+        "Move the banned writing patterns list, hook formula library, and anti-pattern check instructions into a separate referenced file (e.g., writing-rules.md) to reduce the SKILL.md to a lean workflow overview.",
+        "Remove explanatory context Claude already knows — e.g., why LinkedIn penalizes links, how the algorithm works, what 'white space' means in writing. State the rule only: 'No links in post body.'",
+        "Consolidate the Post Rules section and Verification checklist — they heavily overlap. Keep only the checklist and cut the prose rules section.",
+        "Move the search query lists into a separate file (e.g., research-topics.md) that can be updated independently without bloating the main skill."
+      ]
+    },
+    "weightedScore": 2.25,
+    "normalizedScore": 0.625
+  }
+}

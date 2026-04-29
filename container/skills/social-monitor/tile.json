@@ -1,0 +1,11 @@
+{
+  "name": "finsi/social-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Monitors Twitter and the web for mentions of Finsi, competitors (Lifetimely, RetentionX, Churnkey, ProfitWell), and relevant keywords (churn prevention, subscription analytics). Flags buying signals and engagement opportunities. Runs every 4 hours via scheduled task.",
+  "skills": {
+    "social-monitor": {
+      "path": "SKILL.md"
+    }
+  }
+}

@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 84
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 183 (<= 500)",
+        "details": {
+          "line_count": 183,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'social-monitor'",
+        "details": {
+          "value": "social-monitor",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (267 chars)",
+        "details": {
+          "length": 267
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 6401
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "social-monitor",
+    "skillDescription": "Monitors Twitter and the web for mentions of Finsi, competitors (Lifetimely, RetentionX, Churnkey, ProfitWell), and relevant keywords (churn prevention, subscription analytics). Flags buying signals and engagement opportunities. Runs every 4 hours via scheduled task."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: monitors Twitter and web, tracks mentions of named competitors, flags buying signals and engagement opportunities. Includes specific competitor names and keywords."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes highly specific natural keywords users would say: 'Twitter', 'mentions', 'Finsi', named competitors (Lifetimely, RetentionX, Churnkey, ProfitWell), and domain terms like 'churn prevention', 'subscription analytics', 'buying signals'."
+        },
+        "completeness": {
+          "score": 2,
+          "reasoning": "Clearly answers 'what does this do' (monitors Twitter/web for mentions, flags buying signals) but lacks an explicit 'Use when...' clause. The 'Runs every 4 hours via scheduled task' describes execution mode but not when Claude should select this skill."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: social media monitoring for a specific product (Finsi) with named competitors and specific domain keywords. Very unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong description with excellent specificity, naming concrete competitors, platforms, and keywords. Its main weakness is the absence of an explicit 'Use when...' trigger clause, which would help Claude know exactly when to select this skill over others. The scheduled task detail is useful context but doesn't substitute for explicit selection guidance.",
+      "suggestions": [
+        "Add an explicit 'Use when...' clause, e.g., 'Use when the user asks about competitor monitoring, social listening, brand mentions, or tracking buying signals on Twitter/web.'"
+      ]
+    },
+    "weightedScore": 2.6500000000000004,
+    "normalizedScore": 0.8250000000000002
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly long but most content is actionable (search queries, scoring rubrics, alert templates). However, the reply guidelines section explains things Claude already knows about tone and engagement, and some of the keyword lists could be more compact. The 'Bad' vs 'Good' reply example is useful but the surrounding explanation is somewhat verbose."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with specific search queries ready to execute, concrete scoring rubrics (1-5 scales with clear definitions), exact alert message templates, specific tool commands (composio-tool, WebSearch, mcp__nanoclaw__send_message), and a dedup file path. Nearly everything is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear 6-step sequential process: search Twitter → search web → filter/score → deduplicate → format alerts → apply no-noise rule. Includes validation via the scoring threshold (3+ on either axis), deduplication as a checkpoint, and explicit handling of edge cases (nothing found, low-priority only, tool failures). The escalation path for high-profile accounts adds another decision checkpoint."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is entirely self-contained in one file with no references to external documents. At ~150+ lines with detailed alert templates, competitor lists, and reply guidelines, some of this content (e.g., the full alert format templates, the reply guidelines, the competitor keyword lists) could be split into referenced files. However, the section headers provide reasonable navigation within the single file."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable monitoring skill with concrete tool commands, clear scoring rubrics, and detailed alert templates. Its main weakness is length — the reply guidelines and some keyword elaboration could be trimmed or externalized. The workflow is clearly sequenced with appropriate validation (scoring thresholds, dedup, no-noise rule) and error handling (fallback searches, max alerts per run).",
+      "suggestions": [
+        "Consider moving the detailed alert format templates and reply guidelines into a separate reference file (e.g., SOCIAL-MONITOR-TEMPLATES.md) to reduce the main skill's token footprint.",
+        "Trim the reply guidelines section — Claude understands tone-matching and non-salesy engagement; the Good/Bad examples alone would suffice without the bullet-point explanations."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

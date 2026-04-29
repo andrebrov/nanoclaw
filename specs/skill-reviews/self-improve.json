@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 100
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 86 (<= 500)",
+        "details": {
+          "line_count": 86,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'self-improve'",
+        "details": {
+          "value": "self-improve",
+          "length": 12
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (415 chars)",
+        "details": {
+          "length": 415
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2326
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "self-improve",
+    "skillDescription": "Edits skill markdown files, updates agent configuration and memory, modifies workspace scripts, and creates GitHub issues for infrastructure changes on jbaruch/nanoclaw-public. Use when the agent needs to update its own prompts, adjust skill files, improve its tooling, or propose changes to host-level code such as routing logic, container configuration, or persistence pipelines that require a rebuild or restart."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: editing skill markdown files, updating agent configuration and memory, modifying workspace scripts, and creating GitHub issues for infrastructure changes on a specific repository."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users/agents would use: 'skill files', 'prompts', 'tooling', 'routing logic', 'container configuration', 'persistence pipelines', 'GitHub issues', 'agent configuration', 'memory'. These cover a good range of terms relevant to self-modification and infrastructure tasks."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (edits skill files, updates config/memory, modifies scripts, creates GitHub issues) and 'when' (explicit 'Use when' clause covering updating prompts, adjusting skill files, improving tooling, or proposing host-level changes requiring rebuild/restart)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: self-modification of agent internals and infrastructure change proposals via GitHub issues on a specific repository. The combination of self-editing skills, agent memory, and host-level infrastructure changes is unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong description that clearly articulates specific capabilities (editing skills, updating config, creating GitHub issues) and provides explicit trigger guidance via a 'Use when' clause. It covers both agent-level self-modification and infrastructure-level change proposals, making it distinctive and well-scoped. The description is concise yet comprehensive, with good natural trigger terms throughout.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The skill is lean and efficient. It uses a decision tree format that avoids unnecessary explanation, assumes Claude understands concepts like GitHub issues and container rebuilds, and every section earns its place. The collapsible details sections keep examples available without cluttering the main flow."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete, executable guidance throughout: specific file paths for in-system changes, a complete example issue body with TypeScript code, an actual API call example for posting GitHub issues, and a clear classification heuristic. The guidance is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Both workflows (in-system and host-level) are clearly sequenced with numbered steps. The in-system workflow includes an explicit verification step (step 3) and logging step (step 4). The host-level workflow has clear sequential steps from drafting to posting to sharing. The classification rule at the end provides a clear decision checkpoint."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "Excellent use of HTML details/summary tags to hide example bodies while keeping the main flow scannable. The decision tree is at the top for quick reference, followed by detailed processes. Content is well-organized without needing external file references for this scope of skill."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill that efficiently communicates a two-track improvement process. The decision tree provides immediate clarity on routing, the workflows are concrete with validation steps, and the collapsible examples demonstrate progressive disclosure within a single file. The classification rule at the end serves as a useful mental shortcut.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  }
+}

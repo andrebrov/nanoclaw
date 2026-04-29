@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 172 (<= 500)",
+        "details": {
+          "line_count": 172,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'meeting-prep'",
+        "details": {
+          "value": "meeting-prep",
+          "length": 12
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (212 chars)",
+        "details": {
+          "length": 212
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 6362
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "meeting-prep",
+    "skillDescription": "Automatically prepares meeting briefing notes by researching attendees via CRM, Granola transcripts, and email history. Triggered by scheduled task every 15 minutes or manually with \"prep me for my next meeting.\""
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists specific concrete actions: 'prepares meeting briefing notes', 'researching attendees via CRM, Granola transcripts, and email history'. Multiple data sources and the output type are clearly named."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural trigger terms users would say: 'prep me for my next meeting', 'meeting', 'briefing notes', and mentions specific tools (CRM, Granola transcripts, email history). The quoted phrase is exactly what a user would type."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('prepares meeting briefing notes by researching attendees via CRM, Granola transcripts, and email history') and when ('triggered by scheduled task every 15 minutes or manually with \"prep me for my next meeting\"')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: meeting prep briefing notes using specific data sources (CRM, Granola, email). Unlikely to conflict with other skills due to the specific combination of meeting prep, attendee research, and named tools."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates what it does (prepares meeting briefing notes by researching attendees across multiple sources), when it triggers (scheduled every 15 minutes or via manual command), and uses natural language trigger terms. It is specific, complete, and distinctive with minimal risk of conflicting with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly long (~150 lines) with the retention audit section adding significant bulk. However, most content is actionable and specific to this workflow. Some sections like the retention audit templates could be split into a separate file. The skill doesn't over-explain concepts Claude knows, but the sheer volume of templated output formats is borderline verbose."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable throughout — provides specific bash commands, exact tool invocations (composio-tool, MCP tools), concrete output templates, and explicit parameter requirements (e.g., sender: 'Briefing'). The guidance is copy-paste ready with real tool names and file paths."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear 7-step sequential process with explicit checkpoints: check for duplicates before proceeding (step 2), conditional branching for retention audit (step 7), tracker update after sending (step 6). The 'exit silently' instruction and skip conditions serve as validation gates. Error prevention is addressed via the dedup tracker and the explicit 'NEVER fabricate' rule."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The skill is monolithic — the retention audit section (step 7) is substantial and could be split into a separate reference file. The agency meeting adaptation at the end adds more inline content. There are no references to external files for detailed templates or advanced scenarios, despite the content length warranting it."
+        }
+      },
+      "overall_assessment": "This is a well-structured, highly actionable skill with clear sequential workflow and specific tool invocations. Its main weakness is length — the retention audit section nearly doubles the content and would benefit from being extracted into a separate file. The skill excels at providing concrete, executable guidance and explicit constraints (sender routing, dedup tracking, skip conditions).",
+      "suggestions": [
+        "Extract the retention audit section (step 7) into a separate file like `RETENTION-AUDIT.md` and reference it from the main skill to improve progressive disclosure and reduce token usage.",
+        "Consider moving the output format templates (meeting prep format and retention audit format) into a `TEMPLATES.md` file, keeping only a brief description inline."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

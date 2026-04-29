@@ -8,7 +8,8 @@
  * surfaces admin/member for the edge cases (shared instance, collaborators
  * with limited access), but hitting Enter assigns owner.
  */
-import { brightSelect } from './bright-select.js';
+import * as p from '@clack/prompts';
+
 import { ensureAnswer } from './runner.js';
 
 export type OperatorRole = 'owner' | 'admin' | 'member';
@@ -17,7 +18,7 @@ export async function askOperatorRole(
   channelLabel: string,
 ): Promise<OperatorRole> {
   const choice = ensureAnswer(
-    await brightSelect<OperatorRole>({
+    await p.select({
       message: `How should this ${channelLabel} account be registered?`,
       initialValue: 'owner',
       options: [
@@ -38,6 +39,6 @@ export async function askOperatorRole(
         },
       ],
     }),
-  );
+  ) as OperatorRole;
   return choice;
 }

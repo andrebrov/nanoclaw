@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 101 (<= 500)",
+        "details": {
+          "line_count": 101,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'transcript-analyzer'",
+        "details": {
+          "value": "transcript-analyzer",
+          "length": 19
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (239 chars)",
+        "details": {
+          "length": 239
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 3136
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "transcript-analyzer",
+    "skillDescription": "Analyzes meeting transcripts and produces structured analysis with action items, follow-ups, buying signals, and CRM notes. Use when the user asks to analyze a call or meeting transcript, or wants action items and buying signals extracted."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'structured analysis', 'action items', 'follow-ups', 'buying signals', and 'CRM notes'. These are clear, concrete outputs rather than vague language."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'meeting transcripts', 'call', 'action items', 'buying signals', 'CRM notes', 'analyze'. These cover common variations of how users would phrase requests in this domain."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (analyzes meeting transcripts, produces structured analysis with action items, follow-ups, buying signals, CRM notes) and 'when' (explicit 'Use when' clause covering analyzing call/meeting transcripts and extracting action items/buying signals)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: meeting/call transcript analysis with sales-oriented outputs (buying signals, CRM notes). Unlikely to conflict with generic document analysis or note-taking skills due to the specific sales context."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates its purpose, lists specific concrete outputs, includes natural trigger terms, and has an explicit 'Use when' clause. The combination of meeting transcript analysis with sales-specific outputs (buying signals, CRM notes) makes it highly distinctive and unlikely to conflict with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is mostly efficient and provides useful structure, but includes some unnecessary detail like explaining what Granola and Attio are, and the 'When to Use' section largely restates what Claude could infer. The template is appropriately detailed for a complex output format."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides specific MCP tool names, exact CLI commands for Attio, concrete file paths, a complete output template with all sections, and specific verification criteria. Everything is copy-paste ready and leaves no ambiguity about what to produce."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear sequential process for both single and batch analysis. Steps are numbered with explicit ordering (check Granola first, then Attio, then local files). Includes a verification checklist at the end that serves as a validation checkpoint before considering the task complete."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "References external context files appropriately (voice-and-tone.md, icp.md, follow-up-sequence.md), but the output template is quite long inline. The template could potentially be split into a separate reference file, though it's arguably necessary to have inline for clarity. Overall structure is reasonable but slightly heavy."
+        }
+      },
+      "overall_assessment": "This is a well-structured, actionable skill that provides clear workflows for transcript analysis with specific tools, commands, and output formats. Its main strength is the concrete output template and verification checklist. Minor weaknesses include some verbosity in the 'When to Use' section and the inline template length, though these are relatively minor for a skill of this complexity.",
+      "suggestions": []
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

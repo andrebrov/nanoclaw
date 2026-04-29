@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 84
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 211 (<= 500)",
+        "details": {
+          "line_count": 211,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'agency-prospector'",
+        "details": {
+          "value": "agency-prospector",
+          "length": 17
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (277 chars)",
+        "details": {
+          "length": 277
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 8367
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "agency-prospector",
+    "skillDescription": "Daily prospecting for e-commerce/DTC founders unhappy with their marketing agencies. Searches Twitter, Reddit, LinkedIn, and review sites for complaints, researches the companies, finds leadership emails via Clay, drafts outreach, and adds to Attio CRM. Runs daily at 11 AM ET."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: searches social platforms for complaints, researches companies, finds leadership emails via Clay, drafts outreach, and adds to Attio CRM. Very detailed workflow description."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes highly natural and specific keywords: 'prospecting', 'e-commerce', 'DTC', 'marketing agencies', 'Twitter', 'Reddit', 'LinkedIn', 'Clay', 'Attio CRM', 'outreach'. These are terms a user in this domain would naturally use."
+        },
+        "completeness": {
+          "score": 2,
+          "reasoning": "Clearly answers 'what does this do' with detailed workflow steps, but lacks an explicit 'Use when...' clause. The scheduling detail ('Runs daily at 11 AM ET') partially implies when, but there's no explicit trigger guidance for Claude to know when to select this skill in response to a user request."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a very specific niche: prospecting for e-commerce/DTC founders unhappy with marketing agencies. The combination of specific platforms (Clay, Attio CRM), target audience, and workflow makes it extremely unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong, highly specific description that clearly articulates a detailed multi-step workflow targeting a well-defined niche. Its main weakness is the absence of an explicit 'Use when...' clause, which would help Claude know exactly when to select this skill in response to user requests. The domain-specific terminology and tool references make it very distinctive.",
+      "suggestions": [
+        "Add an explicit 'Use when...' clause, e.g., 'Use when the user asks about lead generation, prospecting, finding unhappy agency clients, or running the daily outreach workflow.'"
+      ]
+    },
+    "weightedScore": 2.6500000000000004,
+    "normalizedScore": 0.8250000000000002
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is fairly long (~200+ lines) but most content is actionable commands and templates rather than explanatory fluff. Some areas could be tightened — the email template section is verbose and the personalization rules explain things Claude would naturally do — but overall it's reasonably efficient for the complexity of the workflow."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable throughout: specific bash commands for each tool, exact search queries, concrete JSON payloads for Attio CRM, a complete email template, executable Python for deduplication, and precise fallback sequences (e.g., try Clay then website then pattern). Nearly everything is copy-paste ready."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 7-step process is clearly sequenced with explicit validation checkpoints: LinkedIn URL is marked MANDATORY before creating Attio records, email verification steps are ordered with fallbacks, deduplication checks happen before processing, and the filter/qualify step has clear include/exclude criteria. The feedback loop for email finding (submit → wait 60s → verify in Attio) is well-defined."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is entirely self-contained in one file with no references to external documentation, which is appropriate for a single workflow. However, the skill is quite long and could benefit from splitting the search queries, email template, or deduplication code into separate referenced files. The numbered sections provide good internal structure but the monolithic length works against quick scanning."
+        }
+      },
+      "overall_assessment": "This is a strong, highly actionable skill with excellent workflow clarity and concrete executable commands throughout. Its main weakness is length — while most content earns its place, the email template and personalization rules could be more concise, and some sections (search queries, deduplication code) could be split into referenced files for better progressive disclosure. The mandatory validation checkpoints (LinkedIn before Attio, email verification, deduplication) demonstrate thoughtful workflow design.",
+      "suggestions": [
+        "Consider moving the search query lists and email template into separate referenced files to reduce the main skill's length and improve progressive disclosure.",
+        "Trim the personalization rules section — Claude can infer 'if they complained about ROAS, emphasize unit economics' from the template and context without explicit enumeration."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

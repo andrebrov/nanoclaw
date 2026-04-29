@@ -33,7 +33,7 @@ import {
   spawnStep,
   writeStepEntry,
 } from '../lib/runner.js';
-import { accentGreen, brandBold, note } from '../lib/theme.js';
+import { brandBold } from '../lib/theme.js';
 
 const DEFAULT_AGENT_NAME = 'Nano';
 
@@ -47,7 +47,7 @@ export async function runTelegramChannel(displayName: string): Promise<void> {
   // installed, or the bot's web profile if not. tg://resolve?domain= is
   // more direct but silently fails when the scheme isn't registered.
   const botUrl = `https://t.me/${botUsername}`;
-  note(
+  p.note(
     [
       `Opening @${botUsername} in Telegram so it's ready when the pairing code shows up.`,
       '',
@@ -132,19 +132,7 @@ export async function runTelegramChannel(displayName: string): Promise<void> {
 }
 
 async function collectTelegramToken(): Promise<string> {
-  const existing = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  if (existing && /^[0-9]+:[A-Za-z0-9_-]{35,}$/.test(existing)) {
-    const reuse = ensureAnswer(await p.confirm({
-      message: `Found an existing Telegram bot token (${existing.slice(0, 8)}…). Use it?`,
-      initialValue: true,
-    }));
-    if (reuse) {
-      setupLog.userInput('telegram_token', 'reused-existing');
-      return existing;
-    }
-  }
-
-  note(
+  p.note(
     [
       "Your assistant talks to you through a Telegram bot you create.",
       "Here's how:",
@@ -162,7 +150,6 @@ async function collectTelegramToken(): Promise<string> {
   const answer = ensureAnswer(
     await p.password({
       message: 'Paste your bot token',
-      clearOnError: true,
       validate: (v) => {
         if (!v || !v.trim()) return "Token is required";
         if (!/^[0-9]+:[A-Za-z0-9_-]{35,}$/.test(v.trim())) {
@@ -253,7 +240,7 @@ async function runPairTelegram(): Promise<
         } else {
           stopSpinner("Old code expired. Here's a fresh one.");
         }
-        note(formatCodeCard(block.fields.CODE ?? '????'), 'Secret code');
+        p.note(formatCodeCard(block.fields.CODE ?? '????'), 'Secret code');
         s.start('Waiting for you to send the code from Telegram…');
         spinnerActive = true;
       } else if (block.type === 'PAIR_TELEGRAM_ATTEMPT') {
@@ -304,7 +291,7 @@ async function resolveAgentName(): Promise<string> {
   }
   const answer = ensureAnswer(
     await p.text({
-      message: `What should your ${accentGreen('assistant')} be called?`,
+      message: 'What should your assistant be called?',
       placeholder: DEFAULT_AGENT_NAME,
       defaultValue: DEFAULT_AGENT_NAME,
     }),

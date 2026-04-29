@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 87
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 74 (<= 500)",
+        "details": {
+          "line_count": 74,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'brainstorming'",
+        "details": {
+          "value": "brainstorming",
+          "length": 13
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (514 chars)",
+        "details": {
+          "length": 514
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 3532
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "brainstorming",
+    "skillDescription": "Asks clarifying questions, proposes alternatives, identifies edge cases, and creates requirement summaries before implementation begins. Use when a user wants to brainstorm, plan this out, scope a project, or think through what to build — especially when creating features, building components, adding functionality, or when the user has a vague idea that needs shaping into a concrete design. Trigger phrases include: 'help me think through', 'what should I build', 'brainstorm', 'plan', 'spec', or 'design this'."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'Asks clarifying questions, proposes alternatives, identifies edge cases, and creates requirement summaries before implementation begins.' These are distinct, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural trigger terms users would say: 'brainstorm', 'plan', 'scope a project', 'think through what to build', 'help me think through', 'what should I build', 'spec', 'design this'. These are highly natural phrases."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (asks clarifying questions, proposes alternatives, identifies edge cases, creates requirement summaries) and 'when' (explicit 'Use when...' clause with detailed trigger scenarios and explicit trigger phrases)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 2,
+          "reasoning": "While the description carves out a pre-implementation planning niche, terms like 'brainstorm', 'plan', and 'design' are broad enough to potentially overlap with architecture skills, general coding skills, or project management skills. The phrase 'before implementation begins' helps but doesn't fully eliminate conflict risk."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific capabilities, provides explicit 'Use when' guidance with natural trigger phrases, and answers both what the skill does and when to use it. Its main weakness is moderate overlap risk with other planning, architecture, or design-related skills due to broad terms like 'plan' and 'brainstorm'. The description is well-structured and uses appropriate third-person voice throughout.",
+      "suggestions": []
+    },
+    "weightedScore": 2.8499999999999996,
+    "normalizedScore": 0.9249999999999998
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The content is mostly efficient but includes some unnecessary elaboration. The examples are helpful but slightly verbose — the 'Example approach presentation' and 'Example design section' blocks are long for what they convey. The 'When to Use' section partially restates the description. However, it doesn't explain concepts Claude already knows."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides concrete, specific guidance with detailed examples of clarifying questions, approach presentations, and design sections. The process is clearly instructable with specific formats and patterns Claude can follow directly. The examples are realistic and copy-paste ready for conversational use."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The multi-step process is clearly sequenced: understand → explore approaches → present design → document → implement. Each phase has explicit checkpoints (ask after each section, validate incrementally, ask 'Ready to set up for implementation?'). The feedback loop of going back to clarify is explicitly mentioned."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-structured with clear sections and headers, but it's somewhat monolithic — all content is inline rather than referencing separate files for examples or detailed guides. The mention of 'docs/implementation-plan.md' is a good touch but vague ('consider referencing'). For a skill of this length (~80 lines), the inline approach is borderline acceptable but could benefit from splitting examples into a separate reference."
+        }
+      },
+      "overall_assessment": "This is a solid brainstorming/design skill with clear workflow, good examples, and actionable guidance. Its main strengths are the well-sequenced process with validation checkpoints and the concrete example patterns for each phase. Minor weaknesses include some verbosity in examples and inline content that could be better organized with references to separate files.",
+      "suggestions": [
+        "Trim the example blocks slightly — the approach presentation and design section examples could each be 30-40% shorter while conveying the same pattern.",
+        "Consider extracting the detailed examples into a separate EXAMPLES.md file and referencing it, keeping SKILL.md as a leaner overview of the process."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

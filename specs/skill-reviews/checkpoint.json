@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 100
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 53 (<= 500)",
+        "details": {
+          "line_count": 53,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'checkpoint'",
+        "details": {
+          "value": "checkpoint",
+          "length": 10
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (328 chars)",
+        "details": {
+          "length": 328
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 1443
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "checkpoint",
+    "skillDescription": "Save the current session state to /workspace/agent/checkpoint.md before context fills up or the session ends. Use when switching between long tasks, the context feels heavy, the user triggers /clear, or proactively after completing a major subtask. Triggers — \"checkpoint\", \"save state\", \"before clear\", \"context getting heavy\"."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists a concrete action ('Save the current session state to /workspace/agent/checkpoint.md') with a specific file path and clear purpose ('before context fills up or the session ends'). Multiple specific scenarios are enumerated."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural trigger terms users would actually say: 'checkpoint', 'save state', 'before clear', 'context getting heavy'. Also covers implicit triggers like '/clear' and 'major subtask' completion. Good coverage of realistic user language."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (save session state to a specific file) and 'when' (switching tasks, context heavy, /clear triggered, after major subtask). Includes an explicit 'Use when' clause and a 'Triggers' list."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive — saving session state to a checkpoint file is a very specific niche. The triggers ('checkpoint', 'save state', 'context getting heavy') are unlikely to overlap with other skills. The specific file path further narrows the scope."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates what the skill does (saves session state to a specific checkpoint file), when to use it (multiple well-defined scenarios), and includes natural trigger terms. The description is concise, uses third person voice, and occupies a distinct niche that is unlikely to conflict with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "Every section earns its place. No unnecessary explanations of concepts Claude already knows. The template structure is lean and each field has a brief, clear purpose annotation."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides a concrete, copy-paste-ready markdown template with specific field names and inline guidance for each field. The steps are explicit: write to a specific file path, confirm with a specific message, and follow specific reentry logic."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The workflow is clearly sequenced: write checkpoint → confirm to user. The reentry workflow includes validation (check age), branching logic (< 24h vs older), and cleanup (delete/archive). For a non-destructive operation like saving state, this level of detail is thorough."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "For a simple, single-purpose skill under 50 lines, the content is well-organized into clear sections (When to use, Steps, On reentry) without needing external references. The structure is easy to scan and navigate."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill that is concise, actionable, and clearly structured. It provides a concrete template with specific file paths and field descriptions, includes sensible reentry logic with age-based validation, and avoids unnecessary verbosity. The only minor consideration is whether the 24-hour threshold and archive/delete behavior could be more explicit, but these are reasonable defaults for the skill's scope.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  }
+}

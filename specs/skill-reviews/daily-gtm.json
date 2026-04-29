@@ -1,0 +1,156 @@
+{
+  "review": {
+    "reviewScore": 75
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "warning",
+        "message": "SKILL.md is long (1215 lines); consider splitting into references/ and linking",
+        "details": {
+          "line_count": 1215,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'daily-gtm'",
+        "details": {
+          "value": "daily-gtm",
+          "length": 9
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (284 chars)",
+        "details": {
+          "length": 284
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 51514
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 1,
+    "skillName": "daily-gtm",
+    "skillDescription": "Daily automation for Finsi's GTM outreach - researches new companies, creates personalized outreach drafts, and manages follow-ups. Invoked by scheduled tasks in six modes: daily-prospecting, daily-followups, weekly-research, agency-prospecting, lead-discovery, and snitcher-visitors."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'researches new companies', 'creates personalized outreach drafts', 'manages follow-ups'. Also enumerates six distinct operational modes by name."
+        },
+        "trigger_term_quality": {
+          "score": 2,
+          "reasoning": "Includes relevant terms like 'GTM outreach', 'prospecting', 'follow-ups', 'lead-discovery', and 'snitcher-visitors', but these are more internal/technical mode names than natural user language. Terms like 'outreach', 'sales', 'leads' are partially covered but common variations a user might say (e.g., 'cold email', 'sales pipeline', 'prospect list') are missing."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (researches companies, creates outreach drafts, manages follow-ups) and 'when' (invoked by scheduled tasks in six named modes). The trigger conditions are explicit, specifying the exact invocation modes."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive due to being specific to 'Finsi's GTM outreach' with six named operational modes. Very unlikely to conflict with other skills given the product-specific and mode-specific scoping."
+        }
+      },
+      "overall_assessment": "This is a well-structured description that clearly communicates what the skill does and when it should be invoked, with strong specificity and distinctiveness due to the named product context and enumerated modes. Its main weakness is that the trigger terms lean toward internal/technical vocabulary (mode names) rather than natural language a user might use, though this may be appropriate given it's invoked by scheduled tasks rather than ad-hoc user requests.",
+      "suggestions": [
+        "Consider adding more natural-language trigger terms alongside the mode names (e.g., 'sales outreach', 'cold email drafts', 'prospect research', 'website visitor follow-up') to improve matching if users ever invoke this conversationally."
+      ]
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 1,
+          "reasoning": "This skill is extremely verbose at ~700+ lines. While much of the content is domain-specific configuration, there is massive repetition — the same Attio commands, Clay email finder warnings ('MUST be a domain not company name'), LinkedIn lookup instructions, and dedup procedures are repeated nearly verbatim across every mode. Data quality rules, email rules, and CRM update patterns could be defined once and referenced. The attribute tables and scoring rubrics, while useful, could be in separate reference files."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides fully executable commands throughout — specific bash commands for Attio, Gmail, Instantly, Clay, and curl API calls with exact JSON payloads. Every step includes copy-paste ready code with proper attribute slugs, value formats, and tool invocations. The scoring rubrics have concrete thresholds and formulas."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Each mode has clearly numbered sequential steps with explicit validation checkpoints — dedup checks before proceeding, copy quality gates with minimum thresholds (42/60), cache freshness checks, search-before-create to avoid duplicates, and error recovery guidance ('If the Attio API call fails, log the error but don't block'). The daily-prospecting mode has a 10-step workflow with multiple validation gates including the DTC Brand Gate hard reject and the copy-feedback quality gate with rewrite triggers."
+        },
+        "progressive_disclosure": {
+          "score": 1,
+          "reasoning": "This is a monolithic wall of text with no content split into separate files. The entire skill is inline — attribute tables, scoring rubrics, email rules summaries, Telegram message templates, and detailed procedures for 6 different modes all live in one massive document. The skill references external files (voice-and-tone.md, icp.md, proof-library.md) but doesn't offload any of its own content to sub-files. Each mode could easily be its own referenced document."
+        }
+      },
+      "overall_assessment": "This skill is exceptionally actionable with concrete, executable commands and clear multi-step workflows with validation checkpoints throughout. However, it is severely bloated — the same instructions (dedup procedures, Attio CRUD patterns, Clay domain warnings, LinkedIn lookup steps) are repeated across nearly every mode, and the entire 700+ line document is monolithic with no content split into referenced sub-files. The skill would benefit enormously from extracting shared procedures and per-mode workflows into separate files.",
+      "suggestions": [
+        "Extract repeated procedures (Attio CRUD, dedup checks, Clay email finder, LinkedIn lookup) into a shared 'common-procedures.md' file referenced from each mode, eliminating the extensive duplication.",
+        "Split each mode (daily-prospecting, daily-followups, weekly-research, agency-prospecting, snitcher-visitors) into its own referenced file, keeping SKILL.md as a concise overview with mode descriptions and links.",
+        "Move the Attio attribute tables and scoring rubrics into a separate 'attio-schema.md' or 'scoring-reference.md' file — these are reference material, not workflow instructions.",
+        "Consolidate the repeated warnings (e.g., '--company MUST be a domain not company name' appears 5+ times) into a single 'Common Pitfalls' section referenced once."
+      ]
+    },
+    "weightedScore": 2.1,
+    "normalizedScore": 0.55
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 97
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 113 (<= 500)",
+        "details": {
+          "line_count": 113,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'self-healer'",
+        "details": {
+          "value": "self-healer",
+          "length": 11
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (487 chars)",
+        "details": {
+          "length": 487
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 3407
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "self-healer",
+    "skillDescription": "Detects, diagnoses, and recovers from failed or incomplete tasks by scanning session transcripts and task run logs. Classifies failures as transient, fixable, or systemic; retries what it can; completes broken workflows; escalates credential or service errors to host; and alerts on issues requiring attention. Use when tasks have failed, errors occurred in previous runs, work appears broken, stuck, or incomplete, or you want to troubleshoot, debug, or retry something that went wrong."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: detects/diagnoses/recovers from failed tasks, scans session transcripts and task run logs, classifies failures into three categories (transient, fixable, systemic), retries, completes broken workflows, escalates credential/service errors, and alerts on issues."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural trigger terms users would say: 'failed', 'errors', 'broken', 'stuck', 'incomplete', 'troubleshoot', 'debug', 'retry', 'went wrong'. These are highly natural phrases a user would use when encountering problems."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (detects, diagnoses, recovers from failed tasks with specific mechanisms) and 'when' with an explicit 'Use when...' clause covering multiple trigger scenarios including failed tasks, errors, broken/stuck/incomplete work, and troubleshooting/debugging needs."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Occupies a clear niche focused on failure recovery, task retry, and error diagnosis from session/run logs. The combination of failure classification, workflow recovery, and escalation logic is distinct and unlikely to conflict with general debugging or coding skills."
+        }
+      },
+      "overall_assessment": "This is a strong, well-crafted skill description that excels across all dimensions. It provides specific concrete actions, includes abundant natural trigger terms, explicitly addresses both what the skill does and when to use it, and carves out a distinct niche around task failure recovery and diagnosis. The description is comprehensive without being unnecessarily verbose.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The content is lean and efficient. Every section serves a purpose — classification table, routing table, IPC template, and report format are all necessary reference material. No unnecessary explanations of concepts Claude already knows."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable commands (scan script, IPC JSON template), concrete classification tables, skill routing mappings, and exact message formats. The guidance is specific and copy-paste ready throughout."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear 6-step sequential process with explicit decision points (exit if 0 failures, classify before acting, only escalate systemic issues). Includes validation logic (don't re-process, don't send empty reports) and clear feedback loops (diagnose → fix/escalate → report)."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is well-structured with clear sections and tables, but everything is inline in a single file. The skill routing table and IPC categories could potentially reference external docs, though the current length (~100 lines) is borderline acceptable for a single file."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill with clear, actionable workflows and excellent conciseness. The classification table, skill routing, and IPC template provide concrete guidance for every failure category. The decision logic (when to alert, when to stay silent, when to escalate) is explicit and well-defined, making this a strong skill overall.",
+      "suggestions": []
+    },
+    "weightedScore": 2.8499999999999996,
+    "normalizedScore": 0.9249999999999998
+  }
+}

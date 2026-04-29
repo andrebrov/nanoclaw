@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 100
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 69 (<= 500)",
+        "details": {
+          "line_count": 69,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'session-reentry'",
+        "details": {
+          "value": "session-reentry",
+          "length": 15
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (573 chars)",
+        "details": {
+          "length": 573
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2167
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "session-reentry",
+    "skillDescription": "Documentation for the automatic session-reentry mechanism that injects the previous session checkpoint into a fresh container start. Reference-only — the agent does not invoke this manually; the agent-runner reads /workspace/agent/.checkpoints/default.md before any user message and surfaces it as a session-checkpoint system block. Use this skill when explaining or debugging how cross-session context survives container restarts, when the user asks about session memory, remembering context between sessions, persistence between sessions, or lost context after a restart."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "The description lists concrete specifics: 'session-reentry mechanism', 'injects the previous session checkpoint into a fresh container start', 'reads /workspace/agent/.checkpoints/default.md', 'surfaces it as a session-checkpoint system block'. These are highly specific and concrete actions/behaviors."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural trigger terms: 'session memory', 'remembering context between sessions', 'persistence between sessions', 'lost context after a restart', 'cross-session context', 'container restarts'. These cover multiple natural phrasings a user might use."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (documentation for the automatic session-reentry mechanism that injects checkpoints) and 'when' (explicit 'Use this skill when...' clause with multiple trigger scenarios including explaining/debugging cross-session context and user questions about session memory)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive niche — session-reentry mechanism, checkpoint files, container restarts, cross-session persistence. This is unlikely to conflict with other skills due to its very specific domain of session checkpoint mechanics."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill description that clearly defines a narrow, specific domain (session-reentry/checkpoint mechanism), provides concrete technical details about how it works, and includes an explicit 'Use this skill when' clause with multiple natural trigger phrases. The description balances technical precision with user-facing language variations, making it easy for Claude to select appropriately.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The content is lean and efficient. It doesn't explain what checkpoints are conceptually or how file systems work — it jumps straight to what the mechanism does, the format, and how to use it. Every section earns its place."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides concrete checkpoint format with markdown example, a specific behavioral example showing how to resume from a checkpoint, the exact file path for reading/writing, and a clear verification step. The guidance is specific and directly usable."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The workflow is clearly sequenced: container starts → runner injects checkpoint → agent reads it → agent resumes work. The update workflow includes an explicit validation step (read back and confirm format). The different states (checkpoint present vs absent) are clearly distinguished."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "For a reference-only skill under 50 lines, the content is well-organized into logical sections (what it does, format, when present, updating, no checkpoint). No external references are needed and the structure supports quick scanning."
+        }
+      },
+      "overall_assessment": "This is a well-crafted reference skill that is concise, actionable, and clearly structured. It provides exactly the information needed to understand and debug the session reentry mechanism without over-explaining. The concrete example of resuming from a checkpoint and the verification step for updates are particularly strong.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 119 (<= 500)",
+        "details": {
+          "line_count": 119,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'twitter-algorithm-optimizer'",
+        "details": {
+          "value": "twitter-algorithm-optimizer",
+          "length": 27
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (448 chars)",
+        "details": {
+          "length": 448
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 5232
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "twitter-algorithm-optimizer",
+    "skillDescription": "Analyzes and optimizes tweets for maximum reach using Twitter's open-source algorithm insights. Rewrites tweet drafts, suggests hashtag placement, adjusts posting timing recommendations, restructures content into thread format, and scores tweets against key engagement signals. Use when optimizing tweet drafts, understanding underperformance, rewriting tweets for better engagement, restructuring content as threads, or improving content strategy."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: rewrites tweet drafts, suggests hashtag placement, adjusts posting timing recommendations, restructures content into thread format, and scores tweets against key engagement signals."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural keywords users would say: 'tweets', 'tweet drafts', 'hashtag', 'posting timing', 'thread format', 'engagement', 'underperformance', 'content strategy', and 'Twitter'. These cover a wide range of how users would naturally phrase requests."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (analyzes/optimizes tweets, rewrites drafts, suggests hashtags, adjusts timing, restructures threads, scores engagement) and 'when' with an explicit 'Use when...' clause listing five specific trigger scenarios."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche focused specifically on Twitter/tweet optimization using algorithm insights. The combination of Twitter-specific terminology (tweets, threads, hashtags, engagement signals) makes it unlikely to conflict with general content or social media skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly articulates specific capabilities, includes natural trigger terms users would use, explicitly states both what the skill does and when to use it, and occupies a distinct niche. It follows third-person voice throughout and avoids vague language or buzzwords.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The content is reasonably well-organized but includes some unnecessary explanation (e.g., describing what each algorithm model does at a conceptual level that Claude already understands). The 'Common Pitfalls' and 'Best Practices' sections are somewhat generic. However, the templates and examples are efficient and earn their place."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides concrete tweet templates with specific formats, before/after examples with clear explanations, a scoring checklist, and copy-paste-ready tweet structures. The guidance is specific and immediately usable rather than abstract."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 5-step optimization process is clearly sequenced, culminating in an explicit validation checklist (Step 5) with a feedback loop ('If any box is unchecked, return to Steps 2–3'). This is a well-structured workflow with clear checkpoints for a non-destructive creative task."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-structured with clear headers and sections, but it's a fairly long monolithic document (~150+ lines) with no references to external files. The templates, examples, and algorithm details could be split into separate reference files with the SKILL.md serving as a concise overview."
+        }
+      },
+      "overall_assessment": "This is a solid, actionable skill with clear workflow steps, concrete templates, and useful before/after examples. Its main weakness is length — the content could benefit from splitting detailed sections (templates, algorithm models, examples) into separate reference files, and trimming some explanatory text that Claude doesn't need. The validation checklist with feedback loop is a strong feature.",
+      "suggestions": [
+        "Move the 'Tweet Templates by Goal' and 'Before/After Examples' sections into separate reference files (e.g., TEMPLATES.md, EXAMPLES.md) and link to them from the main skill to improve progressive disclosure.",
+        "Trim the Core Algorithm Models section to just the actionable implication per model (e.g., 'Real-graph: optimize for followers who already engage with you') without explaining what the model does conceptually."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

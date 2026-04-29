@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 109 (<= 500)",
+        "details": {
+          "line_count": 109,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'nanoclaw-reflect'",
+        "details": {
+          "value": "nanoclaw-reflect",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (396 chars)",
+        "details": {
+          "length": 396
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4536
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "nanoclaw-reflect",
+    "skillDescription": "Self-learning system for NanoClaw that captures user corrections and feedback from Telegram conversations, parses actionable learnings, and appends them to CLAUDE.md configuration files. Use when the user corrects Claude's behavior, says 'remember this', 'don't do that again', 'learn from this mistake', 'always do X', 'never do Y', or asks Claude to update its preferences for future responses."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: captures user corrections and feedback, parses actionable learnings, appends them to CLAUDE.md configuration files. Also specifies the source (Telegram conversations) and the system name (NanoClaw)."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural trigger phrases users would actually say: 'remember this', 'don't do that again', 'learn from this mistake', 'always do X', 'never do Y', 'update its preferences'. These are highly natural and varied."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (captures corrections, parses learnings, appends to CLAUDE.md) and 'when' with an explicit 'Use when...' clause listing specific trigger scenarios and phrases."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: self-learning from Telegram conversations for NanoClaw, writing to CLAUDE.md files. The specific trigger phrases ('remember this', 'learn from this mistake') and the specific system context make it very unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly communicates what the skill does (captures corrections, parses learnings, updates CLAUDE.md), when to use it (with explicit trigger phrases), and for what system (NanoClaw/Telegram). It uses third-person voice consistently and provides rich, natural trigger terms that users would actually say.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is mostly efficient but includes some unnecessary verbosity. The examples table and multiple acknowledgement examples add useful clarity, but the content could be tightened—e.g., the 'When to Use' section lists patterns that could be more compact, and some explanations are slightly over-detailed for Claude's capabilities."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "The skill provides highly concrete, actionable guidance: exact formatting templates with date stamps, specific file paths, precise section names to locate/create in CLAUDE.md, and clear examples of input-to-output transformations. Every step tells Claude exactly what to do."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 5-step workflow is clearly sequenced with explicit validation in Step 4 (read back, confirm entry, check valid Markdown) and error handling (report failures, don't silently drop). The edge cases section adds feedback loops for conflicts and ambiguity. This is a well-structured workflow with proper checkpoints."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-organized with clear sections and headers, but it's a moderately long single file (~80+ lines of content) with no references to external files. The examples table and edge cases could potentially be split out, though for this skill's complexity it's borderline acceptable as a single document."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill with excellent actionability and workflow clarity. The 5-step process is clearly sequenced with proper validation, conflict handling, and edge case coverage. The main weakness is slight verbosity—some sections could be tightened given Claude's existing capabilities—and the content is entirely self-contained without leveraging progressive disclosure to external references, though this is a minor issue for a skill of this size.",
+      "suggestions": [
+        "Tighten the 'When to Use' section by consolidating the detection patterns into a more compact format rather than listing categories with sub-examples.",
+        "Consider whether the acknowledgement examples in Step 5 are necessary—Claude already knows how to write brief natural confirmations, so a single example or just the instruction would suffice."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

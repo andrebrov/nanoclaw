@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 86
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 75 (<= 500)",
+        "details": {
+          "line_count": 75,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'deep-research'",
+        "details": {
+          "value": "deep-research",
+          "length": 13
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (268 chars)",
+        "details": {
+          "length": 268
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2094
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "deep-research",
+    "skillDescription": "Runs autonomous deep research tasks using Google Gemini that plan, search, read, and synthesize information into comprehensive reports. Use for market analysis, competitive landscaping, technical literature reviews, due diligence, or any request for thorough research."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'plan, search, read, and synthesize information into comprehensive reports' and names specific use cases like 'market analysis, competitive landscaping, technical literature reviews, due diligence'."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes strong natural trigger terms users would say: 'deep research', 'market analysis', 'competitive landscaping', 'technical literature reviews', 'due diligence', 'thorough research', and 'comprehensive reports'. These cover a good range of how users would phrase research requests."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('runs autonomous deep research tasks using Google Gemini that plan, search, read, and synthesize information into comprehensive reports') and when ('Use for market analysis, competitive landscaping, technical literature reviews, due diligence, or any request for thorough research')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Clearly distinct due to the specific mention of 'Google Gemini', 'autonomous deep research', and the enumerated research domains. The combination of tool (Gemini) and task type (deep research with planning/searching/synthesizing) creates a clear niche unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly communicates what the skill does (autonomous deep research via Google Gemini with planning, searching, reading, and synthesizing), when to use it (market analysis, competitive landscaping, literature reviews, due diligence, thorough research), and is distinctive enough to avoid conflicts. It uses proper third-person voice and includes natural trigger terms users would employ when requesting research tasks.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "Mostly efficient but includes some unnecessary content like the 'When to Use' section which lists obvious use cases Claude could infer, and the Requirements section explaining Python version needs. The cost/time table is useful context though."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable CLI commands with concrete flags and arguments for every operation (start, stream, status, wait, continue). Commands are copy-paste ready with clear paths and options."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The workflow section at the end provides a clear sequence, but lacks validation checkpoints—there's no guidance on what to do if the script fails, if the API key is invalid, if the task times out, or how to verify output quality before returning to the user."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "Content is reasonably organized with clear sections, but everything is inline in one file. The script path reference is good, but there's no linking to additional documentation for the script's full options, error handling, or advanced configuration that likely exists."
+        }
+      },
+      "overall_assessment": "A solid, actionable skill with clear CLI examples that are copy-paste ready. Main weaknesses are the lack of error handling/validation steps in the workflow (what if the API call fails, times out, or returns poor results?) and some unnecessary verbosity in the 'When to Use' and 'Requirements' sections. The workflow would benefit from explicit checkpoints for common failure modes.",
+      "suggestions": [
+        "Add error handling guidance to the workflow: what to do if the API key is missing/invalid, if the task times out, or if the response is incomplete—this would improve workflow clarity significantly.",
+        "Remove or condense the 'When to Use' section since Claude can infer appropriate use cases from the description; fold any non-obvious triggers into a single line.",
+        "Add a brief troubleshooting or validation step (e.g., checking exit codes, verifying output is non-empty) before returning results to the user."
+      ]
+    },
+    "weightedScore": 2.3,
+    "normalizedScore": 0.6499999999999999
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 92
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 82 (<= 500)",
+        "details": {
+          "line_count": 82,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'crm-manager'",
+        "details": {
+          "value": "crm-manager",
+          "length": 11
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (238 chars)",
+        "details": {
+          "length": 238
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2998
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "crm-manager",
+    "skillDescription": "Manages Attio CRM data - search contacts, add records, create notes, update lists, and sync data between Attio and outreach files. Use when the user asks to find someone in CRM, add leads, check pipeline status, or sync research with CRM."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: 'search contacts, add records, create notes, update lists, and sync data between Attio and outreach files.' These are clear, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'CRM', 'contacts', 'leads', 'pipeline status', 'sync', 'find someone in CRM', 'add leads', 'Attio'. Good coverage of terms a user would naturally use when needing CRM-related help."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both what ('search contacts, add records, create notes, update lists, sync data') and when ('Use when the user asks to find someone in CRM, add leads, check pipeline status, or sync research with CRM') with explicit trigger guidance."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive due to the specific product name 'Attio CRM' and domain-specific triggers like 'pipeline status', 'leads', 'outreach files'. Unlikely to conflict with non-CRM skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly identifies the tool (Attio CRM), lists specific capabilities, and provides explicit 'Use when' triggers with natural user language. It follows the recommended pattern closely and uses third-person voice throughout. The description is concise yet comprehensive, making it easy for Claude to select this skill appropriately.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The content is lean and efficient. Every section serves a purpose — command reference is copy-paste ready, patterns are concise step lists, and there's no explanation of what a CRM is or how Attio works. Every token earns its place."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Commands are fully executable with concrete syntax, real JSON payloads, and specific file paths. The find-or-create pattern gives a clear step-by-step with actual commands at each step. Copy-paste ready throughout."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "The find-or-create workflow is clearly sequenced and includes a duplicate-prevention check, but the 'Add Prospect Research to CRM' workflow lacks explicit validation/verification between steps. The verification checklist at the end is good but is a post-hoc checklist rather than inline validation checkpoints during the multi-step processes."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-organized with clear sections and headers, but everything is inline in a single file. The cross-reference sections with file paths and Granola integration could be split into separate reference files. For the length (~80 lines), it's borderline acceptable but the Granola integration and file path references feel like they could be better organized as linked references."
+        }
+      },
+      "overall_assessment": "This is a strong, actionable skill with excellent command reference documentation and concrete patterns. Its main weaknesses are the lack of inline validation checkpoints within multi-step workflows (particularly the prospect research flow) and the opportunity to better organize cross-references into separate files. The conciseness and actionability are exemplary — it respects Claude's intelligence and provides copy-paste ready commands throughout.",
+      "suggestions": [
+        "Add explicit validation steps within the 'Add Prospect Research to CRM' workflow (e.g., verify record was created successfully before adding notes, confirm note was attached).",
+        "Consider extracting the file paths and Granola cross-reference patterns into a separate reference file (e.g., INTEGRATIONS.md) to keep the main skill focused on core CRM operations."
+      ]
+    },
+    "weightedScore": 2.5999999999999996,
+    "normalizedScore": 0.7999999999999998
+  }
+}

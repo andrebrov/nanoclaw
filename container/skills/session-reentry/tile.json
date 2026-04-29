@@ -1,0 +1,11 @@
+{
+  "name": "finsi/session-reentry",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "**Trigger:** `/session-reentry`",
+  "skills": {
+    "session-reentry": {
+      "path": "SKILL.md"
+    }
+  }
+}

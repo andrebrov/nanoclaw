@@ -1,0 +1,153 @@
+{
+  "review": {
+    "reviewScore": 86
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 59 (<= 500)",
+        "details": {
+          "line_count": 59,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'event-prep'",
+        "details": {
+          "value": "event-prep",
+          "length": 10
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (262 chars)",
+        "details": {
+          "length": 262
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 2234
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "event-prep",
+    "skillDescription": "Prepares for conferences, podcasts, or webinars - researches attendees/hosts, builds talking points, creates networking briefs, and drafts follow-up templates. Use when the user mentions an upcoming event or asks to prepare for a conference, podcast, or webinar."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: researches attendees/hosts, builds talking points, creates networking briefs, and drafts follow-up templates. These are clear, actionable capabilities."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'conferences', 'podcasts', 'webinars', 'upcoming event', 'prepare', 'attendees', 'talking points', 'networking', 'follow-up'. Good coverage of terms a user would naturally use when requesting event preparation help."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (researches attendees/hosts, builds talking points, creates networking briefs, drafts follow-up templates) and 'when' (explicit 'Use when the user mentions an upcoming event or asks to prepare for a conference, podcast, or webinar')."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Occupies a clear niche around event/conference preparation with distinct triggers (conferences, podcasts, webinars, networking briefs). Unlikely to conflict with general research or writing skills due to the specific event-preparation framing."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific capabilities, includes natural trigger terms, and explicitly states both what the skill does and when to use it. It follows the recommended pattern closely, uses third person voice, and carves out a distinct niche around event preparation that minimizes conflict risk with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 3,
+          "reasoning": "The skill is lean and efficient. It doesn't explain what conferences or podcasts are, assumes Claude understands the concepts, and every section serves a clear purpose. No unnecessary padding or explanations of obvious concepts."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "Provides specific tool commands (composio-tool, mcp__granola__get_meetings) and concrete file paths, which is good. However, the guidance is still somewhat high-level — 'Research the event, speakers, and attendees via web search' and 'Score attendees against ICP' lack concrete examples of what the output should look like or specific scoring criteria. No example output formats for the generated files."
+        },
+        "workflow_clarity": {
+          "score": 2,
+          "reasoning": "Steps are clearly sequenced for each event type, and there's a verification checklist at the end. However, there are no validation checkpoints within the workflows — for example, no step to verify web search results before proceeding, no feedback loop if CRM lookups fail, and no guidance on what to do when attendee information is incomplete or unavailable."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "References external context files (voice-and-tone.md, icp.md) which is good, but the skill itself is somewhat monolithic — the conference, podcast, webinar, and post-event sections could potentially be split into separate referenced files. The structure is reasonable for the length but the four distinct workflows inline make it dense."
+        }
+      },
+      "overall_assessment": "This is a well-structured event prep skill that efficiently covers multiple event types with specific tool commands and file paths. Its main weaknesses are the lack of concrete output examples (what should attendees.md or talking-points.md actually look like?) and missing validation/feedback loops within the workflows. The skill would benefit from example outputs and error handling guidance.",
+      "suggestions": [
+        "Add a brief example of what a completed attendees.md or talking-points.md entry looks like, so Claude knows the expected output format and level of detail.",
+        "Add validation checkpoints within workflows, e.g., 'If no CRM record found, note as new contact and rely on web research only' or 'Verify at least 3 sources before finalizing attendee brief.'",
+        "Include a concrete example of ICP scoring criteria or reference how icp.md should be applied (e.g., 'Score 1-5 based on ICP fit: 5 = exact match, 1 = no fit')."
+      ]
+    },
+    "weightedScore": 2.3,
+    "normalizedScore": 0.6499999999999999
+  }
+}

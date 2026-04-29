@@ -1,0 +1,149 @@
+{
+  "review": {
+    "reviewScore": 94
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 127 (<= 500)",
+        "details": {
+          "line_count": 127,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'budget-optimizer'",
+        "details": {
+          "value": "budget-optimizer",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (471 chars)",
+        "details": {
+          "length": 471
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4474
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "budget-optimizer",
+    "skillDescription": "Recommends optimal budget allocation across campaigns and platforms based on ROAS, CAC, and growth potential. Provides specific dollar amounts to shift and expected revenue impact. Use when the user asks about reallocating marketing budget, optimizing ad spend, improving campaign ROI, or where to spend more — e.g., 'How should I allocate my ad budget?', 'Where should I shift spend?', 'Help me optimize my marketing budget', or 'Which campaigns should get more budget?'"
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: recommends optimal budget allocation, provides specific dollar amounts to shift, and expected revenue impact. Also names concrete metrics (ROAS, CAC, growth potential) and domains (campaigns, platforms)."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural user phrases: 'reallocating marketing budget', 'optimizing ad spend', 'improving campaign ROI', 'where to spend more', plus four concrete example queries users would naturally say like 'How should I allocate my ad budget?' and 'Which campaigns should get more budget?'"
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (recommends budget allocation, provides dollar amounts and revenue impact) and 'when' (explicit 'Use when...' clause with multiple trigger scenarios and example user queries)."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive niche focused specifically on marketing budget allocation across campaigns/platforms with specific metrics (ROAS, CAC). Unlikely to conflict with general analytics or other marketing skills due to the precise focus on budget reallocation and spend optimization."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that hits all the marks. It provides specific concrete actions (budget allocation recommendations with dollar amounts and revenue impact), includes rich natural trigger terms with example user queries, and clearly delineates both what the skill does and when to use it. The description is well-scoped to a distinct niche that minimizes conflict risk with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The content is mostly efficient and avoids explaining basic concepts, but some sections could be tightened — e.g., the inputs section lists somewhat obvious optional parameters, and the decision logic section partially repeats tiering criteria already covered in Step 2."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides highly specific, concrete guidance: exact thresholds (ROAS > 4.0x, CAC < $50), dollar amounts ($500/day max per move, $50/day minimum), percentage constraints (20% test budget), specific file paths, output formats, and a Telegram message template. This is copy-paste ready for execution."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The 8-step workflow is clearly sequenced with explicit validation gates (creative freshness checks before scaling, 7-day learning phase exceptions, hard constraints). The tiering system provides clear decision criteria, and the scenario modeling step serves as a validation checkpoint before generating the final plan."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "Cleanly references external files (decision-framework.md for full tiering criteria, config.json, CSV data files, budget-plan-template.md) at one level deep with clear signaling. The SKILL.md provides a working summary while pointing to detailed resources, and content is well-organized into logical sections."
+        }
+      },
+      "overall_assessment": "This is a strong, well-structured skill that provides highly actionable budget optimization guidance with specific thresholds, dollar amounts, and constraints. The 8-step workflow is clearly sequenced with appropriate validation gates (creative freshness scoring, learning phase preservation). Minor verbosity in the decision logic section (partially duplicating tiering criteria) and inputs section prevents a perfect conciseness score, but overall the content is efficient and well-organized.",
+      "suggestions": []
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  }
+}

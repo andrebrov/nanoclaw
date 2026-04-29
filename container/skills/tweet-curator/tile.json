@@ -1,0 +1,11 @@
+{
+  "name": "finsi/tweet-curator",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Finds tweets about e-commerce, DTC brands, and physical subscription businesses that Andrei can engage with to build his X presence. Runs every 15 minutes, surfaces engagement opportunities with suggested reply angles.",
+  "skills": {
+    "tweet-curator": {
+      "path": "SKILL.md"
+    }
+  }
+}

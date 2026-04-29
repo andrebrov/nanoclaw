@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 94
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 152 (<= 500)",
+        "details": {
+          "line_count": 152,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'outreach-manager'",
+        "details": {
+          "value": "outreach-manager",
+          "length": 16
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (241 chars)",
+        "details": {
+          "length": 241
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 8065
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "outreach-manager",
+    "skillDescription": "Generates personalized cold outreach emails and follow-up sequences for leads, or manages the status of existing outreach campaigns. Use when the user asks to write cold emails, generate outreach for leads, or check outreach pipeline status."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: generates personalized cold outreach emails, generates follow-up sequences for leads, and manages the status of existing outreach campaigns."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes natural keywords users would say: 'cold emails', 'outreach', 'leads', 'follow-up sequences', 'outreach pipeline status'. These are terms a user would naturally use when requesting this type of work."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (generates cold outreach emails, follow-up sequences, manages outreach campaign status) and 'when' with an explicit 'Use when' clause listing specific triggers like writing cold emails, generating outreach for leads, or checking pipeline status."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "The description carves out a clear niche around cold outreach emails, lead-based follow-up sequences, and outreach pipeline management. The combination of 'cold outreach', 'leads', and 'pipeline status' makes it highly distinct and unlikely to conflict with general email or writing skills."
+        }
+      },
+      "overall_assessment": "This is a strong skill description that clearly articulates specific capabilities (cold email generation, follow-up sequences, campaign status management), includes natural trigger terms users would employ, and provides an explicit 'Use when' clause. It is well-scoped to a distinct niche, minimizing conflict risk with other skills.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is quite long (~150+ lines) with some redundancy — the proof-matching rules appear in Hard Rules and are implicitly repeated in the process section. The follow-up timing is inconsistent between the Process section (Day 3-4, 8-10, 14-16, 21-28) and the Output Format (Day 2-3, 6-7, 14-16), which adds confusion rather than value. However, most content is domain-specific knowledge Claude wouldn't have (proof library mappings, specific tool commands, Andrei's voice), so the bulk earns its place."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Highly actionable with specific file paths, exact CLI commands (composio-tool gmail, composio-tool attio), concrete word count targets (80-110), specific proof point codes (CS-1 through CS-6), exact scoring rubric (42/60 threshold), and a complete output format template. Claude can execute this end-to-end without ambiguity."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "The multi-step process is clearly sequenced (read leads → read proof library → check research → research if needed → check intent signals → draft sequences → tag frameworks → save). The copy-feedback quality gate serves as an explicit validation checkpoint with a numeric threshold and auto-fix patterns. The verification checklist at the end provides a comprehensive final validation loop. The inconsistent follow-up timing between sections is a minor flaw but doesn't undermine the overall workflow clarity."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "The skill clearly references 6 external context files with exact paths and importance annotations (CRITICAL tags), keeping the SKILL.md as an operational overview. Content is well-organized into logical sections (When to Use, Context Files, Critical Rules, Process, Output Format, Quality Gate, Verification) with no deeply nested references."
+        }
+      },
+      "overall_assessment": "This is a strong, highly actionable skill that provides Claude with domain-specific knowledge it wouldn't otherwise have — specific proof point mappings, tool commands, tone rules, and quality gates. The workflow is well-structured with clear validation checkpoints. The main weakness is some redundancy and an inconsistency in follow-up timing between the Process and Output Format sections, which could confuse execution.",
+      "suggestions": [
+        "Reconcile the follow-up timing inconsistency: Process section says Day 3-4, 8-10, 14-16, 21-28 while Output Format says Day 2-3, 6-7, 14-16 — pick one and use it consistently.",
+        "The Process section has two items numbered '6' — renumber and consider consolidating the proof-matching guidance that appears in both Hard Rules (#8) and the Process to reduce redundancy."
+      ]
+    },
+    "weightedScore": 2.7,
+    "normalizedScore": 0.8500000000000001
+  }
+}

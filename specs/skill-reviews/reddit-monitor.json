@@ -1,0 +1,152 @@
+{
+  "review": {
+    "reviewScore": 90
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 99 (<= 500)",
+        "details": {
+          "line_count": 99,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'reddit-monitor'",
+        "details": {
+          "value": "reddit-monitor",
+          "length": 14
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (552 chars)",
+        "details": {
+          "length": 552
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 4192
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "reddit-monitor",
+    "skillDescription": "Monitors r/dtc, r/shopify, and r/ecommerce subreddits daily to surface discussions relevant to Finsi. Fetches top and new posts, filters for relevance (churn, retention, subscriptions, LTV, analytics tools), summarizes key threads, highlights competitor mentions, flags engagement opportunities, and sends a structured Telegram digest. Use when asked for a Reddit digest, community insights, ecommerce trend summaries, social listening updates, or to find out what DTC and Shopify communities are discussing around retention, churn, or analytics tools."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: fetches top and new posts, filters for relevance with named criteria (churn, retention, subscriptions, LTV, analytics tools), summarizes key threads, highlights competitor mentions, flags engagement opportunities, and sends a structured Telegram digest."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Includes a rich set of natural keywords users would say: 'Reddit digest', 'community insights', 'ecommerce trend summaries', 'social listening updates', 'DTC', 'Shopify', 'retention', 'churn', 'analytics tools', plus specific subreddit names. These cover a wide range of natural user phrasings."
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what does this do' (monitors subreddits, fetches posts, filters, summarizes, highlights competitors, flags opportunities, sends Telegram digest) AND 'when should Claude use it' with an explicit 'Use when...' clause listing multiple trigger scenarios."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche: Reddit monitoring specifically for DTC/Shopify/ecommerce subreddits, focused on Finsi-relevant topics, with Telegram digest output. The combination of specific subreddits, domain (retention/churn/LTV), brand (Finsi), and output format (Telegram) makes it very unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that clearly articulates specific actions, provides comprehensive trigger terms, explicitly states both what the skill does and when to use it, and occupies a highly distinctive niche. The description is detailed yet well-organized, covering the full pipeline from data fetching to delivery, with relevant domain keywords that users would naturally use.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "The skill is mostly efficient and well-structured, but includes some unnecessary detail that Claude could infer (e.g., the full relevance scoring table with Medium/Low categories that just say 'skip' or 'if interesting', and the detailed explanation of what constitutes engagement opportunities). The error handling specifics and Telegram format template earn their place, but overall it could be tightened by ~20%."
+        },
+        "actionability": {
+          "score": 3,
+          "reasoning": "Provides fully executable curl commands with specific endpoints, headers, and parameters. The relevance scoring table gives concrete topic lists, the Telegram output format is copy-paste ready, and each step has specific instructions including error handling behaviors and thresholds (e.g., '5+ comments', 'top 3-5 comments', 'wait 60 seconds')."
+        },
+        "workflow_clarity": {
+          "score": 3,
+          "reasoning": "Clear 5-step sequential workflow with explicit error handling at each API call step (429 handling, 5xx handling, malformed JSON). Includes validation checkpoints (check HTTP status on every request), feedback loops (retry once on rate limit), and graceful degradation (skip subreddit, note in digest). The workflow handles failure modes explicitly rather than just the happy path."
+        },
+        "progressive_disclosure": {
+          "score": 2,
+          "reasoning": "The content is well-organized with clear headers and numbered steps, but it's a fairly long monolithic document (~100 lines of substantive content). The relevance scoring table and the Telegram template format could potentially be split into referenced files. However, for a single-purpose skill, keeping everything inline is defensible — it just pushes the boundary of what should stay in one file."
+        }
+      },
+      "overall_assessment": "This is a well-crafted skill with strong actionability and workflow clarity — the curl commands are executable, error handling is explicit, and the 5-step process is clearly sequenced with validation at each API interaction. The main weakness is moderate verbosity: the relevance table and engagement opportunity descriptions could be more concise, and the overall length pushes toward needing progressive disclosure into separate files. The Telegram output template is a strong inclusion that makes the expected output unambiguous.",
+      "suggestions": [
+        "Tighten the relevance table by removing the 'Low' row (Claude can infer what to skip from what's included) and condensing the 'Medium' row into a single line.",
+        "Consider extracting the Telegram digest template and the relevance scoring criteria into a referenced file (e.g., REDDIT_MONITOR_TEMPLATES.md) to keep the main skill leaner."
+      ]
+    },
+    "weightedScore": 2.55,
+    "normalizedScore": 0.7749999999999999
+  }
+}

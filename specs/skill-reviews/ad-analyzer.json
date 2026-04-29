@@ -1,0 +1,154 @@
+{
+  "review": {
+    "reviewScore": 78
+  },
+  "validation": {
+    "checks": [
+      {
+        "name": "skill_md_line_count",
+        "status": "passed",
+        "message": "SKILL.md line count is 41 (<= 500)",
+        "details": {
+          "line_count": 41,
+          "max_lines": 500
+        }
+      },
+      {
+        "name": "frontmatter_valid",
+        "status": "passed",
+        "message": "YAML frontmatter is valid",
+        "details": {
+          "keys": [
+            "name",
+            "description"
+          ]
+        }
+      },
+      {
+        "name": "name_field",
+        "status": "passed",
+        "message": "'name' field is valid: 'ad-analyzer'",
+        "details": {
+          "value": "ad-analyzer",
+          "length": 11
+        }
+      },
+      {
+        "name": "description_field",
+        "status": "passed",
+        "message": "'description' field is valid (469 chars)",
+        "details": {
+          "length": 469
+        }
+      },
+      {
+        "name": "compatibility_field",
+        "status": "passed",
+        "message": "'compatibility' field not present (optional)"
+      },
+      {
+        "name": "allowed_tools_field",
+        "status": "passed",
+        "message": "'allowed-tools' field not present (optional)"
+      },
+      {
+        "name": "metadata_version",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "metadata_field",
+        "status": "passed",
+        "message": "'metadata' field not present (optional)"
+      },
+      {
+        "name": "license_field",
+        "status": "passed",
+        "message": "'license' field not present (optional)"
+      },
+      {
+        "name": "frontmatter_unknown_keys",
+        "status": "passed",
+        "message": "No unknown frontmatter keys found"
+      },
+      {
+        "name": "body_present",
+        "status": "passed",
+        "message": "SKILL.md body is present",
+        "details": {
+          "body_chars": 1368
+        }
+      }
+    ],
+    "overallPassed": true,
+    "errorCount": 0,
+    "warningCount": 0,
+    "skillName": "ad-analyzer",
+    "skillDescription": "Analyzes ad campaign performance across Meta, Google, and TikTok. Identifies top performers to scale, underperformers to pause, budget reallocation opportunities, and creative fatigue signals. Use when the user asks about ad performance, campaign optimization, ROAS, CPA, CTR, ad spend, or paid media analysis — e.g. 'How are my Facebook ads performing?', 'What campaigns should I pause?', 'Where should I reallocate my advertising budget?', 'Check my Google Ads ROAS'."
+  },
+  "descriptionJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "specificity": {
+          "score": 3,
+          "reasoning": "Lists multiple specific concrete actions: analyzes ad campaign performance, identifies top performers to scale, underperformers to pause, budget reallocation opportunities, and creative fatigue signals across named platforms (Meta, Google, TikTok)."
+        },
+        "trigger_term_quality": {
+          "score": 3,
+          "reasoning": "Excellent coverage of natural terms users would say: 'ad performance', 'campaign optimization', 'ROAS', 'CPA', 'CTR', 'ad spend', 'paid media analysis', 'Facebook ads', 'Google Ads', plus natural language examples like 'How are my Facebook ads performing?' and 'What campaigns should I pause?'"
+        },
+        "completeness": {
+          "score": 3,
+          "reasoning": "Clearly answers both 'what' (analyzes ad campaign performance, identifies top/underperformers, budget reallocation, creative fatigue) and 'when' with an explicit 'Use when...' clause listing trigger terms and concrete user query examples."
+        },
+        "distinctiveness_conflict_risk": {
+          "score": 3,
+          "reasoning": "Highly distinctive with a clear niche in paid advertising campaign analysis across specific platforms. The combination of platform names (Meta, Google, TikTok), advertising-specific metrics (ROAS, CPA, CTR), and specific actions (pause, scale, reallocate budget) makes it very unlikely to conflict with other skills."
+        }
+      },
+      "overall_assessment": "This is an excellent skill description that hits all the marks. It provides specific concrete actions, names the platforms it covers, includes a comprehensive set of natural trigger terms and metrics, and provides illustrative user query examples. The explicit 'Use when...' clause with both keyword triggers and example phrases makes it highly effective for skill selection.",
+      "suggestions": []
+    },
+    "weightedScore": 3,
+    "normalizedScore": 1
+  },
+  "contentJudge": {
+    "judgeConfig": {
+      "model": "anthropic/claude-opus-4-6"
+    },
+    "success": true,
+    "evaluation": {
+      "scores": {
+        "conciseness": {
+          "score": 2,
+          "reasoning": "Mostly efficient but includes some unnecessary explanation (e.g., listing standard export columns that Claude could infer, and the description at the top repeats the YAML description). The file paths and config loading are useful, but some tightening is possible."
+        },
+        "actionability": {
+          "score": 2,
+          "reasoning": "Provides concrete bash commands for loading config and listing data files, and references specific file paths and metric names. However, the content appears truncated mid-sentence (Step 2 cuts off), and there are no executable code examples for the actual analysis logic (metric calculations, decision-making). Key steps are missing or incomplete."
+        },
+        "workflow_clarity": {
+          "score": 1,
+          "reasoning": "The workflow is incomplete — it cuts off at Step 2 mid-sentence, so the full analysis sequence is missing. There are no validation checkpoints, no feedback loops for error handling, and no clear end-to-end process. For a multi-step analytical workflow involving data parsing and strategic recommendations, this is insufficient."
+        },
+        "progressive_disclosure": {
+          "score": 3,
+          "reasoning": "Good use of progressive disclosure: the skill provides a clear overview and points to separate framework files (decision-framework.md, metrics-definitions.md), config, and data directories as one-level-deep references. Navigation is well-signaled with numbered core files."
+        }
+      },
+      "overall_assessment": "The skill has a solid structural foundation with good progressive disclosure to external framework files and clear file path references. However, the content is critically incomplete — it cuts off mid-Step 2, leaving the actual analysis workflow, decision-making logic, output format, and validation steps entirely missing. Without the complete workflow, this skill cannot guide Claude through the full ad performance audit.",
+      "suggestions": [
+        "Complete the full workflow: add remaining steps for metric calculation, applying decision framework thresholds, generating recommendations, and producing the final output format.",
+        "Add validation checkpoints — e.g., verify data file columns match expected schema before analysis, confirm metric calculations against known values, and validate that recommendations align with config thresholds.",
+        "Include a concrete example of expected output (e.g., a summary table of campaigns with ROAS, action recommendation, and budget reallocation amounts) so Claude knows the target deliverable.",
+        "Add error handling guidance for common issues: missing data files, incomplete CSV columns, mismatched date ranges across platforms."
+      ]
+    },
+    "weightedScore": 1.9,
+    "normalizedScore": 0.44999999999999996
+  }
+}
