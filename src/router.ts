@@ -19,6 +19,7 @@
  */
 import { getChannelAdapter } from './channels/channel-registry.js';
 import { gateCommand } from './command-gate.js';
+import { checkInboundRateLimit } from './inbound-rate-limiter.js';
 import { getAgentGroup, getAgentGroupByFolder } from './db/agent-groups.js';
 import { getDb } from './db/connection.js';
 import { recordDroppedMessage } from './db/dropped-messages.js';
@@ -313,6 +314,25 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
         platformId: event.platformId,
       });
     }
+    return;
+  }
+
+  // 2a. Rate limit: token-bucket per messaging group. Applies to chat messages
+  //     only — scheduled tasks bypass routeInbound entirely (host-sweep writes
+  //     them directly to the session DB) so they are naturally exempt.
+  const rl = checkInboundRateLimit(mg.id, mg.inbound_rate_limit ?? null);
+  if (!rl.allowed) {
+    if (rl.firstDrop) {
+      void adapter
+        ?.deliver(event.platformId, event.threadId, {
+          kind: 'chat',
+          content: {
+            text: 'Too many messages — I am temporarily pausing responses for this chat. Please wait a moment before sending more.',
+          },
+        })
+        .catch((err) => log.warn('rate-limit notice delivery failed', { messagingGroupId: mg.id, err }));
+    }
+    log.debug('Message dropped — inbound rate limit', { messagingGroupId: mg.id, firstDrop: rl.firstDrop });
     return;
   }
 

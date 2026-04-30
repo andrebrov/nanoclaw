@@ -27,6 +27,12 @@ export interface MessagingGroup {
    * the column itself defaults to NULL in SQLite.
    */
   denied_at?: string | null;
+  /**
+   * Max inbound messages per minute for this group. Null means unlimited.
+   * Enforced host-side by a token bucket before messages reach agents.
+   * Scheduled tasks (written directly by host-sweep) are exempt.
+   */
+  inbound_rate_limit?: number | null;
   created_at: string;
 }
 
