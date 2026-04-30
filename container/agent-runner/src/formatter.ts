@@ -99,21 +99,31 @@ export interface RoutingContext {
  * Replying into topic A leaves topic B silent; replying into topic B (the most
  * recent context) at least lands the answer where the user is currently looking.
  *
- * inReplyTo uses the FIRST trigger=1 message (the message that specifically
- * addressed/woke the agent), not the last message overall. In a busy multi-bot
- * group chat, subsequent bot messages can accumulate after the triggering
- * @-mention before the agent runs; threading the reply to the last message
- * would attach the response to a different bot's message rather than to the
- * one that actually prompted this response.
+ * inReplyTo uses the LAST trigger=1 message in the batch — i.e. the most
+ * recent thing the user said that engaged the agent. Earlier behaviour
+ * threaded to the FIRST trigger to avoid attaching to interleaved bot
+ * messages, but in practice users send multiple messages before the agent
+ * wakes; threading to the first one (which can be minutes old) feels like
+ * the bot is replying to a random earlier message. The last-trigger choice
+ * is what matches user expectation in normal chat. Bot/system messages are
+ * filtered out by trigger=1 already (router only sets trigger on
+ * engagement-passing inbound), so the multi-bot worry doesn't actually
+ * apply here.
  */
 export function extractRouting(messages: MessageInRow[]): RoutingContext {
   const last = messages[messages.length - 1];
-  const firstTrigger = messages.find((m) => m.trigger === 1);
+  let lastTrigger: MessageInRow | undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].trigger === 1) {
+      lastTrigger = messages[i];
+      break;
+    }
+  }
   return {
     platformId: last?.platform_id ?? null,
     channelType: last?.channel_type ?? null,
     threadId: last?.thread_id ?? null,
-    inReplyTo: firstTrigger?.id ?? last?.id ?? null,
+    inReplyTo: lastTrigger?.id ?? last?.id ?? null,
   };
 }
 

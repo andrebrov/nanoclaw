@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
+import { buildSourceChatBlock, findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
@@ -236,11 +236,23 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
         ? (id: string) => setSeriesContinuation(config.providerName, batchSeriesId, id)
         : (id: string) => setContinuation(config.providerName, id);
 
+    // Per-turn source-chat block tells the agent which chat triggered this
+    // batch. Without it, agents juggling multi-chat workflows confuse the
+    // current trigger with task notes from an earlier conversation in a
+    // different chat (e.g. routing replies to a DM destination from a
+    // group-chat trigger).
+    const sourceBlock = buildSourceChatBlock(routing);
+    const turnSystemContext = sourceBlock
+      ? {
+          ...config.systemContext,
+          instructions: [config.systemContext?.instructions, sourceBlock].filter(Boolean).join('\n\n'),
+        }
+      : config.systemContext;
     const query = config.provider.query({
       prompt,
       continuation: batchContinuation,
       cwd: config.cwd,
-      systemContext: config.systemContext,
+      systemContext: turnSystemContext,
       isScheduledTask: keep.every((m) => m.kind === 'task'),
     });
 
@@ -297,7 +309,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
           prompt,
           continuation: undefined,
           cwd: config.cwd,
-          systemContext: config.systemContext,
+          systemContext: turnSystemContext,
           isScheduledTask: keep.every((m) => m.kind === 'task'),
         });
         const onContinuationReadyRetry =

@@ -93,13 +93,19 @@ export function findByRouting(
 }
 
 /**
- * Generate the system-prompt addendum: agent identity + destination map.
+ * Generate the system-prompt addendum: agent identity + destination map +
+ * (optional) the current turn's source chat. The source-chat block is added
+ * per-turn by the poll-loop so the agent always knows where to reply, even
+ * when its prior task context referenced a different chat.
  *
  * Identity is injected here (not in the shared CLAUDE.md) because it's
  * per-agent-group and changes when the operator renames an agent, while
  * the shared base is identical across all agents.
  */
-export function buildSystemPromptAddendum(assistantName?: string): string {
+export function buildSystemPromptAddendum(
+  assistantName?: string,
+  sourceRouting?: { channelType: string | null; platformId: string | null; threadId: string | null } | null,
+): string {
   const sections: string[] = [];
 
   if (assistantName) {
@@ -112,9 +118,34 @@ export function buildSystemPromptAddendum(assistantName?: string): string {
     );
   }
 
+  const sourceBlock = buildSourceChatBlock(sourceRouting ?? null);
+  if (sourceBlock) sections.push(sourceBlock);
+
   sections.push(buildDestinationsSection());
 
   return sections.join('\n\n');
+}
+
+/**
+ * Per-turn block telling the agent which chat triggered the current turn.
+ * Exported so the poll-loop can re-render it on every batch (the rest of
+ * the addendum is stable and built once at startup).
+ */
+export function buildSourceChatBlock(
+  sourceRouting: { channelType: string | null; platformId: string | null; threadId: string | null } | null,
+): string | null {
+  if (!sourceRouting?.channelType || !sourceRouting.platformId) return null;
+  const sourceDest = findByRouting(sourceRouting.channelType, sourceRouting.platformId);
+  const label = sourceDest
+    ? `\`${sourceDest.name}\`${sourceDest.displayName ? ` (${sourceDest.displayName})` : ''}`
+    : `${sourceRouting.channelType}:${sourceRouting.platformId}`;
+  return [
+    '## This turn’s source chat',
+    '',
+    `The triggering message arrived from **${label}**. Plain text replies (no \`<message>\` block, no \`send_message\` \`to:\` parameter) land here automatically.`,
+    '',
+    '**Do not call `send_message`/`send_file` with an explicit `to:` pointing at a different destination unless the operator asked you to cross-post.** Your task notes may reference a delivery target from an earlier conversation in another chat — ignore that target when the current trigger is from a different chat. If you genuinely intend to cross-post, do it as an addition (one plain reply here + one explicit cross-post), not as a replacement.',
+  ].join('\n');
 }
 
 function buildDestinationsSection(): string {

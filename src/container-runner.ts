@@ -264,7 +264,7 @@ async function spawnContainer(session: Session): Promise<void> {
   container.stderr?.on('data', (data) => {
     for (const line of data.toString().trim().split('\n')) {
       if (line) {
-        log.debug(line, { container: agentGroup.folder });
+        log.warn(line, { container: agentGroup.folder });
         feedObserverLine(session.id, line);
       }
     }
@@ -867,6 +867,14 @@ async function buildContainerArgs(
   const agentModel = containerConfig.model?.trim() || resolveAgentModel();
   if (agentModel) {
     args.push('-e', `AGENT_MODEL=${agentModel}`);
+  }
+
+  // Operator-tunable auto-compact threshold for the Claude Agent SDK.
+  // Pass through when set so the container's provider can override the SDK
+  // default. Absent = SDK default (currently 9_000_000 tokens).
+  const autoCompactWindow = process.env.AGENT_AUTO_COMPACT_WINDOW?.trim();
+  if (autoCompactWindow) {
+    args.push('-e', `AGENT_AUTO_COMPACT_WINDOW=${autoCompactWindow}`);
   }
 
   // OneCLI gateway — injects HTTPS_PROXY + certs so container API calls

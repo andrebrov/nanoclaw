@@ -7,6 +7,13 @@
         "mcp",
         "start"
       ]
-    }
+    },
+    "app4": {
+        "type": "http",
+        "url": "https://os.finsi.ai/mcp",
+        "headers": {
+          "Authorization": "Bearer ${APP4_MCP_KEY}"
+        }
+      }
   }
 }

@@ -637,10 +637,13 @@ async function deliverToAgent(
     //   • DMs (is_group=0) — always react, it's a direct conversation
     //   • @mention — the bot was explicitly addressed
     //   • Non-match-all patterns — engagement already implies a trigger hit
-    //   • Main agent group (folder='main') — primary bot, react to everything
+    //
+    // Match-all wirings in group chats only react when explicitly addressed,
+    // even for the Main agent group: chatbot-mode pattern='.' fires on
+    // every message, and reacting to every message is spammy. Operators
+    // who want eager reactions can flip back via a per-mga override later.
     const isMatchAll = agent.engage_mode === 'pattern' && (agent.engage_pattern ?? '.') === '.';
-    const shouldReact =
-      mg.is_group === 0 || event.message.isMention === true || !isMatchAll || agentGroup.folder === 'main';
+    const shouldReact = mg.is_group === 0 || event.message.isMention === true || !isMatchAll;
     startSessionObserver(
       session,
       shouldReact ? event.message.id : null,

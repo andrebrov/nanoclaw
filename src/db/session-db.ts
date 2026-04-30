@@ -72,15 +72,32 @@ export interface DestinationRow {
 }
 
 export function replaceDestinations(db: Database.Database, entries: DestinationRow[]): void {
+  const seen = new Set<string>();
+  const deduped: DestinationRow[] = [];
+  for (const row of entries) {
+    if (seen.has(row.name)) continue;
+    seen.add(row.name);
+    deduped.push(row);
+  }
   const tx = db.transaction((rows: DestinationRow[]) => {
     db.prepare('DELETE FROM destinations').run();
     const stmt = db.prepare(
       `INSERT INTO destinations (name, display_name, type, channel_type, platform_id, agent_group_id)
        VALUES (@name, @display_name, @type, @channel_type, @platform_id, @agent_group_id)`,
     );
-    for (const row of rows) stmt.run(row);
+    for (const row of rows) {
+      try {
+        stmt.run(row);
+      } catch (err) {
+        const e = err as Error;
+        throw new Error(
+          `replaceDestinations INSERT failed on row name="${row.name}" type=${row.type}: ${e.message}. ` +
+            `All rows: ${JSON.stringify(rows.map((r) => r.name))}`,
+        );
+      }
+    }
   });
-  tx(entries);
+  tx(deduped);
 }
 
 // ---------------------------------------------------------------------------
