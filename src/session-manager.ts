@@ -33,6 +33,7 @@ import {
   upsertSessionRouting,
   insertMessage,
   migrateMessagesInTable,
+  migrateSessionRoutingTable,
 } from './db/session-db.js';
 import { log } from './log.js';
 import type { Session } from './types.js';
@@ -180,11 +181,15 @@ export function writeSessionRouting(agentGroupId: string, sessionId: string): vo
 
   let channelType: string | null = null;
   let platformId: string | null = null;
+  // Public channels (anyone can post) are untrusted: injected instructions
+  // in messages from anonymous senders could exfiltrate workspace contents.
+  let trustLevel: 'trusted' | 'untrusted' = 'trusted';
   if (session.messaging_group_id) {
     const mg = getMessagingGroup(session.messaging_group_id);
     if (mg) {
       channelType = mg.channel_type;
       platformId = mg.platform_id;
+      if (mg.unknown_sender_policy === 'public') trustLevel = 'untrusted';
     }
   }
 
@@ -194,11 +199,12 @@ export function writeSessionRouting(agentGroupId: string, sessionId: string): vo
       channel_type: channelType,
       platform_id: platformId,
       thread_id: session.thread_id,
+      trust_level: trustLevel,
     });
   } finally {
     db.close();
   }
-  log.debug('Session routing written', { sessionId, channelType, platformId, threadId: session.thread_id });
+  log.debug('Session routing written', { sessionId, channelType, platformId, threadId: session.thread_id, trustLevel });
 }
 
 /**
@@ -311,6 +317,7 @@ function extractAttachmentFiles(
 export function openInboundDb(agentGroupId: string, sessionId: string): Database.Database {
   const db = openInboundDbRaw(inboundDbPath(agentGroupId, sessionId));
   migrateMessagesInTable(db);
+  migrateSessionRoutingTable(db);
   return db;
 }
 

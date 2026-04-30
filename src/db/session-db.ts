@@ -34,16 +34,32 @@ export function openOutboundDb(dbPath: string): Database.Database {
 
 export function upsertSessionRouting(
   db: Database.Database,
-  routing: { channel_type: string | null; platform_id: string | null; thread_id: string | null },
+  routing: {
+    channel_type: string | null;
+    platform_id: string | null;
+    thread_id: string | null;
+    trust_level: 'trusted' | 'untrusted';
+  },
 ): void {
   db.prepare(
-    `INSERT INTO session_routing (id, channel_type, platform_id, thread_id)
-     VALUES (1, @channel_type, @platform_id, @thread_id)
+    `INSERT INTO session_routing (id, channel_type, platform_id, thread_id, trust_level)
+     VALUES (1, @channel_type, @platform_id, @thread_id, @trust_level)
      ON CONFLICT(id) DO UPDATE SET
        channel_type = excluded.channel_type,
        platform_id  = excluded.platform_id,
-       thread_id    = excluded.thread_id`,
+       thread_id    = excluded.thread_id,
+       trust_level  = excluded.trust_level`,
   ).run(routing);
+}
+
+/** Add trust_level column to session_routing for DBs created before this change. */
+export function migrateSessionRoutingTable(db: Database.Database): void {
+  const cols = new Set(
+    (db.prepare("PRAGMA table_info('session_routing')").all() as Array<{ name: string }>).map((c) => c.name),
+  );
+  if (!cols.has('trust_level')) {
+    db.prepare("ALTER TABLE session_routing ADD COLUMN trust_level TEXT NOT NULL DEFAULT 'trusted'").run();
+  }
 }
 
 export interface DestinationRow {

@@ -6,6 +6,7 @@ import { query as sdkQuery, type HookCallback, type PreCompactHookInput } from '
 import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/connection.js';
 import { writeMessageOut } from '../db/messages-out.js';
 import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
+import { getSessionTrustLevel } from '../db/session-routing.js';
 import { registerProvider } from './provider-registry.js';
 import type {
   AgentProvider,
@@ -42,6 +43,38 @@ const SDK_DISALLOWED_TOOLS = [
   'EnterWorktree',
   'ExitWorktree',
 ];
+
+// Workspace sub-paths the agent must not echo back to untrusted-origin turns.
+// A message from a public channel (unknown_sender_policy='public') could contain
+// prompt-injection that forces the agent to read and forward private data.
+const SENSITIVE_PATH_PREFIXES = [
+  '/workspace/memory/',
+  '/workspace/agent/memory/',
+  '/workspace/agent/pending-followups/',
+];
+
+function isSensitiveWorkspacePath(p: string): boolean {
+  const normalized = p.replace(/\/+$/, '');
+  return SENSITIVE_PATH_PREFIXES.some((prefix) => {
+    const base = prefix.slice(0, -1); // strip trailing slash
+    return normalized === base || normalized.startsWith(base + '/');
+  });
+}
+
+// Cached session trust level — read once per container start-up.
+// Trust level is a property of the session's messaging_group and does not
+// change while the container is running.
+let sessionTrustLevel: 'trusted' | 'untrusted' | null = null;
+function resolveSessionTrustLevel(): 'trusted' | 'untrusted' {
+  if (sessionTrustLevel === null) {
+    try {
+      sessionTrustLevel = getSessionTrustLevel();
+    } catch {
+      sessionTrustLevel = 'trusted';
+    }
+  }
+  return sessionTrustLevel;
+}
 
 // Safe default tools: read-only filesystem access + agent communication.
 // These are available to every agent regardless of allowedCapabilities.
@@ -232,6 +265,24 @@ function createPreToolUseHook(options: { linkedinPostValidator: boolean }): Hook
         decision: 'block',
         stopReason: `Tool '${toolName}' is not available in this environment — use the nanoclaw equivalent.`,
       } as unknown as ReturnType<HookCallback>;
+    }
+    // LLM06 guard: block reads of sensitive workspace paths when the session
+    // channel is public (anyone-can-post). A prompt injection in such a message
+    // could otherwise force the agent to read and forward private memory or
+    // pending-followup files back to the attacker's chat.
+    if (resolveSessionTrustLevel() === 'untrusted' && (toolName === 'Read' || toolName === 'Grep')) {
+      const pathArg =
+        toolName === 'Read'
+          ? (i.tool_input?.file_path as string | undefined)
+          : (i.tool_input?.path as string | undefined);
+      if (pathArg && isSensitiveWorkspacePath(pathArg)) {
+        log(`[security/LLM06] Blocked ${toolName} on sensitive path "${pathArg}" (untrusted session origin)`);
+        return {
+          decision: 'block',
+          stopReason:
+            'Reading sensitive workspace paths (memory/, pending-followups/) is not permitted when responding to messages from public (untrusted) channels.',
+        } as unknown as ReturnType<HookCallback>;
+      }
     }
     if (options.linkedinPostValidator && toolName === 'Bash') {
       const cmd = typeof i.tool_input?.command === 'string' ? (i.tool_input.command as string) : '';

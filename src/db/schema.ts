@@ -206,7 +206,10 @@ CREATE TABLE IF NOT EXISTS session_routing (
   id           INTEGER PRIMARY KEY CHECK (id = 1),
   channel_type TEXT,
   platform_id  TEXT,
-  thread_id    TEXT
+  thread_id    TEXT,
+  trust_level  TEXT NOT NULL DEFAULT 'trusted'
+                  -- 'trusted' | 'untrusted'; 'untrusted' blocks sensitive
+                  -- workspace path reads to prevent prompt-injection exfiltration
 );
 
 -- Reactions sent by the agent to inbound messages.
