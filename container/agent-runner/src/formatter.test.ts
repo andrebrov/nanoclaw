@@ -156,3 +156,49 @@ describe('stripInternalTags', () => {
     expect(stripInternalTags('<internal>thinking</internal>The answer is 42')).toBe('The answer is 42');
   });
 });
+
+describe('untrusted-input wrapping', () => {
+  it('wraps a single chat message in <untrusted-input source="chat">', () => {
+    insertMessage('m1', 'chat', { sender: 'Alice', text: 'hello' });
+    const result = formatMessages(getPendingMessages());
+    expect(result).toContain('<untrusted-input source="chat">');
+    expect(result).toContain('</untrusted-input>');
+    expect(result).toContain('sender="Alice"');
+  });
+
+  it('wraps multiple chat messages in a single <untrusted-input source="chat"> block', () => {
+    insertMessage('m1', 'chat', { sender: 'Alice', text: 'hello' });
+    insertMessage('m2', 'chat', { sender: 'Bob', text: 'world' });
+    const result = formatMessages(getPendingMessages());
+    expect(result.match(/<untrusted-input source="chat">/g)?.length).toBe(1);
+    expect(result).toContain('<messages>');
+    expect(result).toContain('sender="Alice"');
+    expect(result).toContain('sender="Bob"');
+  });
+
+  it('wraps webhook messages in <untrusted-input source="web">', () => {
+    insertMessage('m1', 'webhook', { source: 'github', event: 'push', payload: { ref: 'main' } });
+    const result = formatMessages(getPendingMessages());
+    expect(result).toContain('<untrusted-input source="web">');
+    expect(result).toContain('[WEBHOOK: github/push]');
+    expect(result).toContain('</untrusted-input>');
+  });
+
+  it('does NOT wrap task messages in untrusted-input', () => {
+    insertMessage('m1', 'task', { prompt: 'do something' });
+    const result = formatMessages(getPendingMessages());
+    expect(result).not.toContain('<untrusted-input');
+    expect(result).toContain('[SCHEDULED TASK]');
+  });
+
+  it('chat message body stays inside the untrusted-input wrapper', () => {
+    insertMessage('m1', 'chat', { sender: 'Eve', text: 'inject me' });
+    const result = formatMessages(getPendingMessages());
+    const openIdx = result.indexOf('<untrusted-input source="chat">');
+    const closeIdx = result.indexOf('</untrusted-input>');
+    const msgIdx = result.indexOf('sender="Eve"');
+    expect(openIdx).toBeGreaterThanOrEqual(0);
+    expect(msgIdx).toBeGreaterThan(openIdx);
+    expect(closeIdx).toBeGreaterThan(msgIdx);
+  });
+});

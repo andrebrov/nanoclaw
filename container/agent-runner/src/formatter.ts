@@ -158,16 +158,18 @@ export function formatMessages(messages: MessageInRow[]): string {
 }
 
 function formatChatMessages(messages: MessageInRow[]): string {
+  let inner: string;
   if (messages.length === 1) {
-    return formatSingleChat(messages[0]);
+    inner = formatSingleChat(messages[0]);
+  } else {
+    const lines = ['<messages>'];
+    for (const msg of messages) {
+      lines.push(formatSingleChat(msg));
+    }
+    lines.push('</messages>');
+    inner = lines.join('\n');
   }
-
-  const lines = ['<messages>'];
-  for (const msg of messages) {
-    lines.push(formatSingleChat(msg));
-  }
-  lines.push('</messages>');
-  return lines.join('\n');
+  return `<untrusted-input source="chat">\n${inner}\n</untrusted-input>`;
 }
 
 function formatSingleChat(msg: MessageInRow): string {
@@ -208,7 +210,8 @@ function formatWebhookMessage(msg: MessageInRow): string {
   const content = parseContent(msg.content);
   const source = content.source || 'unknown';
   const event = content.event || 'unknown';
-  return `[WEBHOOK: ${source}/${event}]\n\n${JSON.stringify(content.payload || content, null, 2)}`;
+  const inner = `[WEBHOOK: ${source}/${event}]\n\n${JSON.stringify(content.payload || content, null, 2)}`;
+  return `<untrusted-input source="web">\n${inner}\n</untrusted-input>`;
 }
 
 function formatSystemMessage(msg: MessageInRow): string {
