@@ -6,6 +6,9 @@ import {
   getContinuation,
   migrateLegacyContinuation,
   setContinuation,
+  clearSeriesContinuation,
+  getSeriesContinuation,
+  setSeriesContinuation,
 } from './session-state.js';
 
 beforeEach(() => {
@@ -96,5 +99,50 @@ describe('session-state — legacy migration', () => {
 
     const second = migrateLegacyContinuation('claude');
     expect(second).toBe('once');
+  });
+});
+
+describe('session-state — per-series continuations', () => {
+  test('set/get round-trip', () => {
+    setSeriesContinuation('claude', 'series-abc', 'sdk-session-1');
+    expect(getSeriesContinuation('claude', 'series-abc')).toBe('sdk-session-1');
+  });
+
+  test('different series are isolated', () => {
+    setSeriesContinuation('claude', 'heartbeat', 'session-heartbeat');
+    setSeriesContinuation('claude', 'prospecting', 'session-prospecting');
+
+    expect(getSeriesContinuation('claude', 'heartbeat')).toBe('session-heartbeat');
+    expect(getSeriesContinuation('claude', 'prospecting')).toBe('session-prospecting');
+  });
+
+  test('series continuation is provider-scoped', () => {
+    setSeriesContinuation('claude', 'series-abc', 'claude-session');
+    setSeriesContinuation('codex', 'series-abc', 'codex-session');
+
+    expect(getSeriesContinuation('claude', 'series-abc')).toBe('claude-session');
+    expect(getSeriesContinuation('codex', 'series-abc')).toBe('codex-session');
+  });
+
+  test('clearSeriesContinuation removes only the targeted entry', () => {
+    setSeriesContinuation('claude', 'series-a', 'keep');
+    setSeriesContinuation('claude', 'series-b', 'drop');
+
+    clearSeriesContinuation('claude', 'series-b');
+
+    expect(getSeriesContinuation('claude', 'series-a')).toBe('keep');
+    expect(getSeriesContinuation('claude', 'series-b')).toBeUndefined();
+  });
+
+  test('per-series keys do not affect global per-provider continuation', () => {
+    setContinuation('claude', 'global-session');
+    setSeriesContinuation('claude', 'series-abc', 'series-session');
+
+    expect(getContinuation('claude')).toBe('global-session');
+    expect(getSeriesContinuation('claude', 'series-abc')).toBe('series-session');
+  });
+
+  test('unknown series returns undefined', () => {
+    expect(getSeriesContinuation('claude', 'never-seen')).toBeUndefined();
   });
 });

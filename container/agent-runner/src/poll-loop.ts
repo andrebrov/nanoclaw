@@ -18,6 +18,9 @@ import {
   clearContinuation,
   migrateLegacyContinuation,
   setContinuation,
+  getSeriesContinuation,
+  setSeriesContinuation,
+  clearSeriesContinuation,
 } from './db/session-state.js';
 import { scheduleSnapshotWrite, clearSnapshot } from './db/session-snapshot.js';
 import {
@@ -205,15 +208,37 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 
     log(`Processing ${keep.length} message(s), kinds: ${[...new Set(keep.map((m) => m.kind))].join(',')}`);
 
-    // Scheduled-task batches must not resume a prior SDK session. The SDK
-    // surfaces the previous turn's terminal message into the new turn's stream
-    // when a session is resumed, so task B would capture task A's result text
-    // as its own output. Starting a fresh session for every task batch prevents
-    // this cross-attribution without affecting interactive chat continuity.
-    const isTaskBatch = keep.some((m) => m.kind === 'task');
+    // Determine the series ID for task batches. Recurring tasks share a stable
+    // series_id across fires (set to the original task id on creation and carried
+    // forward by the recurrence fanout). One-shot tasks have series_id === id, so
+    // they each get a unique per-series key — effectively the same fresh-session
+    // behaviour as before. Different task series (e.g. heartbeat vs prospecting)
+    // use different keys, preventing cross-task session contamination.
+    const taskMessages = keep.filter((m) => m.kind === 'task');
+    const isTaskBatch = taskMessages.length > 0;
+    const batchSeriesId = isTaskBatch ? (taskMessages[0].series_id ?? taskMessages[0].id) : null;
+
+    // Resolve the continuation to resume. Task batches use the per-series slot so
+    // each recurring task resumes its own prior SDK session rather than always
+    // starting from scratch (which causes a full cache_create on every fire).
+    // Chat batches use the global per-provider continuation as before.
+    let batchContinuation: string | undefined;
+    if (batchSeriesId !== null) {
+      batchContinuation = getSeriesContinuation(config.providerName, batchSeriesId);
+    } else {
+      batchContinuation = continuation;
+    }
+
+    // Callback written at SDK init time (before the first result) so a container
+    // crash mid-turn still persists the continuation for the next wake.
+    const onContinuationReady =
+      batchSeriesId !== null
+        ? (id: string) => setSeriesContinuation(config.providerName, batchSeriesId, id)
+        : (id: string) => setContinuation(config.providerName, id);
+
     const query = config.provider.query({
       prompt,
-      continuation: isTaskBatch ? undefined : continuation,
+      continuation: batchContinuation,
       cwd: config.cwd,
       systemContext: config.systemContext,
       isScheduledTask: keep.every((m) => m.kind === 'task'),
@@ -224,14 +249,29 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     const processingIds = ids.filter((id) => !commandIds.includes(id) && !skippedSet.has(id));
     let queryError: unknown = null;
     try {
-      const result = await processQuery(query, routing, processingIds, prompt, config.providerName);
+      const result = await processQuery(
+        query,
+        routing,
+        processingIds,
+        prompt,
+        config.providerName,
+        onContinuationReady,
+      );
       if (result.clearContinuation) {
-        log('Clearing continuation anchor (thinking-only result)');
-        continuation = undefined;
-        clearStoredSessionId();
-      } else if (result.continuation && result.continuation !== continuation) {
-        continuation = result.continuation;
-        setContinuation(config.providerName, continuation);
+        if (batchSeriesId !== null) {
+          clearSeriesContinuation(config.providerName, batchSeriesId);
+        } else {
+          log('Clearing continuation anchor (thinking-only result)');
+          continuation = undefined;
+          clearStoredSessionId();
+        }
+      } else if (result.continuation) {
+        if (batchSeriesId !== null) {
+          setSeriesContinuation(config.providerName, batchSeriesId, result.continuation);
+        } else if (result.continuation !== continuation) {
+          continuation = result.continuation;
+          setContinuation(config.providerName, continuation);
+        }
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -239,10 +279,16 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
 
       // Stale/corrupt continuation recovery: clear it before the retry so the
       // fresh attempt doesn't resume a broken session.
-      if (continuation && config.provider.isSessionInvalid(err)) {
-        log(`Stale session detected (${continuation}) — clearing for retry`);
-        continuation = undefined;
-        clearContinuation(config.providerName);
+      if (config.provider.isSessionInvalid(err)) {
+        if (batchSeriesId !== null && batchContinuation) {
+          log(`Stale task session detected (series: ${batchSeriesId}) — clearing for retry`);
+          clearSeriesContinuation(config.providerName, batchSeriesId);
+          batchContinuation = undefined;
+        } else if (continuation) {
+          log(`Stale session detected (${continuation}) — clearing for retry`);
+          continuation = undefined;
+          clearContinuation(config.providerName);
+        }
       }
 
       // Single automatic retry with a fresh session.
@@ -254,13 +300,35 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
           systemContext: config.systemContext,
           isScheduledTask: keep.every((m) => m.kind === 'task'),
         });
-        const retryResult = await processQuery(retryQuery, routing, processingIds, prompt, config.providerName);
+        const onContinuationReadyRetry =
+          batchSeriesId !== null
+            ? (id: string) => setSeriesContinuation(config.providerName, batchSeriesId, id)
+            : (id: string) => {
+                setContinuation(config.providerName, id);
+                setStoredSessionId(id);
+              };
+        const retryResult = await processQuery(
+          retryQuery,
+          routing,
+          processingIds,
+          prompt,
+          config.providerName,
+          onContinuationReadyRetry,
+        );
         if (retryResult.clearContinuation) {
-          continuation = undefined;
-          clearStoredSessionId();
+          if (batchSeriesId !== null) {
+            clearSeriesContinuation(config.providerName, batchSeriesId);
+          } else {
+            continuation = undefined;
+            clearStoredSessionId();
+          }
         } else if (retryResult.continuation) {
-          continuation = retryResult.continuation;
-          setStoredSessionId(continuation);
+          if (batchSeriesId !== null) {
+            setSeriesContinuation(config.providerName, batchSeriesId, retryResult.continuation);
+          } else {
+            continuation = retryResult.continuation;
+            setStoredSessionId(continuation);
+          }
         }
       } catch (retryErr) {
         const retryErrMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
@@ -382,6 +450,7 @@ async function processQuery(
   initialBatchIds: string[],
   prompt: string,
   providerName: string,
+  onContinuationReady?: (id: string) => void,
 ): Promise<QueryResult> {
   // Provider-agnostic query lifecycle signals for the host observer.
   // claude.ts also emits these from within translateEvents(), but emitting
@@ -468,7 +537,11 @@ async function processQuery(
         // container died between `init` and `result`, the SDK session was
         // effectively orphaned and the next message started a blank
         // Claude session with no prior context.
-        setContinuation(providerName, event.continuation);
+        if (onContinuationReady) {
+          onContinuationReady(event.continuation);
+        } else {
+          setContinuation(providerName, event.continuation);
+        }
       } else if (event.type === 'result') {
         // Write the reply to messages_out BEFORE marking the batch completed
         // in processing_ack. If the container crashes between the two writes,

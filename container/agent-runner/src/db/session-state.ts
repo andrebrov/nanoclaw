@@ -78,6 +78,33 @@ export function clearContinuation(providerName: string): void {
   deleteValue(continuationKey(providerName));
 }
 
+// ── Per-series continuations (recurring tasks) ──
+
+/**
+ * Key for a task-series continuation. Scoped per provider so flipping
+ * providers doesn't resurface a stale series session from a different backend.
+ *
+ * Series IDs come from messages_in.series_id — stable across all fires of the
+ * same recurring task. One-shot tasks also have a series_id (equal to their
+ * own message id) so they get their own isolated key and effectively start
+ * fresh every fire, matching the previous behaviour.
+ */
+function seriesContinuationKey(providerName: string, seriesId: string): string {
+  return `continuation:series:${providerName.toLowerCase()}:${seriesId}`;
+}
+
+export function getSeriesContinuation(providerName: string, seriesId: string): string | undefined {
+  return getValue(seriesContinuationKey(providerName, seriesId));
+}
+
+export function setSeriesContinuation(providerName: string, seriesId: string, id: string): void {
+  setValue(seriesContinuationKey(providerName, seriesId), id);
+}
+
+export function clearSeriesContinuation(providerName: string, seriesId: string): void {
+  deleteValue(seriesContinuationKey(providerName, seriesId));
+}
+
 /**
  * Provider-agnostic session id slot. Read/written by retry paths that
  * track the last-known good session anchor independently of the
