@@ -362,17 +362,27 @@ async function deliverMessage(
       throw new Error(`unknown messaging group for ${msg.channel_type}/${msg.platform_id} (message ${msg.id})`);
     }
     const isOriginChat = session.messaging_group_id === mg.id;
-    // Guarded: without the agent-to-agent module, `agent_destinations`
-    // doesn't exist and we permit all non-origin channel sends (the
-    // origin-chat case is always allowed regardless). Inlined SQL instead
-    // of importing `hasDestination` so core doesn't depend on the module.
-    if (!isOriginChat && hasTable(getDb(), 'agent_destinations')) {
+    // Capability gate (LLM08 fix, issue #140): cross-channel sends require an
+    // explicit agent_destinations row. Fail closed — if the table is missing
+    // (should never happen post-migration) deny rather than permit.
+    // Origin-chat replies are always allowed (agent replies to the chat it
+    // was invoked from). Inlined SQL to keep core free of module imports.
+    if (!isOriginChat) {
+      if (!hasTable(getDb(), 'agent_destinations')) {
+        throw new Error(`cannot authorize cross-channel send: agent_destinations table missing (message ${msg.id})`);
+      }
       const row = getDb()
         .prepare(
           'SELECT 1 FROM agent_destinations WHERE agent_group_id = ? AND target_type = ? AND target_id = ? LIMIT 1',
         )
         .get(session.agent_group_id, 'channel', mg.id);
       if (!row) {
+        log.warn('Unauthorized cross-channel send attempt blocked', {
+          agentGroupId: session.agent_group_id,
+          channelType: mg.channel_type,
+          platformId: mg.platform_id,
+          messageId: msg.id,
+        });
         throw new Error(
           `unauthorized channel destination: ${session.agent_group_id} cannot send to ${mg.channel_type}/${mg.platform_id}`,
         );

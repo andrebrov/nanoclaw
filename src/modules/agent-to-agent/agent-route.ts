@@ -36,6 +36,7 @@ import { wakeContainer } from '../../container-runner.js';
 import { log } from '../../log.js';
 import { resolveSession, sessionDir, writeSessionMessage } from '../../session-manager.js';
 import type { Session } from '../../types.js';
+import { hasDestination } from './db/agent-destinations.js';
 
 export { isSafeAttachmentName };
 
@@ -183,10 +184,20 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
     return;
   }
 
-  // All agent groups are synthetically available as peer destinations (auto-
-  // injected by write-destinations.ts for cross-channel handoff, PR #32). The
-  // earlier `hasDestination` auth check is now redundant — every peer is
-  // implicitly authorized — so we just verify the target still exists.
+  // Capability gate (LLM08 fix, issue #140): the source agent must have an
+  // explicit agent_destinations row for this target. Synthetic peer injection
+  // was removed from write-destinations.ts, so only explicitly wired routes
+  // (e.g. bidirectional rows created by `create_agent`) pass this check.
+  if (!hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)) {
+    log.warn('Unauthorized agent-to-agent send attempt blocked', {
+      from: session.agent_group_id,
+      to: targetAgentGroupId,
+      messageId: msg.id,
+    });
+    throw new Error(
+      `unauthorized agent destination: ${session.agent_group_id} cannot send to agent ${targetAgentGroupId}`,
+    );
+  }
   if (!getAgentGroup(targetAgentGroupId)) {
     throw new Error(`target agent group ${targetAgentGroupId} not found for message ${msg.id}`);
   }
