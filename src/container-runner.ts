@@ -16,6 +16,7 @@ import {
   DATA_DIR,
   DEFAULT_SESSION_NAME,
   GROUPS_DIR,
+  MAINTENANCE_SESSION_NAME,
   MAX_CONCURRENT_CONTAINERS,
   ONECLI_API_KEY,
   ONECLI_URL,
@@ -427,7 +428,11 @@ function buildMounts(
 
   // Compose CLAUDE.md fresh every spawn from the shared base, enabled skill
   // fragments, and MCP server instructions. See `claude-md-compose.ts`.
-  composeGroupClaudeMd(agentGroup);
+  // When maintenanceSkillBlocklist is set, also writes CLAUDE.maintenance.md —
+  // the slim variant mounted for scheduled-task containers.
+  composeGroupClaudeMd(agentGroup, {
+    maintenanceBlocklist: containerConfig.maintenanceSkillBlocklist ?? [],
+  });
 
   const mounts: VolumeMount[] = [];
   const sessDir = sessionDir(agentGroup.id, session.id);
@@ -453,9 +458,15 @@ function buildMounts(
   // `.claude-shared.md` is a symlink whose target (`/app/CLAUDE.md`) is
   // already RO-mounted, so writes through it fail regardless — no need for
   // a nested mount there.
-  const composedClaudeMd = path.join(groupDir, 'CLAUDE.md');
-  if (fs.existsSync(composedClaudeMd)) {
-    mounts.push({ hostPath: composedClaudeMd, containerPath: '/workspace/agent/CLAUDE.md', readonly: true });
+  //
+  // Maintenance sessions get CLAUDE.maintenance.md (slim variant) when it
+  // exists; otherwise fall back to the full CLAUDE.md.
+  const isMaintenanceSession = session.session_name === MAINTENANCE_SESSION_NAME;
+  const maintenanceClaudeMd = path.join(groupDir, 'CLAUDE.maintenance.md');
+  const claudeMdHostPath =
+    isMaintenanceSession && fs.existsSync(maintenanceClaudeMd) ? maintenanceClaudeMd : path.join(groupDir, 'CLAUDE.md');
+  if (fs.existsSync(claudeMdHostPath)) {
+    mounts.push({ hostPath: claudeMdHostPath, containerPath: '/workspace/agent/CLAUDE.md', readonly: true });
   }
   const fragmentsDir = path.join(groupDir, '.claude-fragments');
   if (fs.existsSync(fragmentsDir)) {

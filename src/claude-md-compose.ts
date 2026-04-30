@@ -34,12 +34,26 @@ const MCP_TOOLS_HOST_SUBPATH = path.join('container', 'agent-runner', 'src', 'mc
 
 const COMPOSED_HEADER = '<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->';
 
+export interface ComposeOptions {
+  /**
+   * When non-empty, also write `CLAUDE.maintenance.md` alongside `CLAUDE.md`.
+   * The maintenance variant omits skill fragments whose name matches an entry in
+   * this list (matched against the skill directory name, e.g. "crm").
+   * Maintenance sessions mount `CLAUDE.maintenance.md` instead of `CLAUDE.md`.
+   */
+  maintenanceBlocklist?: string[];
+}
+
 /**
  * Regenerate `groups/<folder>/CLAUDE.md` from the shared base, enabled skill
  * fragments, and MCP server fragments declared in `container.json`. Creates
  * an empty `CLAUDE.local.md` if missing.
+ *
+ * When `opts.maintenanceBlocklist` is non-empty, also writes
+ * `CLAUDE.maintenance.md` — a slim variant that omits the listed skill
+ * fragments. Used to reduce cold-start token cost for scheduled tasks.
  */
-export function composeGroupClaudeMd(group: AgentGroup): void {
+export function composeGroupClaudeMd(group: AgentGroup, opts?: ComposeOptions): void {
   const groupDir = path.resolve(GROUPS_DIR, group.folder);
   if (!fs.existsSync(groupDir)) {
     fs.mkdirSync(groupDir, { recursive: true });
@@ -116,12 +130,35 @@ export function composeGroupClaudeMd(group: AgentGroup): void {
   }
 
   // Composed entry — imports only.
+  const sortedFragments = [...desired.keys()].sort();
   const imports = ['@./.claude-shared.md'];
-  for (const name of [...desired.keys()].sort()) {
+  for (const name of sortedFragments) {
     imports.push(`@./.claude-fragments/${name}`);
   }
   const body = [COMPOSED_HEADER, ...imports, ''].join('\n');
   writeAtomic(path.join(groupDir, 'CLAUDE.md'), body);
+
+  // Slim maintenance variant — same as above minus blocked skill fragments.
+  // Written only when the blocklist is non-empty; removed otherwise so stale
+  // files don't linger after the operator clears the blocklist.
+  const maintenancePath = path.join(groupDir, 'CLAUDE.maintenance.md');
+  const blocklist = opts?.maintenanceBlocklist ?? [];
+  if (blocklist.length > 0) {
+    const blocked = new Set(blocklist.map((s) => `skill-${s}.md`));
+    const maintenanceImports = ['@./.claude-shared.md'];
+    for (const name of sortedFragments) {
+      if (!blocked.has(name)) {
+        maintenanceImports.push(`@./.claude-fragments/${name}`);
+      }
+    }
+    writeAtomic(maintenancePath, [COMPOSED_HEADER, ...maintenanceImports, ''].join('\n'));
+  } else {
+    try {
+      fs.unlinkSync(maintenancePath);
+    } catch {
+      /* file absent — nothing to remove */
+    }
+  }
 
   const localFile = path.join(groupDir, 'CLAUDE.local.md');
   if (!fs.existsSync(localFile)) {

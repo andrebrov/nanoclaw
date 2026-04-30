@@ -104,6 +104,13 @@ export interface ContainerConfig {
     statusChannelType: string;
     statusThreadId?: string | null;
   };
+  /**
+   * Skill names to exclude from the system prompt for maintenance/scheduled
+   * sessions. Interactive sessions still receive the full prompt. Entries are
+   * skill directory names under `container/skills/` (e.g. "crm", "outreach").
+   * Absent or empty → no filtering.
+   */
+  maintenanceSkillBlocklist?: string[];
 }
 
 const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
@@ -185,6 +192,9 @@ export function readContainerConfig(folder: string): ContainerConfig {
       allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
       linkedinPostValidator: raw.linkedinPostValidator === true,
       observer: raw.observer,
+      maintenanceSkillBlocklist: Array.isArray(raw.maintenanceSkillBlocklist)
+        ? raw.maintenanceSkillBlocklist.filter((s): s is string => typeof s === 'string')
+        : undefined,
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);
