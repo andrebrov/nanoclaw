@@ -16,6 +16,34 @@ export type McpServerEntry =
   | { command: string; args: string[]; env: Record<string, string>; url?: never }
   | { url: string; type: 'http' | 'sse'; headers?: Record<string, string>; oauth?: OAuthConfig; command?: never };
 
+/** A single named middleware slot: maps a display name to a shell command. */
+export interface MiddlewareSlot {
+  name: string;
+  command: string;
+}
+
+/**
+ * Ordered middleware pipeline per hook event.
+ * Each key is a Claude Agent SDK hook event name; the value is an array of
+ * slots executed in declared order, short-circuiting on the first block.
+ *
+ * Example container.json entry:
+ * ```json
+ * {
+ *   "middlewareChain": {
+ *     "PreToolUse": [
+ *       { "name": "sandbox", "command": "/workspace/hooks/sandbox.sh" },
+ *       { "name": "loop_detection", "command": "/workspace/hooks/loop.sh" }
+ *     ],
+ *     "PostToolUse": [
+ *       { "name": "memory", "command": "/workspace/hooks/memory.sh" }
+ *     ]
+ *   }
+ * }
+ * ```
+ */
+export type MiddlewareChain = Partial<Record<'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure', MiddlewareSlot[]>>;
+
 /**
  * Capabilities explicitly granted by the operator in container.json.
  * Mirrors the AgentCapability type on the host side.
@@ -81,6 +109,54 @@ export interface RunnerConfig {
    * false / absent → disabled.
    */
   loopDetection: false | { windowSize: number; repeatThreshold: number };
+  /**
+   * Ordered middleware pipeline per hook event. Absent means no extra
+   * middleware. Slots are executed in declared order; the first block
+   * short-circuits the chain. Each slot runs a shell command with the
+   * hook input as JSON on stdin. See MiddlewareChain for details.
+   */
+  middlewareChain: MiddlewareChain;
+}
+
+const KNOWN_MIDDLEWARE_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure']);
+
+function parseMiddlewareChain(raw: unknown): MiddlewareChain {
+  if (raw === undefined || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    if (raw !== undefined && raw !== null) {
+      console.error(`[config] middlewareChain must be an object — ignoring (got: ${typeof raw})`);
+    }
+    return {};
+  }
+  const result: MiddlewareChain = {};
+  for (const [event, slots] of Object.entries(raw as Record<string, unknown>)) {
+    if (!KNOWN_MIDDLEWARE_EVENTS.has(event)) {
+      console.error(`[config] middlewareChain: unknown event '${event}' — ignored`);
+      continue;
+    }
+    if (!Array.isArray(slots)) {
+      console.error(`[config] middlewareChain.${event} must be an array — ignored`);
+      continue;
+    }
+    const parsed: MiddlewareSlot[] = [];
+    for (const slot of slots) {
+      if (typeof slot !== 'object' || slot === null || Array.isArray(slot)) {
+        console.error(`[config] middlewareChain.${event}: slot must be an object — ignored`);
+        continue;
+      }
+      const s = slot as Record<string, unknown>;
+      if (typeof s.name !== 'string' || !s.name) {
+        console.error(`[config] middlewareChain.${event}: slot missing 'name' string — ignored`);
+        continue;
+      }
+      if (typeof s.command !== 'string' || !s.command) {
+        console.error(`[config] middlewareChain.${event}: slot '${s.name}' missing 'command' string — ignored`);
+        continue;
+      }
+      parsed.push({ name: s.name, command: s.command });
+    }
+    result[event as keyof MiddlewareChain] = parsed;
+  }
+  return result;
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
@@ -125,6 +201,7 @@ export function loadConfig(): RunnerConfig {
     allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities),
     linkedinPostValidator: raw.linkedinPostValidator === true,
     loopDetection: parseLoopDetection(raw.loopDetection),
+    middlewareChain: parseMiddlewareChain(raw.middlewareChain),
   };
 
   return _config;

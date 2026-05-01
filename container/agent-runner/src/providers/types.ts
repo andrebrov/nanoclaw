@@ -1,5 +1,5 @@
-import type { AgentCapability } from '../config.js';
-export type { AgentCapability } from '../config.js';
+import type { AgentCapability, MiddlewareChain } from '../config.js';
+export type { AgentCapability, MiddlewareChain } from '../config.js';
 
 export interface AgentProvider {
   /**
@@ -47,6 +47,12 @@ export interface ProviderOptions {
    * configure thresholds explicitly.
    */
   loopDetection?: boolean | { windowSize?: number; repeatThreshold?: number };
+  /**
+   * Ordered middleware pipeline per hook event. When present, user-defined
+   * shell commands are appended after the provider's built-in hooks for
+   * the declared events. See MiddlewareChain for the slot format.
+   */
+  middlewareChain?: MiddlewareChain;
 }
 
 /**

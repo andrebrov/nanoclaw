@@ -8,6 +8,8 @@ import { writeMessageOut } from '../db/messages-out.js';
 import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
 import { createLoopDetectionGate } from '../hooks/loop-detection.js';
 import { parseSubagentLimit, SUBAGENT_TOOL, SubagentLimitTracker } from '../hooks/subagent-limit.js';
+import { createMiddlewareHook } from '../hooks/middleware-chain.js';
+import type { MiddlewareChain } from '../config.js';
 import { getSessionTrustLevel } from '../db/session-routing.js';
 import { registerProvider } from './provider-registry.js';
 import type {
@@ -586,6 +588,7 @@ export class ClaudeProvider implements AgentProvider {
   private model: string | undefined;
   private preToolUseHook: HookCallback;
   private postToolBatchHook: HookCallback | undefined;
+  private middlewareChain: MiddlewareChain;
 
   constructor(options: ProviderOptions = {}) {
     this.assistantName = options.assistantName;
@@ -610,6 +613,7 @@ export class ClaudeProvider implements AgentProvider {
       subagentLimitTracker,
     });
     this.postToolBatchHook = subagentLimitTracker ? createPostToolBatchHook(subagentLimitTracker) : undefined;
+    this.middlewareChain = options.middlewareChain ?? {};
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude
     // subprocess — it spawns with a filtered/sanitized env. Symptom when
@@ -686,9 +690,36 @@ export class ClaudeProvider implements AgentProvider {
         // 'summarized' so thinking is always visible when the model uses it.
         thinking: { type: 'adaptive', display: 'summarized' },
         hooks: {
-          PreToolUse: [{ hooks: [this.preToolUseHook] }],
-          PostToolUse: [{ hooks: [postToolUseHook] }],
-          PostToolUseFailure: [{ hooks: [postToolUseHook] }],
+          PreToolUse: [
+            {
+              hooks: [
+                this.preToolUseHook,
+                ...(this.middlewareChain.PreToolUse?.length
+                  ? [createMiddlewareHook(this.middlewareChain.PreToolUse)]
+                  : []),
+              ],
+            },
+          ],
+          PostToolUse: [
+            {
+              hooks: [
+                postToolUseHook,
+                ...(this.middlewareChain.PostToolUse?.length
+                  ? [createMiddlewareHook(this.middlewareChain.PostToolUse)]
+                  : []),
+              ],
+            },
+          ],
+          PostToolUseFailure: [
+            {
+              hooks: [
+                postToolUseHook,
+                ...(this.middlewareChain.PostToolUseFailure?.length
+                  ? [createMiddlewareHook(this.middlewareChain.PostToolUseFailure)]
+                  : []),
+              ],
+            },
+          ],
           PreCompact: [{ hooks: [createPreCompactHook(this.assistantName)] }],
           ...(this.postToolBatchHook ? { PostToolBatch: [{ hooks: [this.postToolBatchHook] }] } : {}),
         },
