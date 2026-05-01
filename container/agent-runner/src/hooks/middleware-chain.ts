@@ -8,10 +8,14 @@
  *
  *   exit 0, empty stdout  → continue (pass-through)
  *   exit 0, JSON stdout   → { decision, reason } override (block or continue)
+ *                            OR { hookSpecificOutput: { hookEventName, updatedInput } }
+ *                            to transparently rewrite the tool input for PreToolUse
  *   exit non-zero         → block, reason from stdout or generic message
  *   any spawn error       → fail-open (continue), warning logged
  *
  * The chain runs in declared order and short-circuits on the first block.
+ * If a slot returns an updatedInput, subsequent slots receive the updated
+ * tool_input so translations compose correctly.
  */
 import { spawn } from 'child_process';
 import type { HookCallback } from '@anthropic-ai/claude-agent-sdk';
@@ -26,6 +30,8 @@ function log(msg: string): void {
 interface SlotDecision {
   block: boolean;
   reason?: string;
+  /** Replacement tool_input from hookSpecificOutput.updatedInput (PreToolUse only). */
+  updatedInput?: Record<string, unknown>;
 }
 
 async function runSlot(slot: MiddlewareSlot, input: unknown): Promise<SlotDecision> {
@@ -74,14 +80,22 @@ async function runSlot(slot: MiddlewareSlot, input: unknown): Promise<SlotDecisi
       // Try to parse JSON decision from stdout regardless of exit code.
       if (stdoutText) {
         try {
-          const parsed = JSON.parse(stdoutText) as { decision?: string; reason?: string };
+          const parsed = JSON.parse(stdoutText) as {
+            decision?: string;
+            reason?: string;
+            hookSpecificOutput?: {
+              hookEventName?: string;
+              updatedInput?: Record<string, unknown>;
+            };
+          };
+          const updatedInput = parsed.hookSpecificOutput?.updatedInput;
           if (parsed.decision === 'block') {
             log(`[${slot.name}] blocked: ${parsed.reason ?? '(no reason)'}`);
             resolve({ block: true, reason: parsed.reason ?? `Blocked by middleware '${slot.name}'` });
             return;
           }
           if (parsed.decision === 'continue' || code === 0) {
-            resolve({ block: false });
+            resolve({ block: false, updatedInput });
             return;
           }
         } catch {
@@ -111,18 +125,48 @@ async function runSlot(slot: MiddlewareSlot, input: unknown): Promise<SlotDecisi
 /**
  * Build a HookCallback that runs the given middleware slots in declared order.
  * Fails open on any slot error; short-circuits on the first block.
+ *
+ * For PreToolUse hooks: if any slot returns an updatedInput, the modified
+ * tool_input is threaded through subsequent slots and returned to the SDK so
+ * the translation is transparent to the agent. Slots compose: each slot sees
+ * the tool_input as already modified by earlier slots.
  */
 export function createMiddlewareHook(slots: MiddlewareSlot[]): HookCallback {
   return async (input) => {
+    const hookInput = input as Record<string, unknown>;
+    let currentToolInput: Record<string, unknown> | undefined =
+      hookInput.tool_input != null && typeof hookInput.tool_input === 'object'
+        ? (hookInput.tool_input as Record<string, unknown>)
+        : undefined;
+    let inputModified = false;
+
     for (const slot of slots) {
-      const decision = await runSlot(slot, input);
+      const slotInput =
+        currentToolInput !== undefined && currentToolInput !== hookInput.tool_input
+          ? { ...hookInput, tool_input: currentToolInput }
+          : hookInput;
+      const decision = await runSlot(slot, slotInput);
       if (decision.block) {
         return {
           decision: 'block',
           stopReason: decision.reason ?? `Blocked by middleware '${slot.name}'`,
         } as unknown as ReturnType<HookCallback>;
       }
+      if (decision.updatedInput !== undefined) {
+        currentToolInput = decision.updatedInput;
+        inputModified = true;
+      }
     }
+
+    if (inputModified && currentToolInput !== undefined) {
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          updatedInput: currentToolInput,
+        },
+      } as unknown as ReturnType<HookCallback>;
+    }
+
     return { continue: true };
   };
 }

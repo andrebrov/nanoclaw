@@ -9,6 +9,8 @@
  *   4. A non-zero exit code blocks with the stdout as the reason.
  *   5. JSON { decision: 'block' } in stdout blocks; { decision: 'continue' } or exit 0 passes.
  *   6. An empty chain passes through unconditionally.
+ *   7. hookSpecificOutput.updatedInput is threaded through subsequent slots and
+ *      returned to the SDK so PreToolUse path translation composes correctly.
  *
  * All slots use plain shell commands so the tests run without any stubs or
  * mocks.  Timeouts are generous to avoid flakiness on slow CI machines —
@@ -16,6 +18,9 @@
  * because sleeping 10 s in a unit test would be unreasonable.
  */
 import { describe, it, expect } from 'bun:test';
+import { writeFileSync, chmodSync, readFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 import { createMiddlewareHook } from './middleware-chain.js';
 import type { MiddlewareSlot } from '../config.js';
@@ -24,6 +29,15 @@ import type { MiddlewareSlot } from '../config.js';
 // executor we only care that the input is forwarded to the slot as JSON on
 // stdin — the shape itself doesn't matter to the chain logic.
 const DUMMY_INPUT = { tool_name: 'Read', type: 'PreToolUse' };
+
+function makeTempScript(body: string): string {
+  const p = join(tmpdir(), `mw-test-${Math.random().toString(36).slice(2)}.sh`);
+  writeFileSync(p, `#!/bin/sh\n${body}\n`);
+  chmodSync(p, 0o755);
+  return p;
+}
+
+const noopSignal = new AbortController().signal;
 
 describe('createMiddlewareHook', () => {
   it('passes through when the chain is empty', async () => {
@@ -154,5 +168,91 @@ describe('createMiddlewareHook', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await hook(DUMMY_INPUT as any);
     expect(result).toMatchObject({ decision: 'block' });
+  });
+});
+
+describe('createMiddlewareHook — updatedInput (path translation)', () => {
+  it('returns hookSpecificOutput.updatedInput when slot rewrites tool_input', async () => {
+    const translated = { command: 'view', path: '/workspace/agent/tenant-123/file.txt' };
+    const response = JSON.stringify({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput: translated },
+    });
+    const script = makeTempScript(`printf '%s' '${response}'`);
+
+    const hook = createMiddlewareHook([{ name: 'translate', command: script }]);
+    const result = await hook(
+      { tool_input: { command: 'view', path: '/mnt/user-data/file.txt' } } as never,
+      undefined,
+      { signal: noopSignal },
+    );
+
+    expect(result).toEqual({
+      hookSpecificOutput: { hookEventName: 'PreToolUse', updatedInput: translated },
+    });
+  });
+
+  it('threads updatedInput through subsequent slots', async () => {
+    const step1Out = JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        updatedInput: { path: '/workspace/agent/tenant-123/file.txt' },
+      },
+    });
+    const script1 = makeTempScript(`printf '%s' '${step1Out}'`);
+
+    // Second slot dumps its stdin to a temp file so we can assert what it received.
+    const recordFile = join(tmpdir(), `mw-record-${Math.random().toString(36).slice(2)}.txt`);
+    const script2 = makeTempScript(`cat > '${recordFile}'`);
+
+    const hook = createMiddlewareHook([
+      { name: 'translate', command: script1 },
+      { name: 'record', command: script2 },
+    ]);
+
+    await hook({ tool_input: { path: '/mnt/user-data/file.txt' } } as never, undefined, {
+      signal: noopSignal,
+    });
+
+    const recorded = JSON.parse(readFileSync(recordFile, 'utf8')) as {
+      tool_input?: { path?: string };
+    };
+    // Second slot must see the translated path, not the original.
+    expect(recorded.tool_input?.path).toBe('/workspace/agent/tenant-123/file.txt');
+  });
+
+  it('returns { continue: true } when no slot modifies tool_input', async () => {
+    const script1 = makeTempScript(`printf '%s' '{"decision":"continue"}'`);
+    const script2 = makeTempScript('exit 0');
+
+    const hook = createMiddlewareHook([
+      { name: 'allow1', command: script1 },
+      { name: 'allow2', command: script2 },
+    ]);
+    const result = await hook({ tool_input: { path: '/foo' } } as never, undefined, {
+      signal: noopSignal,
+    });
+    expect(result).toEqual({ continue: true });
+  });
+
+  it('short-circuits on block even after a successful translate', async () => {
+    const step1Out = JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        updatedInput: { path: '/workspace/agent/tenant-123/file.txt' },
+      },
+    });
+    const script1 = makeTempScript(`printf '%s' '${step1Out}'`);
+    const script2 = makeTempScript(`printf '%s' '{"decision":"block","reason":"second slot blocks"}'`);
+
+    const hook = createMiddlewareHook([
+      { name: 'translate', command: script1 },
+      { name: 'block', command: script2 },
+    ]);
+    const result = await hook(
+      { tool_input: { path: '/mnt/user-data/file.txt' } } as never,
+      undefined,
+      { signal: noopSignal },
+    );
+    expect((result as { decision?: string }).decision).toBe('block');
   });
 });
