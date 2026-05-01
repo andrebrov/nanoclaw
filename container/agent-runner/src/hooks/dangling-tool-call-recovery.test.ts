@@ -4,129 +4,10 @@ import path from 'path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { buildToolAllowlist, isThinkingOnlyEndTurn } from './claude.js';
-import { repairDanglingToolCalls } from '../hooks/dangling-tool-call-recovery.js';
-
-describe('isThinkingOnlyEndTurn', () => {
-  const base = { type: 'result', subtype: 'success', stop_reason: 'end_turn', result: '' };
-
-  it('returns true for a canonical thinking-only end_turn', () => {
-    expect(isThinkingOnlyEndTurn(base)).toBe(true);
-  });
-
-  it('returns true when result is whitespace-only', () => {
-    expect(isThinkingOnlyEndTurn({ ...base, result: '   \n  ' })).toBe(true);
-  });
-
-  it('returns false when result has text', () => {
-    expect(isThinkingOnlyEndTurn({ ...base, result: 'hello' })).toBe(false);
-  });
-
-  it('returns false when stop_reason is not end_turn', () => {
-    expect(isThinkingOnlyEndTurn({ ...base, stop_reason: 'max_tokens' })).toBe(false);
-  });
-
-  it('returns false when subtype is not success', () => {
-    expect(isThinkingOnlyEndTurn({ ...base, subtype: 'error' })).toBe(false);
-  });
-
-  it('returns false when type is not result', () => {
-    expect(isThinkingOnlyEndTurn({ ...base, type: 'assistant' })).toBe(false);
-  });
-
-  it('returns false for null', () => {
-    expect(isThinkingOnlyEndTurn(null)).toBe(false);
-  });
-
-  it('returns false for a non-object', () => {
-    expect(isThinkingOnlyEndTurn('result')).toBe(false);
-  });
-
-  it('returns false when result field is missing', () => {
-    const { result: _r, ...noResult } = base;
-    expect(isThinkingOnlyEndTurn(noResult)).toBe(false);
-  });
-});
-
-const SDK_DISALLOWED = [
-  'CronCreate',
-  'CronDelete',
-  'CronList',
-  'ScheduleWakeup',
-  'AskUserQuestion',
-  'EnterPlanMode',
-  'ExitPlanMode',
-  'EnterWorktree',
-  'ExitWorktree',
-];
-
-describe('buildToolAllowlist', () => {
-  it('empty caps → BASE_TOOLS only (no Bash, Write, WebSearch)', () => {
-    const tools = buildToolAllowlist([]);
-    expect(tools).toContain('Read');
-    expect(tools).toContain('Glob');
-    expect(tools).toContain('mcp__nanoclaw__*');
-    expect(tools).not.toContain('Bash');
-    expect(tools).not.toContain('Write');
-    expect(tools).not.toContain('Edit');
-    expect(tools).not.toContain('NotebookEdit');
-    expect(tools).not.toContain('WebSearch');
-    expect(tools).not.toContain('WebFetch');
-  });
-
-  it('shell_exec unlocks Bash', () => {
-    const tools = buildToolAllowlist(['shell_exec']);
-    expect(tools).toContain('Bash');
-    expect(tools).not.toContain('Write');
-    expect(tools).not.toContain('WebSearch');
-  });
-
-  it('file_write unlocks Write, Edit, NotebookEdit', () => {
-    const tools = buildToolAllowlist(['file_write']);
-    expect(tools).toContain('Write');
-    expect(tools).toContain('Edit');
-    expect(tools).toContain('NotebookEdit');
-    expect(tools).not.toContain('Bash');
-    expect(tools).not.toContain('WebSearch');
-  });
-
-  it('network unlocks WebSearch and WebFetch', () => {
-    const tools = buildToolAllowlist(['network']);
-    expect(tools).toContain('WebSearch');
-    expect(tools).toContain('WebFetch');
-    expect(tools).not.toContain('Bash');
-    expect(tools).not.toContain('Write');
-  });
-
-  it('all three caps unlock all tool groups', () => {
-    const tools = buildToolAllowlist(['shell_exec', 'file_write', 'network']);
-    expect(tools).toContain('Bash');
-    expect(tools).toContain('Write');
-    expect(tools).toContain('Edit');
-    expect(tools).toContain('NotebookEdit');
-    expect(tools).toContain('WebSearch');
-    expect(tools).toContain('WebFetch');
-  });
-
-  it('unknown cap is a no-op (does not unlock anything extra)', () => {
-    const tools = buildToolAllowlist(['shellexec', 'filewrite', 'typo']);
-    expect(tools).not.toContain('Bash');
-    expect(tools).not.toContain('Write');
-    expect(tools).not.toContain('WebSearch');
-  });
-
-  it('SDK_DISALLOWED_TOOLS are never in the allowlist', () => {
-    const tools = buildToolAllowlist(['shell_exec', 'file_write', 'network']);
-    for (const disallowed of SDK_DISALLOWED) {
-      expect(tools).not.toContain(disallowed);
-    }
-  });
-});
-
-// ── repairDanglingToolCalls ──
+import { repairDanglingToolCalls } from './dangling-tool-call-recovery.js';
 
 function writeTranscript(entries: object[]): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nanoclaw-test-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nanoclaw-dangling-test-'));
   const file = path.join(dir, 'session.jsonl');
   fs.writeFileSync(file, entries.map((e) => JSON.stringify(e)).join('\n'));
   return file;
@@ -209,6 +90,23 @@ describe('repairDanglingToolCalls', () => {
     expect(blocks[0].is_error).toBe(true);
   });
 
+  it('placeholder content signals interruption, not an empty result', () => {
+    const file = make([
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'xyz', name: 'Bash', input: {} }] },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs
+      .readFileSync(file, 'utf-8')
+      .split('\n')
+      .filter((l) => l.trim());
+    const injected = JSON.parse(lines[1]);
+    const block = (injected.message.content as Array<{ content: string }>)[0];
+    expect(block.content).toContain('interrupted');
+  });
+
   it('groups multiple dangling ids into a single injected user message', () => {
     const file = make([
       {
@@ -275,5 +173,52 @@ describe('repairDanglingToolCalls', () => {
       .split('\n')
       .filter((l) => l.trim());
     expect(lines).toHaveLength(2);
+  });
+
+  it('interrupted session resumes cleanly — mixed resolved and dangling calls', () => {
+    // Simulates: turn 1 completes normally, turn 2 is interrupted mid-loop
+    const file = make([
+      // Turn 1: completed tool call
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'turn1-call', name: 'Read', input: {} }] },
+      },
+      {
+        type: 'user',
+        message: {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'turn1-call', content: 'file contents' }],
+        },
+      },
+      // Turn 2: interrupted before result arrived
+      {
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'turn2-call-a', name: 'Bash', input: { command: 'echo hello' } },
+            { type: 'tool_use', id: 'turn2-call-b', name: 'Write', input: { file_path: '/tmp/x' } },
+          ],
+        },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs
+      .readFileSync(file, 'utf-8')
+      .split('\n')
+      .filter((l) => l.trim());
+    // Original 3 lines + 1 injected
+    expect(lines).toHaveLength(4);
+    const injected = JSON.parse(lines[3]);
+    const blocks = injected.message.content as Array<{ type: string; tool_use_id: string; is_error: boolean }>;
+    expect(blocks).toHaveLength(2);
+    const injectedIds = blocks.map((b) => b.tool_use_id);
+    expect(injectedIds).toContain('turn2-call-a');
+    expect(injectedIds).toContain('turn2-call-b');
+    expect(injectedIds).not.toContain('turn1-call');
+    // All placeholders are marked as errors (not empty results)
+    for (const block of blocks) {
+      expect(block.is_error).toBe(true);
+    }
   });
 });
