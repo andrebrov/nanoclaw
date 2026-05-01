@@ -151,6 +151,14 @@ export interface ContainerConfig {
    * defer every skill. Absent or empty → all skills loaded eagerly (default).
    */
   progressiveSkills?: string[] | 'all';
+  /**
+   * Hard cap on Task (sub-agent spawn) calls per model turn. After the model
+   * responds, calls that would exceed this limit are blocked before execution.
+   * The counter resets after each model turn. Absent or ≤ 0 → unlimited.
+   *
+   * Takes precedence over the host-level AGENT_SUBAGENT_LIMIT env var.
+   */
+  subagentLimit?: number;
 }
 
 const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
@@ -214,6 +222,13 @@ function parseLoopDetectionConfig(
   return undefined;
 }
 
+function parseSubagentLimit(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.floor(n);
+}
+
 function parseProgressiveSkills(raw: unknown): string[] | 'all' | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (raw === 'all') return 'all';
@@ -261,6 +276,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
         ? raw.maintenanceSkillBlocklist.filter((s): s is string => typeof s === 'string')
         : undefined,
       progressiveSkills: parseProgressiveSkills(raw.progressiveSkills),
+      subagentLimit: parseSubagentLimit(raw.subagentLimit),
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

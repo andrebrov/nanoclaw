@@ -111,6 +111,50 @@ describe('initContainerConfig', () => {
   });
 });
 
+describe('readContainerConfig — subagentLimit', () => {
+  it('absent field → undefined', () => {
+    writeGroupConfig('g1', { mcpServers: {} });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBeUndefined();
+  });
+
+  it('positive integer → returned as-is', () => {
+    writeGroupConfig('g1', { subagentLimit: 3 });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBe(3);
+  });
+
+  it('zero → undefined (treated as unlimited)', () => {
+    writeGroupConfig('g1', { subagentLimit: 0 });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBeUndefined();
+  });
+
+  it('negative value → undefined', () => {
+    writeGroupConfig('g1', { subagentLimit: -1 });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBeUndefined();
+  });
+
+  it('float → floored to integer', () => {
+    writeGroupConfig('g1', { subagentLimit: 3.9 });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBe(3);
+  });
+
+  it('string number → parsed', () => {
+    writeGroupConfig('g1', { subagentLimit: '5' });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBe(5);
+  });
+
+  it('non-numeric string → undefined', () => {
+    writeGroupConfig('g1', { subagentLimit: 'many' });
+    const cfg = readContainerConfig('g1');
+    expect(cfg.subagentLimit).toBeUndefined();
+  });
+});
+
 describe('backfillAllowedCapabilities', () => {
   it('backfills missing field and skips already-present field', () => {
     writeGroupConfig('old', { mcpServers: {} });

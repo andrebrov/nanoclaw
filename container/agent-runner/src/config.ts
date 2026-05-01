@@ -116,6 +116,12 @@ export interface RunnerConfig {
    * hook input as JSON on stdin. See MiddlewareChain for details.
    */
   middlewareChain: MiddlewareChain;
+  /**
+   * Hard cap on Task (sub-agent spawn) calls per model turn. Absent or ≤ 0
+   * means no limit from container.json; falls back to AGENT_SUBAGENT_LIMIT
+   * env var. Per-group config takes precedence over the env var.
+   */
+  subagentLimit: number | undefined;
 }
 
 const KNOWN_MIDDLEWARE_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure']);
@@ -174,6 +180,13 @@ function parseLoopDetection(raw: unknown): false | { windowSize: number; repeatT
   return false;
 }
 
+function parseContainerSubagentLimit(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return Math.floor(n);
+}
+
 let _config: RunnerConfig | null = null;
 
 /**
@@ -202,6 +215,7 @@ export function loadConfig(): RunnerConfig {
     linkedinPostValidator: raw.linkedinPostValidator === true,
     loopDetection: parseLoopDetection(raw.loopDetection),
     middlewareChain: parseMiddlewareChain(raw.middlewareChain),
+    subagentLimit: parseContainerSubagentLimit(raw.subagentLimit),
   };
 
   return _config;

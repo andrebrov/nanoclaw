@@ -53,6 +53,15 @@ export interface ProviderOptions {
    * the declared events. See MiddlewareChain for the slot format.
    */
   middlewareChain?: MiddlewareChain;
+  /**
+   * Hard cap on Task (sub-agent spawn) calls per model turn. When set,
+   * calls beyond this limit are blocked before execution and a context note
+   * is injected so the model adapts on the next step. Absent → unlimited
+   * (or falls back to AGENT_SUBAGENT_LIMIT env var if set).
+   *
+   * Per-group config (container.json) takes precedence over the env var.
+   */
+  subagentLimit?: number;
 }
 
 /**

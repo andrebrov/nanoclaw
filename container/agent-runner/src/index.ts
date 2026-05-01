@@ -207,6 +207,7 @@ async function main(): Promise<void> {
     linkedinPostValidator: config.linkedinPostValidator,
     loopDetection: config.loopDetection !== false ? config.loopDetection : false,
     middlewareChain: config.middlewareChain,
+    subagentLimit: config.subagentLimit,
   });
 
   await runPollLoop({

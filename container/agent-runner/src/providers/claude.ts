@@ -525,10 +525,12 @@ export class ClaudeProvider implements AgentProvider {
         : loopDetectionOpt && typeof loopDetectionOpt === 'object'
           ? loopDetectionOpt
           : false;
-    const subagentLimit = parseSubagentLimit();
+    // Per-group container.json config takes precedence over the global env var.
+    const subagentLimit = options.subagentLimit ?? parseSubagentLimit();
     const subagentLimitTracker = subagentLimit !== undefined ? new SubagentLimitTracker(subagentLimit) : undefined;
     if (subagentLimitTracker) {
-      log(`SubagentLimit enabled: max ${subagentLimit} Task spawn(s) per model turn`);
+      const source = options.subagentLimit !== undefined ? 'container.json' : 'env';
+      log(`SubagentLimit enabled: max ${subagentLimit} Task spawn(s) per model turn (source: ${source})`);
     }
     this.preToolUseHook = createPreToolUseHook({
       linkedinPostValidator: options.linkedinPostValidator === true,
