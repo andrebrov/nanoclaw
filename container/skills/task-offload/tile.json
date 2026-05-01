@@ -1,0 +1,11 @@
+{
+  "name": "finsi/task-offload",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Offload intermediate results from long multi-step tasks to /workspace/agent/offload/ to prevent context overflow.",
+  "skills": {
+    "task-offload": {
+      "path": "SKILL.md"
+    }
+  }
+}

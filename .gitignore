@@ -63,6 +63,7 @@ container/skills/*
 !container/skills/session-reentry/
 !container/skills/tweet-curator/
 !container/skills/wiki-briefing/
+!container/skills/task-offload/
 
 # One-off / local scripts
 scripts/.granola-auth-state.json
