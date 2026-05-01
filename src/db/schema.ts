@@ -144,6 +144,21 @@ CREATE TABLE pending_sender_approvals (
   created_at         TEXT NOT NULL,
   UNIQUE(messaging_group_id, sender_identity)
 );
+
+-- Per-channel and per-user config overrides resolved at request time.
+-- scope_type: 'channel' (by messaging_group_id) | 'user' (by user_id)
+-- scope_id: the messaging_group_id or user_id this override applies to
+-- agent_group_id: '' = all agent groups; otherwise scoped to one group
+-- config_json: JSON subset of {model, maxTokens, systemPromptAppend, allowedTools}
+-- Resolution order: channel override first, user override wins (merged).
+CREATE TABLE config_overrides (
+  scope_type     TEXT NOT NULL,
+  scope_id       TEXT NOT NULL,
+  agent_group_id TEXT NOT NULL DEFAULT '',
+  config_json    TEXT NOT NULL,
+  updated_at     TEXT NOT NULL,
+  PRIMARY KEY (scope_type, scope_id, agent_group_id)
+);
 `;
 
 /**
@@ -171,7 +186,9 @@ CREATE TABLE IF NOT EXISTS messages_in (
   platform_id    TEXT,
   channel_type   TEXT,
   thread_id      TEXT,
-  content        TEXT NOT NULL
+  content        TEXT NOT NULL,
+  overrides      TEXT
+                 -- JSON: resolved config overrides for this message (channel+user merged)
 );
 CREATE INDEX IF NOT EXISTS idx_messages_in_series ON messages_in(series_id);
 

@@ -49,6 +49,24 @@ export interface ProviderOptions {
   loopDetection?: boolean | { windowSize?: number; repeatThreshold?: number };
 }
 
+/**
+ * Per-channel and per-user config overrides resolved at request time.
+ * All fields are optional; only present fields are applied.
+ */
+export interface ConfigOverride {
+  /** Claude model string, e.g. "claude-haiku-4-5". */
+  model?: string;
+  /** Maximum output tokens for this request. */
+  maxTokens?: number;
+  /** Appended verbatim to the system prompt for this turn. */
+  systemPromptAppend?: string;
+  /**
+   * Additional tool names granted for this scope. Additive union with the
+   * group's base allowlist — cannot remove tools, only add them.
+   */
+  allowedTools?: string[];
+}
+
 export interface QueryInput {
   /** Initial prompt (already formatted by agent-runner). */
   prompt: string;
@@ -76,6 +94,14 @@ export interface QueryInput {
    * for silent maintenance runs.
    */
   isScheduledTask?: boolean;
+
+  /**
+   * Per-channel and per-user config overrides for this turn.
+   * Resolved by the host at routing time and stamped on the triggering
+   * message. When present, these values take precedence over the group's
+   * static container.json config for this query only.
+   */
+  overrides?: ConfigOverride;
 }
 
 export type McpServerConfig =

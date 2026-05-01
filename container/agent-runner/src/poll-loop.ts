@@ -31,13 +31,28 @@ import {
   stripInternalTags,
   type RoutingContext,
 } from './formatter.js';
-import type { AgentProvider, AgentQuery, ProviderEvent } from './providers/types.js';
+import type { AgentProvider, AgentQuery, ConfigOverride, ProviderEvent } from './providers/types.js';
 
 const POLL_INTERVAL_MS = 1000;
 const ACTIVE_POLL_INTERVAL_MS = 500;
 
 function log(msg: string): void {
   console.error(`[poll-loop] ${msg}`);
+}
+
+/**
+ * Extract the resolved config overrides from the triggering message in a batch.
+ * Uses the last trigger=1 message's overrides field; falls back to the last
+ * message in the batch. Returns null when no overrides are set.
+ */
+function extractTurnOverrides(messages: MessageInRow[]): ConfigOverride | null {
+  const trigger = [...messages].reverse().find((m) => m.trigger === 1) ?? messages[messages.length - 1];
+  if (!trigger?.overrides) return null;
+  try {
+    return JSON.parse(trigger.overrides) as ConfigOverride;
+  } catch {
+    return null;
+  }
 }
 
 function generateId(): string {
@@ -248,12 +263,19 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
           instructions: [config.systemContext?.instructions, sourceBlock].filter(Boolean).join('\n\n'),
         }
       : config.systemContext;
+
+    // Extract config overrides from the triggering message (highest-priority
+    // trigger=1 row in the batch, or the last message if none). The host
+    // stamps resolved channel+user overrides onto each message at routing time.
+    const turnOverrides = extractTurnOverrides(keep);
+
     const query = config.provider.query({
       prompt,
       continuation: batchContinuation,
       cwd: config.cwd,
       systemContext: turnSystemContext,
       isScheduledTask: keep.every((m) => m.kind === 'task'),
+      overrides: turnOverrides ?? undefined,
     });
 
     // Process the query while concurrently polling for new messages

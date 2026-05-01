@@ -21,6 +21,7 @@ import { getChannelAdapter } from './channels/channel-registry.js';
 import { gateCommand } from './command-gate.js';
 import { checkInboundRateLimit } from './inbound-rate-limiter.js';
 import { getAgentGroup, getAgentGroupByFolder } from './db/agent-groups.js';
+import { resolveOverrides } from './db/config-overrides.js';
 import { getDb } from './db/connection.js';
 import { recordDroppedMessage } from './db/dropped-messages.js';
 import {
@@ -583,6 +584,7 @@ async function deliverToAgent(
     }
   }
 
+  const resolvedOverrides = resolveOverrides(getDb(), mg.id, userId, agent.agent_group_id);
   writeSessionMessage(session.agent_group_id, session.id, {
     id: messageIdForAgent(event.message.id, agent.agent_group_id),
     kind: event.message.kind,
@@ -592,6 +594,7 @@ async function deliverToAgent(
     threadId: deliveryAddr.threadId,
     content: event.message.content,
     trigger: wake ? 1 : 0,
+    overrides: resolvedOverrides ? JSON.stringify(resolvedOverrides) : null,
   });
 
   log.info('Message routed', {

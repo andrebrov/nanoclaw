@@ -624,7 +624,18 @@ export class ClaudeProvider implements AgentProvider {
     const stream = new MessageStream();
     stream.push(input.prompt);
 
-    const instructions = input.systemContext?.instructions;
+    // Apply per-turn overrides on top of the group's static config.
+    const ov = input.overrides;
+    const effectiveModel = ov?.model?.trim() || this.model;
+    const effectiveTools = ov?.allowedTools
+      ? [...new Set([...this.toolAllowlist, ...ov.allowedTools])]
+      : this.toolAllowlist;
+
+    // Append any per-turn system prompt addendum (channel/user override).
+    const baseInstructions = input.systemContext?.instructions;
+    const instructions = ov?.systemPromptAppend
+      ? [baseInstructions, ov.systemPromptAppend].filter(Boolean).join('\n\n')
+      : baseInstructions;
 
     const sdkResult = sdkQuery({
       prompt: stream,
@@ -636,10 +647,11 @@ export class ClaudeProvider implements AgentProvider {
         systemPrompt: instructions
           ? { type: 'preset' as const, preset: 'claude_code' as const, append: instructions }
           : undefined,
-        allowedTools: this.toolAllowlist,
+        allowedTools: effectiveTools,
         disallowedTools: SDK_DISALLOWED_TOOLS,
         env: this.env,
-        model: this.model,
+        model: effectiveModel,
+        ...(ov?.maxTokens !== undefined ? { maxTokens: ov.maxTokens } : {}),
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         settingSources: ['project', 'user'],

@@ -26,6 +26,8 @@ export interface MessageInRow {
   channel_type: string | null;
   thread_id: string | null;
   content: string;
+  /** Serialised ConfigOverride JSON resolved from channel + user overrides. */
+  overrides: string | null;
 }
 
 // Cap on how many messages reach the agent in one prompt. Read from
