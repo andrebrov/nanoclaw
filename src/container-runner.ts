@@ -666,9 +666,16 @@ function syncSkillSymlinks(claudeDir: string, containerConfig: import('./contain
     desired = containerConfig.skills;
   }
 
-  const desiredSet = new Set(desired);
+  // Skills marked as progressive are NOT symlinked — Claude Code won't load
+  // them at startup. The agent discovers them via mcp__nanoclaw__list_skills
+  // and loads full instructions with mcp__nanoclaw__get_skill on demand.
+  const progressiveRaw = containerConfig.progressiveSkills;
+  const progressiveSet: Set<string> =
+    progressiveRaw === 'all' ? new Set(desired) : new Set(Array.isArray(progressiveRaw) ? progressiveRaw : []);
 
-  // Remove symlinks not in the desired set
+  const eagerSet = new Set(desired.filter((s) => !progressiveSet.has(s)));
+
+  // Remove symlinks not in the eager set (i.e. no longer desired or now progressive)
   for (const entry of fs.readdirSync(skillsDir)) {
     const entryPath = path.join(skillsDir, entry);
     let isSymlink = false;
@@ -677,13 +684,14 @@ function syncSkillSymlinks(claudeDir: string, containerConfig: import('./contain
     } catch {
       continue;
     }
-    if (isSymlink && !desiredSet.has(entry)) {
+    if (isSymlink && !eagerSet.has(entry)) {
       fs.unlinkSync(entryPath);
     }
   }
 
-  // Create symlinks for desired skills (container path targets)
+  // Create symlinks for eager (non-progressive) desired skills
   for (const skill of desired) {
+    if (progressiveSet.has(skill)) continue;
     const linkPath = path.join(skillsDir, skill);
     let exists = false;
     try {

@@ -34,6 +34,51 @@ const MCP_TOOLS_HOST_SUBPATH = path.join('container', 'agent-runner', 'src', 'mc
 
 const COMPOSED_HEADER = '<!-- Composed at spawn — do not edit. Edit CLAUDE.local.md for per-group content. -->';
 
+/**
+ * Extract the `description` field from a SKILL.md YAML frontmatter block.
+ * Handles quoted (single or double) and unquoted values, including multi-word
+ * descriptions that span the rest of the `description:` line.
+ */
+function parseSkillDescription(content: string): string {
+  const fm = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) return '';
+  const descMatch = fm[1].match(/^description:\s*([\s\S]*?)(?=\n\S|\n*$)/m);
+  if (!descMatch) return '';
+  return descMatch[1]
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim();
+}
+
+/**
+ * Build a compact manifest block listing progressive skills.
+ * Reads each skill's SKILL.md frontmatter from the host-side skills directory.
+ */
+function buildProgressiveSkillManifest(skillNames: string[], skillsHostDir: string): string {
+  const entries: string[] = [];
+  for (const name of skillNames.sort()) {
+    const skillMdPath = path.join(skillsHostDir, name, 'SKILL.md');
+    let desc = '';
+    if (fs.existsSync(skillMdPath)) {
+      try {
+        desc = parseSkillDescription(fs.readFileSync(skillMdPath, 'utf-8'));
+      } catch {
+        /* skip unreadable */
+      }
+    }
+    entries.push(`- **${name}**: ${desc}`);
+  }
+  return [
+    '## Skills available on demand',
+    '',
+    'The following skills are available but not pre-loaded. Use `mcp__nanoclaw__list_skills` to',
+    'see this list with descriptions, then `mcp__nanoclaw__get_skill("<name>")` to load the full',
+    'instructions for a specific skill before using it.',
+    '',
+    ...entries,
+  ].join('\n');
+}
+
 export interface ComposeOptions {
   /**
    * When non-empty, also write `CLAUDE.maintenance.md` alongside `CLAUDE.md`.
@@ -74,8 +119,25 @@ export function composeGroupClaudeMd(group: AgentGroup, opts?: ComposeOptions): 
   // Skill fragments — every skill that ships an `instructions.md`.
   // TODO (shared-source refactor): respect `container.json` skill selection.
   const skillsHostDir = path.join(process.cwd(), 'container', 'skills');
+
+  // Resolve the set of progressive skills from container config.
+  const progressiveRaw = config.progressiveSkills;
+  let allSkillNames: string[] = [];
   if (fs.existsSync(skillsHostDir)) {
-    for (const skillName of fs.readdirSync(skillsHostDir)) {
+    allSkillNames = fs.readdirSync(skillsHostDir).filter((e) => {
+      try {
+        return fs.statSync(path.join(skillsHostDir, e)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
+  }
+  const progressiveSet: Set<string> =
+    progressiveRaw === 'all' ? new Set(allSkillNames) : new Set(Array.isArray(progressiveRaw) ? progressiveRaw : []);
+
+  if (fs.existsSync(skillsHostDir)) {
+    for (const skillName of allSkillNames) {
+      if (progressiveSet.has(skillName)) continue; // deferred — not eagerly included
       const hostFragment = path.join(skillsHostDir, skillName, 'instructions.md');
       if (fs.existsSync(hostFragment)) {
         desired.set(`skill-${skillName}.md`, {
@@ -84,6 +146,13 @@ export function composeGroupClaudeMd(group: AgentGroup, opts?: ComposeOptions): 
         });
       }
     }
+  }
+
+  // Progressive skill manifest — a compact list added to CLAUDE.md when any
+  // skills are deferred. Informs the agent what's available on demand.
+  if (progressiveSet.size > 0) {
+    const manifest = buildProgressiveSkillManifest([...progressiveSet], skillsHostDir);
+    desired.set('progressive-skills.md', { type: 'inline', content: manifest });
   }
 
   // Built-in module fragments — every MCP tool source file that ships a

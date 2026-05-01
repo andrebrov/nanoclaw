@@ -139,6 +139,18 @@ export interface ContainerConfig {
    * Absent or empty → no filtering.
    */
   maintenanceSkillBlocklist?: string[];
+  /**
+   * Skills to load progressively (on-demand) rather than at session startup.
+   * Listed skills are NOT symlinked into `.claude/skills/` — Claude Code does
+   * not load their SKILL.md at startup. Instead, the agent discovers them via
+   * `mcp__nanoclaw__list_skills` and loads full instructions with
+   * `mcp__nanoclaw__get_skill`. Reduces baseline prompt tokens for sessions
+   * that don't use most skills (e.g. scheduled tasks).
+   *
+   * Entries are skill directory names under `container/skills/`. Use "all" to
+   * defer every skill. Absent or empty → all skills loaded eagerly (default).
+   */
+  progressiveSkills?: string[] | 'all';
 }
 
 const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
@@ -202,6 +214,14 @@ function parseLoopDetectionConfig(
   return undefined;
 }
 
+function parseProgressiveSkills(raw: unknown): string[] | 'all' | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (raw === 'all') return 'all';
+  if (!Array.isArray(raw)) return undefined;
+  const result = raw.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+  return result.length > 0 ? result : undefined;
+}
+
 function configPath(folder: string): string {
   return path.join(GROUPS_DIR, folder, 'container.json');
 }
@@ -240,6 +260,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       maintenanceSkillBlocklist: Array.isArray(raw.maintenanceSkillBlocklist)
         ? raw.maintenanceSkillBlocklist.filter((s): s is string => typeof s === 'string')
         : undefined,
+      progressiveSkills: parseProgressiveSkills(raw.progressiveSkills),
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);
