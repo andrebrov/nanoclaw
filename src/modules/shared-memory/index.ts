@@ -17,9 +17,12 @@ import type { Session } from '../../types.js';
 // Mirror of the container-side validation — must stay in sync.
 export const SAFE_FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 
-/** Collapse all whitespace runs to a single space and trim edges. Used for dedup comparison only. */
+/**
+ * Normalize a string for dedup comparison only — never stored.
+ * Lowercases, collapses whitespace runs to a single space, and trims edges.
+ */
 export function normalizeForDedup(s: string): string {
-  return s.trim().replace(/\s+/g, ' ');
+  return s.trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 async function handleWriteSharedMemory(content: Record<string, unknown>, session: Session): Promise<void> {

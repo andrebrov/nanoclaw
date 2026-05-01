@@ -27,6 +27,12 @@ describe('normalizeForDedup', () => {
   it('leaves already-normalized content unchanged', () => {
     expect(normalizeForDedup('hello world')).toBe('hello world');
   });
+
+  it('lowercases content for case-insensitive dedup', () => {
+    expect(normalizeForDedup('Hello World')).toBe('hello world');
+    expect(normalizeForDedup('APPLE IS A FRUIT')).toBe('apple is a fruit');
+    expect(normalizeForDedup('Mixed CASE  entry')).toBe('mixed case entry');
+  });
 });
 
 // --- write_shared_memory filename validation ---
