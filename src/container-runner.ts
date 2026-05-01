@@ -877,6 +877,14 @@ async function buildContainerArgs(
     args.push('-e', `AGENT_AUTO_COMPACT_WINDOW=${autoCompactWindow}`);
   }
 
+  // Hard cap on sub-agent (Task tool) spawns per model turn. When set, the
+  // container's PreToolUse hook blocks Task calls beyond this limit and injects
+  // a context note so the model adapts on the next step. Absent = unlimited.
+  const subagentLimit = process.env.AGENT_SUBAGENT_LIMIT?.trim();
+  if (subagentLimit) {
+    args.push('-e', `AGENT_SUBAGENT_LIMIT=${subagentLimit}`);
+  }
+
   // OneCLI gateway — injects HTTPS_PROXY + certs so container API calls
   // are routed through the agent vault for credential injection.
   try {

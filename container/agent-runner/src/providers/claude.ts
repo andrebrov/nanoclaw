@@ -7,6 +7,7 @@ import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/conn
 import { writeMessageOut } from '../db/messages-out.js';
 import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
 import { createLoopDetectionGate } from '../hooks/loop-detection.js';
+import { parseSubagentLimit, SUBAGENT_TOOL, SubagentLimitTracker } from '../hooks/subagent-limit.js';
 import { getSessionTrustLevel } from '../db/session-routing.js';
 import { registerProvider } from './provider-registry.js';
 import type {
@@ -264,6 +265,7 @@ function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | nu
 function createPreToolUseHook(options: {
   linkedinPostValidator: boolean;
   loopDetection: false | { windowSize?: number; repeatThreshold?: number };
+  subagentLimitTracker?: SubagentLimitTracker;
 }): HookCallback {
   const loopGate = options.loopDetection !== false ? createLoopDetectionGate(options.loopDetection) : null;
 
@@ -275,6 +277,13 @@ function createPreToolUseHook(options: {
         decision: 'block',
         stopReason: `Tool '${toolName}' is not available in this environment — use the nanoclaw equivalent.`,
       } as unknown as ReturnType<HookCallback>;
+    }
+    if (options.subagentLimitTracker && toolName === SUBAGENT_TOOL) {
+      const stopReason = options.subagentLimitTracker.intercept();
+      if (stopReason) {
+        log(`[subagent-limit] blocking Task call: ${stopReason}`);
+        return { decision: 'block', stopReason } as unknown as ReturnType<HookCallback>;
+      }
     }
     // LLM06 guard: block reads of sensitive workspace paths when the session
     // channel is public (anyone-can-post). A prompt injection in such a message
@@ -337,6 +346,14 @@ const postToolUseHook: HookCallback = async () => {
   }
   return { continue: true };
 };
+
+/** Reset the sub-agent turn counter on PostToolBatch (before the next model request). */
+function createPostToolBatchHook(tracker: SubagentLimitTracker): HookCallback {
+  return async () => {
+    tracker.reset();
+    return { continue: true };
+  };
+}
 
 function createPreCompactHook(assistantName?: string): HookCallback {
   return async (input) => {
@@ -568,6 +585,7 @@ export class ClaudeProvider implements AgentProvider {
   private toolAllowlist: string[];
   private model: string | undefined;
   private preToolUseHook: HookCallback;
+  private postToolBatchHook: HookCallback | undefined;
 
   constructor(options: ProviderOptions = {}) {
     this.assistantName = options.assistantName;
@@ -581,10 +599,17 @@ export class ClaudeProvider implements AgentProvider {
         : loopDetectionOpt && typeof loopDetectionOpt === 'object'
           ? loopDetectionOpt
           : false;
+    const subagentLimit = parseSubagentLimit();
+    const subagentLimitTracker = subagentLimit !== undefined ? new SubagentLimitTracker(subagentLimit) : undefined;
+    if (subagentLimitTracker) {
+      log(`SubagentLimit enabled: max ${subagentLimit} Task spawn(s) per model turn`);
+    }
     this.preToolUseHook = createPreToolUseHook({
       linkedinPostValidator: options.linkedinPostValidator === true,
       loopDetection,
+      subagentLimitTracker,
     });
+    this.postToolBatchHook = subagentLimitTracker ? createPostToolBatchHook(subagentLimitTracker) : undefined;
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude
     // subprocess — it spawns with a filtered/sanitized env. Symptom when
@@ -665,6 +690,7 @@ export class ClaudeProvider implements AgentProvider {
           PostToolUse: [{ hooks: [postToolUseHook] }],
           PostToolUseFailure: [{ hooks: [postToolUseHook] }],
           PreCompact: [{ hooks: [createPreCompactHook(this.assistantName)] }],
+          ...(this.postToolBatchHook ? { PostToolBatch: [{ hooks: [this.postToolBatchHook] }] } : {}),
         },
       },
     });
