@@ -6,6 +6,7 @@ import { query as sdkQuery, type HookCallback, type PreCompactHookInput } from '
 import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/connection.js';
 import { writeMessageOut } from '../db/messages-out.js';
 import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
+import { createLoopDetectionGate } from '../hooks/loop-detection.js';
 import { getSessionTrustLevel } from '../db/session-routing.js';
 import { registerProvider } from './provider-registry.js';
 import type {
@@ -255,8 +256,17 @@ function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | nu
  * When `linkedinPostValidator` is true, Bash commands matching the
  * LinkedIn-posting patterns are also routed through the merchant-advocate
  * gate before they execute (see ../hooks/linkedin-post-validator.ts).
+ *
+ * When `loopDetection` is set, a rolling-hash guard checks every tool call
+ * against the last N calls and blocks repeated identical sequences
+ * (see ../hooks/loop-detection.ts).
  */
-function createPreToolUseHook(options: { linkedinPostValidator: boolean }): HookCallback {
+function createPreToolUseHook(options: {
+  linkedinPostValidator: boolean;
+  loopDetection: false | { windowSize?: number; repeatThreshold?: number };
+}): HookCallback {
+  const loopGate = options.loopDetection !== false ? createLoopDetectionGate(options.loopDetection) : null;
+
   return async (input) => {
     const i = input as { tool_name?: string; tool_input?: Record<string, unknown> };
     const toolName = i.tool_name ?? '';
@@ -294,6 +304,15 @@ function createPreToolUseHook(options: { linkedinPostValidator: boolean }): Hook
             stopReason: decision.reason,
           } as unknown as ReturnType<HookCallback>;
         }
+      }
+    }
+    if (loopGate) {
+      const decision = loopGate(toolName, i.tool_input);
+      if (decision.block) {
+        return {
+          decision: 'block',
+          stopReason: decision.reason,
+        } as unknown as ReturnType<HookCallback>;
       }
     }
     // Bash exposes its timeout via the tool_input.timeout field (ms). Any other
@@ -477,8 +496,16 @@ export class ClaudeProvider implements AgentProvider {
     this.mcpServers = options.mcpServers ?? {};
     this.additionalDirectories = options.additionalDirectories;
     this.toolAllowlist = buildToolAllowlist(options.allowedCapabilities ?? []);
+    const loopDetectionOpt = options.loopDetection;
+    const loopDetection: false | { windowSize?: number; repeatThreshold?: number } =
+      loopDetectionOpt === true
+        ? {}
+        : loopDetectionOpt && typeof loopDetectionOpt === 'object'
+          ? loopDetectionOpt
+          : false;
     this.preToolUseHook = createPreToolUseHook({
       linkedinPostValidator: options.linkedinPostValidator === true,
+      loopDetection,
     });
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude

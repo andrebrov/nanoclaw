@@ -185,6 +185,7 @@ async function main(): Promise<void> {
     additionalDirectories: additionalDirectories.length > 0 ? additionalDirectories : undefined,
     allowedCapabilities: config.allowedCapabilities,
     linkedinPostValidator: config.linkedinPostValidator,
+    loopDetection: config.loopDetection !== false ? config.loopDetection : false,
   });
 
   await runPollLoop({

@@ -71,9 +71,29 @@ export interface RunnerConfig {
    * specs/linkedin-post-validator.spec.md.
    */
   linkedinPostValidator: boolean;
+  /**
+   * When set, the PreToolUse hook maintains a rolling window of the last
+   * `windowSize` tool call fingerprints and blocks any call whose fingerprint
+   * has appeared `repeatThreshold` or more times in the window.
+   * false / absent → disabled.
+   */
+  loopDetection: false | { windowSize: number; repeatThreshold: number };
 }
 
 const DEFAULT_MAX_MESSAGES = 10;
+
+function parseLoopDetection(raw: unknown): false | { windowSize: number; repeatThreshold: number } {
+  if (!raw) return false;
+  if (raw === true) return { windowSize: 10, repeatThreshold: 3 };
+  if (typeof raw === 'object' && raw !== null) {
+    const o = raw as Record<string, unknown>;
+    const windowSize = typeof o.windowSize === 'number' && o.windowSize > 0 ? Math.floor(o.windowSize) : 10;
+    const repeatThreshold =
+      typeof o.repeatThreshold === 'number' && o.repeatThreshold >= 2 ? Math.floor(o.repeatThreshold) : 3;
+    return { windowSize, repeatThreshold };
+  }
+  return false;
+}
 
 let _config: RunnerConfig | null = null;
 
@@ -101,6 +121,7 @@ export function loadConfig(): RunnerConfig {
     isAdmin: (raw.isAdmin as boolean) === true,
     allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities),
     linkedinPostValidator: raw.linkedinPostValidator === true,
+    loopDetection: parseLoopDetection(raw.loopDetection),
   };
 
   return _config;

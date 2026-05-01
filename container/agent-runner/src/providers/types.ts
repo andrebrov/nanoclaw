@@ -40,6 +40,13 @@ export interface ProviderOptions {
    * routed through the rubric before they execute.
    */
   linkedinPostValidator?: boolean;
+  /**
+   * Enable the loop-detection gate. The Claude provider tracks a rolling
+   * window of tool-call fingerprints and blocks repeated identical calls.
+   * Pass `true` for defaults (window=10, threshold=3) or an object to
+   * configure thresholds explicitly.
+   */
+  loopDetection?: boolean | { windowSize?: number; repeatThreshold?: number };
 }
 
 export interface QueryInput {

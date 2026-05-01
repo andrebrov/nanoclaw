@@ -94,6 +94,13 @@ export interface ContainerConfig {
    */
   linkedinPostValidator?: boolean;
   /**
+   * Enable the loop-detection guard. The agent's PreToolUse hook maintains
+   * a rolling window of tool-call fingerprints and blocks repeated identical
+   * calls. Set to `true` for defaults (window=10, threshold=3) or an object
+   * to configure thresholds explicitly.
+   */
+  loopDetection?: boolean | { windowSize?: number; repeatThreshold?: number };
+  /**
    * Optional observer status channel — streams thinking/tool events and
    * watchdog pings to a separate channel for real-time observability.
    * When absent, the status-channel feature is disabled; the reaction
@@ -158,6 +165,22 @@ function parseAllowedCapabilities(raw: unknown, source: string): AgentCapability
   return result;
 }
 
+function parseLoopDetectionConfig(
+  raw: unknown,
+): boolean | { windowSize?: number; repeatThreshold?: number } | undefined {
+  if (raw === true) return true;
+  if (!raw) return undefined;
+  if (typeof raw === 'object' && raw !== null) {
+    const o = raw as Record<string, unknown>;
+    const out: { windowSize?: number; repeatThreshold?: number } = {};
+    if (typeof o.windowSize === 'number' && o.windowSize > 0) out.windowSize = Math.floor(o.windowSize);
+    if (typeof o.repeatThreshold === 'number' && o.repeatThreshold >= 2)
+      out.repeatThreshold = Math.floor(o.repeatThreshold);
+    return out;
+  }
+  return undefined;
+}
+
 function configPath(folder: string): string {
   return path.join(GROUPS_DIR, folder, 'container.json');
 }
@@ -191,6 +214,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       isAdmin: raw.isAdmin,
       allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
       linkedinPostValidator: raw.linkedinPostValidator === true,
+      loopDetection: parseLoopDetectionConfig(raw.loopDetection),
       observer: raw.observer,
       maintenanceSkillBlocklist: Array.isArray(raw.maintenanceSkillBlocklist)
         ? raw.maintenanceSkillBlocklist.filter((s): s is string => typeof s === 'string')
