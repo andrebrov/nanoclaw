@@ -743,6 +743,84 @@ The provider name comes from the container's environment (`AGENT_PROVIDER` env v
 - Additional directories discovery (`/workspace/extra/*`)
 - Logging via stderr (`[agent-runner] ...`)
 
+## Middleware Chain
+
+The middleware chain is an explicit, ordered pipeline of shell-command hooks that gate tool calls before the SDK executes them. It is configured per-event in `container.json` and is separate from — and runs after — the built-in gates (loop detection, LinkedIn post validator, capability allowlist).
+
+### Interface
+
+Each **slot** maps a display name to a shell command:
+
+```typescript
+interface MiddlewareSlot {
+  name: string;     // display name (used in log messages)
+  command: string;  // shell command executed via /bin/sh -c
+}
+```
+
+The **chain** is keyed by Claude Agent SDK hook event name:
+
+```typescript
+type MiddlewareChain = Partial<Record<
+  'PreToolUse' | 'PostToolUse' | 'PostToolUseFailure',
+  MiddlewareSlot[]
+>>;
+```
+
+### Execution order
+
+Slots are executed **sequentially in declared order**. The chain short-circuits on the first blocking slot — later slots never run. This means:
+
+1. Place the cheapest or most-likely-to-block gate first.
+2. Place expensive or rarely-triggered gates last.
+
+**Order is a contract.** Swapping two slots changes which gate fires first and therefore which reason the agent sees.
+
+### Slot protocol
+
+Each slot receives the full hook input as JSON on **stdin**. The slot communicates its decision via stdout and exit code:
+
+| stdout | exit code | decision |
+|--------|-----------|----------|
+| empty or non-JSON | 0 | **continue** |
+| `{"decision":"continue"}` | any | **continue** |
+| `{"decision":"block","reason":"..."}` | any | **block**, reason from JSON |
+| non-JSON text | non-zero | **block**, reason from stdout |
+| empty | non-zero | **block**, generic reason |
+
+**Fail-open:** Any spawn error or timeout (10 s per slot) is treated as **continue** — a broken gate never causes the agent to stall.
+
+### Example container.json entry
+
+```json
+{
+  "middlewareChain": {
+    "PreToolUse": [
+      { "name": "sandbox",        "command": "/workspace/hooks/sandbox.sh" },
+      { "name": "loop_detection", "command": "/workspace/hooks/loop.sh" }
+    ],
+    "PostToolUse": [
+      { "name": "memory",         "command": "/workspace/hooks/memory.sh" }
+    ]
+  }
+}
+```
+
+### Relationship to built-in hooks
+
+The middleware chain runs **in addition to** the built-in `PreToolUse` gates. Execution order within a single SDK hook event:
+
+1. Built-in gates (capability allowlist check, loop detection, LinkedIn post validator) — wired directly in the Claude provider.
+2. Middleware chain slots — wired from `middlewareChain` in `container.json`.
+
+If any built-in gate blocks, the middleware chain never runs. If any middleware slot blocks, the remaining slots never run.
+
+### Implementation
+
+- **`container/agent-runner/src/hooks/middleware-chain.ts`** — `createMiddlewareHook(slots)` builds a `HookCallback` that runs the chain.
+- **`container/agent-runner/src/config.ts`** — `parseMiddlewareChain()` validates and normalises the raw JSON; `MiddlewareSlot` and `MiddlewareChain` types are exported from here.
+- **`container/agent-runner/src/providers/claude.ts`** — wires `createMiddlewareHook` into the SDK `hooks` option at query time.
+
 ## Related Documents
 
 - **[architecture.md](architecture.md)** — High-level architecture (session DB schema, central DB, channel adapters, message flow)
