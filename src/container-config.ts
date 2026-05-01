@@ -159,6 +159,39 @@ export interface ContainerConfig {
    * Takes precedence over the host-level AGENT_SUBAGENT_LIMIT env var.
    */
   subagentLimit?: number;
+  /**
+   * Three-stage cost gate for match-all group wirings (issue #174).
+   *
+   * Only applies when engage_mode='pattern' and engage_pattern='.' on a
+   * group messaging group. DMs and explicit @mentions always bypass the gate.
+   *
+   * Stage 1 (deterministic): reply-to-our-bot, thread bot-involvement signal,
+   * other-bot-handle skip.
+   * Stage 2 (Haiku classifier): binary YES/NO via claude-haiku-4-5.
+   * Requires ANTHROPIC_API_KEY in .env.
+   */
+  costGating?: {
+    /** Enable the three-stage gate. Default: false. */
+    enabled?: boolean;
+    /**
+     * Platform handles of sibling bots in this group (e.g. ["RockyBot", "LoMBot"]).
+     * When a message @-mentions only one of these and not our bot, Stage 1
+     * immediately skips engagement — no Stage 2 call needed.
+     */
+    otherBotHandles?: string[];
+    /**
+     * Classifier bias for Stage 2.
+     * 'no'  → bias toward not spawning (good for high-volume social chats).
+     * 'yes' → bias toward spawning (good for dev/ops chats where missing a
+     *         message is costly). Default: 'no'.
+     */
+    classifierBias?: 'yes' | 'no';
+    /**
+     * Number of recent messages to include as Stage 2 context.
+     * Higher values improve accuracy but increase token cost. Default: 10.
+     */
+    contextMessageCount?: number;
+  };
 }
 
 const ALL_CAPABILITIES: AgentCapability[] = ['shell_exec', 'file_write', 'network'];
@@ -229,6 +262,25 @@ function parseSubagentLimit(raw: unknown): number | undefined {
   return Math.floor(n);
 }
 
+function parseCostGatingConfig(raw: unknown): ContainerConfig['costGating'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const handles = Array.isArray(o.otherBotHandles)
+    ? o.otherBotHandles.filter((h): h is string => typeof h === 'string' && h.trim().length > 0)
+    : undefined;
+  const bias = o.classifierBias === 'yes' || o.classifierBias === 'no' ? o.classifierBias : undefined;
+  const count =
+    typeof o.contextMessageCount === 'number' && o.contextMessageCount > 0
+      ? Math.floor(o.contextMessageCount)
+      : undefined;
+  return {
+    enabled: o.enabled === true,
+    otherBotHandles: handles,
+    classifierBias: bias,
+    contextMessageCount: count,
+  };
+}
+
 function parseProgressiveSkills(raw: unknown): string[] | 'all' | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (raw === 'all') return 'all';
@@ -277,6 +329,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
         : undefined,
       progressiveSkills: parseProgressiveSkills(raw.progressiveSkills),
       subagentLimit: parseSubagentLimit(raw.subagentLimit),
+      costGating: parseCostGatingConfig(raw.costGating),
     };
   } catch (err) {
     console.error(`[container-config] failed to parse ${p}: ${String(err)}`);

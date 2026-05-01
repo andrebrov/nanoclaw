@@ -12,8 +12,10 @@
  */
 import Database from 'better-sqlite3';
 import fs from 'fs';
+import path from 'path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { isExplicitNewRequest } from './router.js';
+import { isAddressedToOtherBot, isReplyToOurMessage, threadHasBotInvolvement } from './cost-gate.js';
 
 import {
   initTestDb,
@@ -709,5 +711,122 @@ describe('Stage 1 gate integration — group channel (issue #175)', () => {
     }
 
     expect(wakeContainer).not.toHaveBeenCalled();
+  });
+});
+
+// ── Stage 1 cost-gate helpers (issue #174) ───────────────────────────────────
+//
+// Pure-unit tests for the deterministic helpers in cost-gate.ts. No network
+// calls, no container involvement. The DB-backed helpers (isReplyToOurMessage,
+// threadHasBotInvolvement) use a temporary messages.db that the shared
+// beforeEach below seeds at the DATA_DIR path (mocked to '/tmp/nanoclaw-test-router').
+
+// The config.js mock above maps DATA_DIR → '/tmp/nanoclaw-test-router', so
+// cost-gate.ts will open its messages.db at that path. Seed it before tests.
+const COST_GATE_DB_PATH = path.join('/tmp/nanoclaw-test-router', 'messages.db');
+
+beforeEach(() => {
+  // The outer beforeEach has already created '/tmp/nanoclaw-test-router' and
+  // its v2.db. Now seed a messages.db with known outbound rows for cost-gate tests.
+  if (!fs.existsSync('/tmp/nanoclaw-test-router')) {
+    fs.mkdirSync('/tmp/nanoclaw-test-router', { recursive: true });
+  }
+  // Overwrite any messages.db written by previous test runs (message-store
+  // lazily creates it on first use; here we pre-populate it for cost-gate tests).
+  if (fs.existsSync(COST_GATE_DB_PATH)) fs.unlinkSync(COST_GATE_DB_PATH);
+  const db = new Database(COST_GATE_DB_PATH);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      messaging_group_id TEXT,
+      channel_type       TEXT NOT NULL,
+      platform_id        TEXT NOT NULL,
+      thread_id          TEXT,
+      direction          TEXT NOT NULL,
+      kind               TEXT,
+      sender_user_id     TEXT,
+      sender_name        TEXT,
+      text               TEXT,
+      content_json       TEXT,
+      platform_msg_id    TEXT,
+      session_id         TEXT,
+      agent_group_id     TEXT,
+      created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+  // Outbound row: bot sent a message on this channel/thread
+  db.prepare(
+    `INSERT INTO messages
+       (channel_type, platform_id, thread_id, direction, platform_msg_id, created_at)
+       VALUES ('telegram', 'tg-cost-chat', 'thread-A', 'out', '42000', datetime('now'))`,
+  ).run();
+  // Inbound row (NOT ours): should NOT match isReplyToOurMessage
+  db.prepare(
+    `INSERT INTO messages
+       (channel_type, platform_id, thread_id, direction, platform_msg_id, created_at)
+       VALUES ('telegram', 'tg-cost-chat', null, 'in', '41999', datetime('now'))`,
+  ).run();
+  db.close();
+});
+
+describe('isAddressedToOtherBot (issue #174)', () => {
+  it('returns false when no other-bot handles configured', () => {
+    expect(isAddressedToOtherBot('@RockyBot fix this', [])).toBe(false);
+  });
+
+  it('returns true when message @-mentions a known other-bot handle', () => {
+    expect(isAddressedToOtherBot('@RockyBot fix the login', ['RockyBot', 'LoMBot'])).toBe(true);
+  });
+
+  it('returns true for handle mid-sentence', () => {
+    expect(isAddressedToOtherBot('hey @LoMBot what do you think?', ['RockyBot', 'LoMBot'])).toBe(true);
+  });
+
+  it('returns false when message mentions our own bot (not in otherBotHandles)', () => {
+    expect(isAddressedToOtherBot('@OurBot do this', ['RockyBot', 'LoMBot'])).toBe(false);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isAddressedToOtherBot('@rockybot fix this', ['RockyBot'])).toBe(true);
+  });
+
+  it('requires word boundary (no partial match)', () => {
+    expect(isAddressedToOtherBot('we use RockyBotXYZ today', ['RockyBot'])).toBe(false);
+  });
+});
+
+describe('isReplyToOurMessage (issue #174)', () => {
+  it('returns true when replyToMsgId matches an outbound platform_msg_id', () => {
+    expect(isReplyToOurMessage('telegram', 'tg-cost-chat', '42000')).toBe(true);
+  });
+
+  it('returns true for numeric replyToMsgId matching string platform_msg_id', () => {
+    expect(isReplyToOurMessage('telegram', 'tg-cost-chat', 42000)).toBe(true);
+  });
+
+  it('returns false when replyToMsgId matches an inbound message (not ours)', () => {
+    expect(isReplyToOurMessage('telegram', 'tg-cost-chat', '41999')).toBe(false);
+  });
+
+  it('returns false for null replyToMsgId', () => {
+    expect(isReplyToOurMessage('telegram', 'tg-cost-chat', null)).toBe(false);
+  });
+
+  it('returns false for unknown channel/platform', () => {
+    expect(isReplyToOurMessage('slack', 'no-such-channel', '42000')).toBe(false);
+  });
+});
+
+describe('threadHasBotInvolvement (issue #174)', () => {
+  it('returns true when thread has a prior bot outbound message', () => {
+    expect(threadHasBotInvolvement('telegram', 'tg-cost-chat', 'thread-A')).toBe(true);
+  });
+
+  it('returns false for a thread with no outbound messages', () => {
+    expect(threadHasBotInvolvement('telegram', 'tg-cost-chat', 'thread-Z')).toBe(false);
+  });
+
+  it('returns false for a different channel', () => {
+    expect(threadHasBotInvolvement('slack', 'tg-cost-chat', 'thread-A')).toBe(false);
   });
 });

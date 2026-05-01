@@ -38,6 +38,14 @@ import { indexMessage } from './message-store.js';
 import { resolveSession, writeSessionMessage, writeOutboundDirect } from './session-manager.js';
 import { wakeContainer } from './container-runner.js';
 import { getSession } from './db/sessions.js';
+import { readContainerConfig } from './container-config.js';
+import {
+  classifyNeedsAgent,
+  getRecentGroupMessages,
+  isAddressedToOtherBot,
+  isReplyToOurMessage,
+  threadHasBotInvolvement,
+} from './cost-gate.js';
 import type { AgentGroup, MessagingGroup, MessagingGroupAgent } from './types.js';
 import type { InboundEvent } from './channels/adapter.js';
 
@@ -408,20 +416,98 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
     const scopeOk = engages && accessOk && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
 
     if (engages && accessOk && scopeOk) {
-      // Stage 1 gate (issue #175): only wake the container when the message
-      // carries explicit new-request intent. DMs (is_group=0) and explicit
-      // @mentions bypass the gate — they are direct user-addressed requests.
-      // For all other engaged messages (pattern match-all, mention-sticky
-      // follow-ups) that read as context-only or continuation-without-directive,
-      // the message is stored with trigger=0 so the agent sees it as history on
-      // the next real wake, avoiding a no-op container spawn.
-      const wake = mg.is_group === 0 || isMention || isExplicitNewRequest(messageText);
+      // Three-stage cost gate (issues #174, #175).
+      //
+      // Stage 1 (deterministic, microseconds): fast-pass on DMs and explicit
+      // @mentions of our bot. For group match-all wirings also check:
+      //   • isExplicitNewRequest — short directive or question
+      //   • reply-to-our-message — inbound replies to one of our outbound msgs
+      //   • thread bot-involvement — we already engaged in this thread
+      //   • other-bot skip — message @-mentions only a sibling bot → no wake,
+      //     no Stage 2 (clearly not our responsibility)
+      //
+      // Stage 2 (Haiku classifier, ~$0.003/call): fired only when Stage 1 did
+      // not fast-pass AND costGating.enabled=true in container.json. Wraps all
+      // user content in <untrusted-input> (OWASP LLM01/LLM08).
+      //
+      // For all other wirings (mention, mention-sticky, custom pattern) only
+      // the existing isExplicitNewRequest heuristic applies (Stage 1 only).
+
+      // Is this wiring a match-all pattern on a group chat? Cost gating only
+      // applies to this shape (every-message-triggers pattern in group chats).
+      const isMatchAll = mg.is_group !== 0 && agent.engage_mode === 'pattern' && (agent.engage_pattern ?? '.') === '.';
+      const costGatingCfg = isMatchAll ? readContainerConfig(agentGroup.folder).costGating : undefined;
+
+      // Fast-pass: DM or explicit @mention of our bot → always wake.
+      let wake = mg.is_group === 0 || isMention;
+
       if (!wake) {
-        log.debug('Stage 1 gate: context-only message — stored without container wake', {
-          agentGroupId: agent.agent_group_id,
-          text: messageText.slice(0, 120),
-        });
+        // Stage 1: existing heuristic (applies to all group wiring types).
+        wake = isExplicitNewRequest(messageText);
+
+        // Stage 1 extended checks — match-all group wirings only.
+        if (!wake && isMatchAll) {
+          // Reply-to-our-message: extract platform reply reference from content.
+          let replyToMsgId: string | number | null = null;
+          try {
+            const rawContent = JSON.parse(event.message.content) as Record<string, unknown>;
+            replyToMsgId = (rawContent.replyToMessageId ?? rawContent.reply_to_message_id ?? null) as
+              | string
+              | number
+              | null;
+          } catch {
+            /* non-JSON content — no reply id */
+          }
+
+          if (isReplyToOurMessage(event.channelType, event.platformId, replyToMsgId)) {
+            log.debug('Stage 1 gate: reply-to-our-message → wake', { agentGroupId: agent.agent_group_id });
+            wake = true;
+          } else if (event.threadId && threadHasBotInvolvement(event.channelType, event.platformId, event.threadId)) {
+            log.debug('Stage 1 gate: thread bot-involvement → wake', { agentGroupId: agent.agent_group_id });
+            wake = true;
+          }
+
+          // Other-bot skip: message @-mentions only a sibling bot.
+          // Store silently without waking; skip Stage 2 — it's not our message.
+          if (!wake) {
+            const otherHandles = costGatingCfg?.otherBotHandles ?? [];
+            if (otherHandles.length > 0 && isAddressedToOtherBot(messageText, otherHandles)) {
+              log.debug('Stage 1 gate: addressed to sibling bot — stored without wake', {
+                agentGroupId: agent.agent_group_id,
+                text: messageText.slice(0, 80),
+              });
+              // deliver with wake=false; no Stage 2
+              await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, false);
+              engagedCount++;
+              // engage_mode='pattern' so the mention-sticky block below is a no-op;
+              // using continue to be explicit about skipping it.
+              continue;
+            }
+          }
+
+          // Stage 2: Haiku classifier.
+          if (!wake && costGatingCfg?.enabled) {
+            const contextCount = costGatingCfg.contextMessageCount ?? 10;
+            const biasNo = (costGatingCfg.classifierBias ?? 'no') === 'no';
+            const context = getRecentGroupMessages(event.channelType, event.platformId, contextCount);
+            wake = await classifyNeedsAgent(messageText, context, biasNo);
+            if (!wake) {
+              log.debug('Stage 2 classifier: no bot engagement needed — stored without wake', {
+                agentGroupId: agent.agent_group_id,
+                text: messageText.slice(0, 120),
+              });
+            }
+          }
+        }
+
+        if (!wake) {
+          log.debug('Cost gate: context-only message — stored without container wake', {
+            agentGroupId: agent.agent_group_id,
+            text: messageText.slice(0, 120),
+          });
+        }
       }
+
       await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, wake);
       engagedCount++;
 
