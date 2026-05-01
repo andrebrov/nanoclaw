@@ -91,12 +91,15 @@ export const addMcpServer: McpToolDefinition = {
   tool: {
     name: 'add_mcp_server',
     description:
-      'Wire an EXISTING third-party MCP server into YOUR per-agent runtime config. For local process servers provide `command` + `args`. For remote HTTP/SSE servers (e.g. `https://mcp.granola.ai/mcp`) provide `url` and optionally `type` ("http" or "sse", default "http") and `headers`. Requires admin approval; fire-and-forget.',
+      'Wire an EXISTING third-party MCP server into YOUR per-agent runtime config. For local process servers provide `command` + `args`. For remote HTTP/SSE servers (e.g. `https://mcp.granola.ai/mcp`) provide `url` and optionally `type` ("http" or "sse", default "http"), `headers`, and `oauth` for OAuth 2.0 auth. Requires admin approval; fire-and-forget.',
     inputSchema: {
       type: 'object' as const,
       properties: {
         name: { type: 'string', description: 'MCP server name (unique identifier)' },
-        command: { type: 'string', description: 'Command to run a local stdio MCP server (e.g. `npx @modelcontextprotocol/server-github`)' },
+        command: {
+          type: 'string',
+          description: 'Command to run a local stdio MCP server (e.g. `npx @modelcontextprotocol/server-github`)',
+        },
         args: { type: 'array', items: { type: 'string' }, description: 'Command arguments (local servers only)' },
         env: { type: 'object', description: 'Environment variables for local servers' },
         url: { type: 'string', description: 'URL of a remote HTTP or SSE MCP server' },
@@ -105,7 +108,28 @@ export const addMcpServer: McpToolDefinition = {
           enum: ['http', 'sse'],
           description: 'Transport type for remote servers: "http" (Streamable HTTP, default) or "sse"',
         },
-        headers: { type: 'object', description: 'HTTP headers for remote servers (e.g. Authorization: Bearer <token>)' },
+        headers: { type: 'object', description: 'Static HTTP headers for remote servers (e.g. {"X-Api-Key": "..."})' },
+        oauth: {
+          type: 'object',
+          description:
+            'OAuth 2.0 config for servers that require bearer-token auth. The agent-runner acquires and refreshes tokens transparently — no manual header management needed.',
+          properties: {
+            tokenUrl: { type: 'string', description: 'Token endpoint URL' },
+            grantType: {
+              type: 'string',
+              enum: ['client_credentials', 'refresh_token'],
+              description: '"client_credentials" for machine-to-machine; "refresh_token" for user-delegated access',
+            },
+            clientId: { type: 'string', description: 'OAuth client ID' },
+            clientSecret: {
+              type: 'string',
+              description: 'OAuth client secret (client_credentials or confidential-client refresh)',
+            },
+            refreshToken: { type: 'string', description: 'Refresh token (refresh_token grant only)' },
+            scope: { type: 'string', description: 'Space-separated OAuth scope (optional)' },
+          },
+          required: ['tokenUrl', 'grantType', 'clientId'],
+        },
       },
       required: ['name'],
     },
@@ -121,6 +145,16 @@ export const addMcpServer: McpToolDefinition = {
     if (url) {
       const type = (args.type as string) || 'http';
       if (type !== 'http' && type !== 'sse') return err('type must be "http" or "sse"');
+      const oauth = args.oauth as Record<string, string> | undefined;
+      if (oauth) {
+        if (!oauth.tokenUrl) return err('oauth.tokenUrl is required');
+        if (!oauth.grantType) return err('oauth.grantType is required');
+        if (!oauth.clientId) return err('oauth.clientId is required');
+        if (oauth.grantType !== 'client_credentials' && oauth.grantType !== 'refresh_token')
+          return err('oauth.grantType must be "client_credentials" or "refresh_token"');
+        if (oauth.grantType === 'refresh_token' && !oauth.refreshToken)
+          return err('oauth.refreshToken is required for refresh_token grant');
+      }
       writeMessageOut({
         id: requestId,
         kind: 'system',
@@ -130,9 +164,10 @@ export const addMcpServer: McpToolDefinition = {
           url,
           type,
           headers: (args.headers as Record<string, string>) || {},
+          ...(oauth ? { oauth } : {}),
         }),
       });
-      log(`add_mcp_server: ${requestId} → "${name}" (${url})`);
+      log(`add_mcp_server: ${requestId} → "${name}" (${url})${oauth ? ` [oauth:${oauth.grantType}]` : ''}`);
     } else {
       writeMessageOut({
         id: requestId,

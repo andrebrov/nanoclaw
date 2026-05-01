@@ -11,7 +11,7 @@
  * add_mcp_server: kill container only — bun runs TS directly, so a pure
  *   MCP wiring change needs nothing more than a process restart.
  */
-import { updateContainerConfig } from '../../container-config.js';
+import { updateContainerConfig, type OAuthConfig } from '../../container-config.js';
 import { buildAgentGroupImage, killContainer } from '../../container-runner.js';
 import { getAgentGroup } from '../../db/agent-groups.js';
 import { log } from '../../log.js';
@@ -78,6 +78,7 @@ export const applyAddMcpServer: ApprovalHandler = async ({ session, payload, use
         url: payload.url as string,
         type: (payload.type as 'http' | 'sse') ?? 'http',
         headers: (payload.headers as Record<string, string>) || undefined,
+        oauth: (payload.oauth as OAuthConfig) || undefined,
       };
     } else {
       cfg.mcpServers[name] = {

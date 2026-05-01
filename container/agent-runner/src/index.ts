@@ -28,6 +28,7 @@ import { fileURLToPath } from 'url';
 
 import { loadConfig } from './config.js';
 import { buildSystemPromptAddendum } from './destinations.js';
+import { getAccessToken } from './oauth.js';
 import { readSnapshot } from './db/session-snapshot.js';
 import { buildWikiBriefing } from './wiki-briefing.js';
 // Providers barrel — each enabled provider self-registers on import.
@@ -158,7 +159,26 @@ async function main(): Promise<void> {
   };
 
   for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-    mcpServers[name] = serverConfig;
+    if (serverConfig.url) {
+      // HTTP/SSE server — resolve OAuth token before wiring so the SDK
+      // never sees a 401. Strip `oauth` from the config passed to the SDK.
+      const { oauth, ...rest } = serverConfig;
+      let headers = rest.headers ?? {};
+      if (oauth) {
+        try {
+          const token = await getAccessToken(oauth);
+          headers = { ...headers, Authorization: `Bearer ${token}` };
+          log(`OAuth token acquired for MCP server: ${name} (${oauth.grantType})`);
+        } catch (err) {
+          log(
+            `OAuth token acquisition failed for "${name}": ${err instanceof Error ? err.message : String(err)} — server will be wired without auth`,
+          );
+        }
+      }
+      mcpServers[name] = { ...rest, headers };
+    } else {
+      mcpServers[name] = serverConfig;
+    }
     const label = serverConfig.url ? serverConfig.url : serverConfig.command;
     log(`Additional MCP server: ${name} (${label})`);
   }

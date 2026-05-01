@@ -15,6 +15,25 @@ import path from 'path';
 import { GROUPS_DIR } from './config.js';
 import { log } from './log.js';
 
+/**
+ * OAuth 2.0 credentials for HTTP/SSE MCP servers that require bearer-token
+ * auth. The agent-runner resolves the token at container start-up and injects
+ * it as `Authorization: Bearer <token>` before handing the server config to
+ * the Claude Code SDK. The SDK itself is unaware of OAuth.
+ */
+export interface OAuthConfig {
+  /** Token endpoint (e.g. https://auth.example.com/oauth/token) */
+  tokenUrl: string;
+  /** "client_credentials" for service-to-service; "refresh_token" for user-delegated */
+  grantType: 'client_credentials' | 'refresh_token';
+  clientId: string;
+  clientSecret?: string;
+  /** Required when grantType is "refresh_token" */
+  refreshToken?: string;
+  /** Space-separated OAuth scope string */
+  scope?: string;
+}
+
 export type McpServerConfig =
   | {
       // stdio transport (local process)
@@ -31,6 +50,8 @@ export type McpServerConfig =
       url: string;
       type: 'http' | 'sse';
       headers?: Record<string, string>;
+      /** OAuth 2.0 config — token is resolved by the agent-runner at startup */
+      oauth?: OAuthConfig;
       command?: never;
       args?: never;
       env?: never;

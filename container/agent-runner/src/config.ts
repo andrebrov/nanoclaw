@@ -7,11 +7,14 @@
  */
 import fs from 'fs';
 
+import type { OAuthConfig } from './oauth.js';
+export type { OAuthConfig } from './oauth.js';
+
 const CONFIG_PATH = '/workspace/agent/container.json';
 
 export type McpServerEntry =
   | { command: string; args: string[]; env: Record<string, string>; url?: never }
-  | { url: string; type: 'http' | 'sse'; headers?: Record<string, string>; command?: never };
+  | { url: string; type: 'http' | 'sse'; headers?: Record<string, string>; oauth?: OAuthConfig; command?: never };
 
 /**
  * Capabilities explicitly granted by the operator in container.json.
