@@ -13,6 +13,7 @@
 import Database from 'better-sqlite3';
 import fs from 'fs';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { isExplicitNewRequest } from './router.js';
 
 import {
   initTestDb,
@@ -521,5 +522,192 @@ describe('group chat auto-wire (issue #125)', () => {
     });
 
     expect(wakeContainer).toHaveBeenCalled();
+  });
+});
+
+// ── Stage 1 gate — isExplicitNewRequest (issue #175) ─────────────────────────
+//
+// Pure unit tests for the deterministic intent check. No DB or container
+// involvement — just the function's accept/reject decisions.
+
+describe('isExplicitNewRequest (issue #175)', () => {
+  it('returns true for short messages regardless of content', () => {
+    expect(isExplicitNewRequest('hi')).toBe(true);
+    expect(isExplicitNewRequest('hello')).toBe(true);
+    expect(isExplicitNewRequest('ok got it')).toBe(true);
+  });
+
+  it('returns true for messages containing a question mark', () => {
+    expect(isExplicitNewRequest('what is the status of the deploy?')).toBe(true);
+    expect(isExplicitNewRequest('can you fix the login bug? here is the context')).toBe(true);
+  });
+
+  it('returns true for normal directives', () => {
+    expect(isExplicitNewRequest('fix the auth bug in login.ts')).toBe(true);
+    expect(isExplicitNewRequest('here is what I need you to do: build the widget')).toBe(true);
+    expect(isExplicitNewRequest('review the PR and leave comments')).toBe(true);
+  });
+
+  it('returns false for "continue from where you left off" variants', () => {
+    expect(isExplicitNewRequest('continue from where you left off')).toBe(false);
+    expect(isExplicitNewRequest('Continue from where we left off, here is the old context')).toBe(false);
+    expect(isExplicitNewRequest('continuing from the last session, please proceed')).toBe(false);
+  });
+
+  it('returns false for "picking up from" variants', () => {
+    expect(isExplicitNewRequest('picking up from where we left off last time')).toBe(false);
+    expect(isExplicitNewRequest('pick up from the last checkpoint and continue')).toBe(false);
+  });
+
+  it('returns false for "resume from" variants', () => {
+    expect(isExplicitNewRequest('resume from where you stopped yesterday')).toBe(false);
+    expect(isExplicitNewRequest('resume from the last session context below')).toBe(false);
+  });
+
+  it('returns false for context-dump openers', () => {
+    expect(isExplicitNewRequest("here's the context for the discussion that follows")).toBe(false);
+    expect(isExplicitNewRequest('here is the background you will need for this work')).toBe(false);
+    expect(isExplicitNewRequest('for context, the project started three months ago')).toBe(false);
+    expect(isExplicitNewRequest('for background: the API was deprecated last year')).toBe(false);
+    expect(isExplicitNewRequest('for your reference, attached is the spec')).toBe(false);
+    expect(isExplicitNewRequest('fyi: the server went down this morning at 9am')).toBe(false);
+  });
+
+  it('returns true for empty or whitespace-only text', () => {
+    expect(isExplicitNewRequest('')).toBe(true);
+    expect(isExplicitNewRequest('   ')).toBe(true);
+  });
+});
+
+// ── Stage 1 gate integration — group channel (issue #175) ────────────────────
+//
+// Verifies that context-only messages reaching a group channel (pattern='.')
+// do not wake the container, but explicit directives still do.
+
+describe('Stage 1 gate integration — group channel (issue #175)', () => {
+  async function setupAdapter() {
+    const { registerChannelAdapter, initChannelAdapters } = await import('./channels/channel-registry.js');
+    registerChannelAdapter('telegram', {
+      factory: () => ({
+        name: 'telegram',
+        channelType: 'telegram',
+        supportsThreads: false,
+        async setup() {},
+        async teardown() {},
+        isConnected: () => true,
+        async deliver() {
+          return undefined;
+        },
+      }),
+    });
+    await initChannelAdapters(() => ({
+      conversations: [],
+      onInbound: () => {},
+      onInboundEvent: () => {},
+      onMetadata: () => {},
+      onAction: () => {},
+    }));
+  }
+
+  it('context-only message in group → message stored but container NOT woken', async () => {
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: 'tg-chat-1',
+      threadId: null,
+      message: {
+        id: 'ctx-msg-1',
+        kind: 'chat',
+        content: JSON.stringify({
+          sender: 'Alice',
+          text: 'continue from where you left off, here is the full context of our discussion',
+        }),
+        timestamp: now(),
+        isMention: false,
+      },
+    });
+
+    expect(wakeContainer).not.toHaveBeenCalled();
+  });
+
+  it('context-only message with explicit @mention still wakes container', async () => {
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: 'tg-chat-1',
+      threadId: null,
+      message: {
+        id: 'ctx-mention-msg-1',
+        kind: 'chat',
+        content: JSON.stringify({
+          sender: 'Alice',
+          text: 'continue from where you left off, here is the full context of our discussion',
+        }),
+        timestamp: now(),
+        isMention: true,
+      },
+    });
+
+    expect(wakeContainer).toHaveBeenCalled();
+  });
+
+  it('normal directive in group → container woken as before', async () => {
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: 'tg-chat-1',
+      threadId: null,
+      message: {
+        id: 'directive-msg-1',
+        kind: 'chat',
+        content: JSON.stringify({ sender: 'Bob', text: 'fix the login bug in auth.ts' }),
+        timestamp: now(),
+        isMention: false,
+      },
+    });
+
+    expect(wakeContainer).toHaveBeenCalled();
+  });
+
+  it('duplicate context-only messages → zero container wakes', async () => {
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { wakeContainer } = await import('./container-runner.js');
+    (wakeContainer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
+    const contextMsg = {
+      sender: 'Alice',
+      text: 'for context: the project was set up six months ago and these are the legacy files',
+    };
+
+    // Simulate the same context arriving three times (e.g. scheduled re-delivery)
+    for (let i = 0; i < 3; i++) {
+      await routeInbound({
+        channelType: 'telegram',
+        platformId: 'tg-chat-1',
+        threadId: null,
+        message: {
+          id: `dup-ctx-${i}`,
+          kind: 'chat',
+          content: JSON.stringify(contextMsg),
+          timestamp: now(),
+          isMention: false,
+        },
+      });
+    }
+
+    expect(wakeContainer).not.toHaveBeenCalled();
   });
 });

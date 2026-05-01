@@ -408,7 +408,21 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
     const scopeOk = engages && accessOk && (!senderScopeGate || senderScopeGate(event, userId, mg, agent).allowed);
 
     if (engages && accessOk && scopeOk) {
-      await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, true);
+      // Stage 1 gate (issue #175): only wake the container when the message
+      // carries explicit new-request intent. DMs (is_group=0) and explicit
+      // @mentions bypass the gate — they are direct user-addressed requests.
+      // For all other engaged messages (pattern match-all, mention-sticky
+      // follow-ups) that read as context-only or continuation-without-directive,
+      // the message is stored with trigger=0 so the agent sees it as history on
+      // the next real wake, avoiding a no-op container spawn.
+      const wake = mg.is_group === 0 || isMention || isExplicitNewRequest(messageText);
+      if (!wake) {
+        log.debug('Stage 1 gate: context-only message — stored without container wake', {
+          agentGroupId: agent.agent_group_id,
+          text: messageText.slice(0, 120),
+        });
+      }
+      await deliverToAgent(agent, agentGroup, mg, event, userId, adapter?.supportsThreads === true, wake);
       engagedCount++;
 
       // Mention-sticky: ask the adapter to subscribe the thread so the
@@ -466,6 +480,54 @@ export async function routeInbound(event: InboundEvent): Promise<void> {
       agent_group_id: null,
     });
   }
+}
+
+/**
+ * Stage 1 gate: deterministic check for explicit new-request intent.
+ *
+ * Returns true for messages that carry a clear new directive — questions,
+ * imperatives, short bursts, or any text that does not open with a known
+ * context-only or continuation phrase. Returns false only when the opener
+ * unambiguously signals "this is reference material / I'm just continuing"
+ * without a directive, which is the pattern that causes repeated no-op
+ * container spawns (issue #175).
+ *
+ * Biases toward true so existing spawn behaviour is preserved for normal
+ * messages. DMs and explicit @mentions bypass this gate in the caller.
+ *
+ * Exported for unit testing.
+ */
+export function isExplicitNewRequest(text: string): boolean {
+  if (!text || !text.trim()) return true;
+  const t = text.trim();
+
+  // Very short messages (≤ 5 words) are almost always directives, never dumps.
+  if (t.split(/\s+/).length <= 5) return true;
+
+  // Direct questions always indicate a request.
+  if (t.includes('?')) return true;
+
+  // "continue from where you left off" and close variants.
+  if (/\b(continue|continuing)\s+from\s+(where|the\s+last|where\s+(you|we)\s+left)\b/i.test(t)) return false;
+  if (/\bpick(?:ing)?\s+up\s+from\s+(where|the\s+last)\b/i.test(t)) return false;
+  if (/\bresume\s+(?:from\s+)?(?:where|the\s+last)\b/i.test(t)) return false;
+
+  // Context / background / reference dump openers without a follow-on directive.
+  if (
+    /^(?:here(?:'s|\s+is)\s+(?:the\s+|some\s+)?(?:context|background|reference|history|summary|code|file|link|data))/i.test(
+      t,
+    )
+  )
+    return false;
+  if (
+    /^(?:for\s+(?:context|background|(?:your\s+)?reference)|as\s+(?:context|background|(?:per|an?\s+)?update))[,:\s]/i.test(
+      t,
+    )
+  )
+    return false;
+  if (/^fyi[,:\s]/i.test(t)) return false;
+
+  return true;
 }
 
 /**
