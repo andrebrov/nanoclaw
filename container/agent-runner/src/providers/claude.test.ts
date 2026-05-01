@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'bun:test';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
-import { buildToolAllowlist, isThinkingOnlyEndTurn } from './claude.js';
+import { afterEach, describe, expect, it } from 'bun:test';
+
+import { buildToolAllowlist, isThinkingOnlyEndTurn, repairDanglingToolCalls } from './claude.js';
 
 describe('isThinkingOnlyEndTurn', () => {
   const base = { type: 'result', subtype: 'success', stop_reason: 'end_turn', result: '' };
@@ -115,5 +119,142 @@ describe('buildToolAllowlist', () => {
     for (const disallowed of SDK_DISALLOWED) {
       expect(tools).not.toContain(disallowed);
     }
+  });
+});
+
+// ── repairDanglingToolCalls ──
+
+function writeTranscript(entries: object[]): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nanoclaw-test-'));
+  const file = path.join(dir, 'session.jsonl');
+  fs.writeFileSync(file, entries.map((e) => JSON.stringify(e)).join('\n'));
+  return file;
+}
+
+describe('repairDanglingToolCalls', () => {
+  const temps: string[] = [];
+
+  afterEach(() => {
+    for (const f of temps.splice(0)) {
+      try {
+        fs.rmSync(path.dirname(f), { recursive: true, force: true });
+      } catch {
+        /* best-effort */
+      }
+    }
+  });
+
+  function make(entries: object[]): string {
+    const f = writeTranscript(entries);
+    temps.push(f);
+    return f;
+  }
+
+  it('no-op when file does not exist', () => {
+    expect(() => repairDanglingToolCalls('/nonexistent/path/session.jsonl')).not.toThrow();
+  });
+
+  it('no-op when transcript has no tool_use blocks', () => {
+    const file = make([
+      { type: 'user', message: { role: 'user', content: 'hello' } },
+      { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'hi' }] } },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter((l) => l.trim());
+    expect(lines).toHaveLength(2);
+  });
+
+  it('no-op when every tool_use has a matching tool_result', () => {
+    const file = make([
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'abc', name: 'Bash', input: {} }] },
+      },
+      {
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'abc', content: 'ok' }] },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter((l) => l.trim());
+    expect(lines).toHaveLength(2);
+  });
+
+  it('injects a placeholder for a single dangling tool_use', () => {
+    const file = make([
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'xyz', name: 'Read', input: {} }] },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter((l) => l.trim());
+    expect(lines).toHaveLength(2);
+    const injected = JSON.parse(lines[1]);
+    expect(injected.type).toBe('user');
+    const blocks = injected.message.content as Array<{ type: string; tool_use_id: string; is_error: boolean }>;
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0].type).toBe('tool_result');
+    expect(blocks[0].tool_use_id).toBe('xyz');
+    expect(blocks[0].is_error).toBe(true);
+  });
+
+  it('groups multiple dangling ids into a single injected user message', () => {
+    const file = make([
+      {
+        type: 'assistant',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'tool_use', id: 'id1', name: 'Bash', input: {} },
+            { type: 'tool_use', id: 'id2', name: 'Read', input: {} },
+          ],
+        },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter((l) => l.trim());
+    expect(lines).toHaveLength(2);
+    const injected = JSON.parse(lines[1]);
+    const ids = (injected.message.content as Array<{ tool_use_id: string }>).map((b) => b.tool_use_id);
+    expect(ids).toContain('id1');
+    expect(ids).toContain('id2');
+  });
+
+  it('only injects for truly dangling ids, leaving resolved ones alone', () => {
+    const file = make([
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'done', name: 'Bash', input: {} }] },
+      },
+      {
+        type: 'user',
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'done', content: 'ok' }] },
+      },
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'dangling', name: 'Read', input: {} }] },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter((l) => l.trim());
+    expect(lines).toHaveLength(4);
+    const injected = JSON.parse(lines[3]);
+    const ids = (injected.message.content as Array<{ tool_use_id: string }>).map((b) => b.tool_use_id);
+    expect(ids).toContain('dangling');
+    expect(ids).not.toContain('done');
+  });
+
+  it('is idempotent — a second call does not inject again', () => {
+    const file = make([
+      {
+        type: 'assistant',
+        message: { role: 'assistant', content: [{ type: 'tool_use', id: 'once', name: 'Bash', input: {} }] },
+      },
+    ]);
+    repairDanglingToolCalls(file);
+    repairDanglingToolCalls(file);
+    const lines = fs.readFileSync(file, 'utf-8').split('\n').filter((l) => l.trim());
+    expect(lines).toHaveLength(2);
   });
 });
