@@ -3,7 +3,31 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 
 import { DATA_DIR, GROUPS_DIR } from '../../config.js';
-import { SAFE_FILENAME_RE } from './index.js';
+import { SAFE_FILENAME_RE, normalizeForDedup } from './index.js';
+
+// --- normalizeForDedup ---
+
+describe('normalizeForDedup', () => {
+  it('trims leading and trailing whitespace', () => {
+    expect(normalizeForDedup('  hello  ')).toBe('hello');
+    expect(normalizeForDedup('\nhello\n')).toBe('hello');
+  });
+
+  it('collapses internal whitespace runs to a single space', () => {
+    expect(normalizeForDedup('hello   world')).toBe('hello world');
+    expect(normalizeForDedup('a\tb')).toBe('a b');
+    expect(normalizeForDedup('a\n\nb')).toBe('a b');
+  });
+
+  it('returns empty string for whitespace-only input', () => {
+    expect(normalizeForDedup('   ')).toBe('');
+    expect(normalizeForDedup('\n\t')).toBe('');
+  });
+
+  it('leaves already-normalized content unchanged', () => {
+    expect(normalizeForDedup('hello world')).toBe('hello world');
+  });
+});
 
 // --- write_shared_memory filename validation ---
 
