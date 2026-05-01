@@ -120,7 +120,9 @@ function parseObserverJid(): { channelType: string; platformId: string } | null 
     log(`OBSERVER_CHAT_JID "${jid}" must be "channel_type:platform_id" — observer disabled`);
     return null;
   }
-  return { channelType: jid.slice(0, colonIdx), platformId: jid.slice(colonIdx + 1) };
+  // platform_id in messaging_groups stores the full prefixed form ("telegram:-12345"),
+  // so keep the JID intact rather than stripping the channel prefix.
+  return { channelType: jid.slice(0, colonIdx), platformId: jid };
 }
 
 const OBSERVER = parseObserverJid();
