@@ -191,6 +191,24 @@ export const sendMessage: McpToolDefinition = {
       // No explicit destination and no explicit inReplyTo: default to the
       // triggering message of the current turn so replies thread correctly.
       inReplyToId = getTurnReplyTo();
+    } else {
+      // Explicit `to` was given but no `inReplyTo`. If the destination
+      // resolves to the same channel/platform as the triggering message,
+      // still thread to that message — losing threading just because the
+      // agent passed `to:` is a footgun. After a session restart the SDK
+      // conversation history primes the agent to keep passing `to:` (e.g.
+      // in group chats with multiple destinations), and without this
+      // fallback its replies stop threading on every cold-start.
+      // Cross-channel sends (different channel/platform) still fall
+      // through with no default — threading wouldn't be meaningful there.
+      const turnSource = getTurnSourceRouting();
+      if (
+        turnSource &&
+        turnSource.channelType === routing.channel_type &&
+        turnSource.platformId === routing.platform_id
+      ) {
+        inReplyToId = getTurnReplyTo();
+      }
     }
 
     const id = generateId();

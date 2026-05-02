@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
 import { closeSessionDb, getInboundDb, getOutboundDb, initTestSessionDb } from '../db/connection.js';
 import { getUndeliveredMessages } from '../db/messages-out.js';
-import { clearTurnReplyTo, setTurnReplyTo } from '../db/session-state.js';
+import { clearTurnReplyTo, setTurnReplyTo, setTurnSourceRouting } from '../db/session-state.js';
 import { addReaction, editMessage, sendMessage } from './core.js';
 
 beforeEach(() => {
@@ -245,7 +245,7 @@ describe('send_message default inReplyTo', () => {
     expect(out[0].in_reply_to).toBeNull();
   });
 
-  it('does not use turn reply-to when explicit to is provided', async () => {
+  it('does not use turn reply-to when explicit to points to a different channel', async () => {
     getInboundDb()
       .prepare(
         `INSERT INTO destinations (name, type, channel_type, platform_id)
@@ -253,6 +253,7 @@ describe('send_message default inReplyTo', () => {
       )
       .run();
     setTurnReplyTo('tg-chat-123:42:ag-test');
+    setTurnSourceRouting('telegram', 'tg-chat-123', null);
 
     const result = await sendMessage.handler({ to: 'work', text: 'Hello' });
 
@@ -260,6 +261,24 @@ describe('send_message default inReplyTo', () => {
     const out = getUndeliveredMessages();
     expect(out).toHaveLength(1);
     expect(out[0].in_reply_to).toBeNull();
+  });
+
+  it('uses turn reply-to when explicit to resolves to the same channel as the triggering message', async () => {
+    getInboundDb()
+      .prepare(
+        `INSERT INTO destinations (name, type, channel_type, platform_id)
+         VALUES ('main', 'channel', 'telegram', 'tg-chat-123')`,
+      )
+      .run();
+    setTurnReplyTo('tg-chat-123:42:ag-test');
+    setTurnSourceRouting('telegram', 'tg-chat-123', null);
+
+    const result = await sendMessage.handler({ to: 'main', text: 'Hello' });
+
+    expect(result.isError).toBeFalsy();
+    const out = getUndeliveredMessages();
+    expect(out).toHaveLength(1);
+    expect(out[0].in_reply_to).toBe('tg-chat-123:42:ag-test');
   });
 
   it('explicit inReplyTo overrides turn reply-to', async () => {
