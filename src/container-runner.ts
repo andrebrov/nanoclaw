@@ -618,6 +618,10 @@ function buildMounts(
     if (fs.existsSync(sessionsDir)) {
       mounts.push({ hostPath: sessionsDir, containerPath: '/workspace/host-logs/sessions', readonly: true });
     }
+    // Groups dir — container.json per-group config for set_group_model / list_groups.
+    if (fs.existsSync(GROUPS_DIR)) {
+      mounts.push({ hostPath: GROUPS_DIR, containerPath: '/workspace/host-logs/groups', readonly: true });
+    }
   }
 
   // Additional mounts from container config

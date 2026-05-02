@@ -23,3 +23,4 @@ import './permissions/index.js';
 import './agent-to-agent/index.js';
 import './self-mod/index.js';
 import './shared-memory/index.js';
+import './channel-model/index.js';

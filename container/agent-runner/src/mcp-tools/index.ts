@@ -28,6 +28,7 @@ async function start(): Promise<void> {
   const config = loadConfig();
   if (config.isAdmin) {
     await import('./observability.js');
+    await import('./channel-model.js');
   }
   await startMcpServer();
 }
