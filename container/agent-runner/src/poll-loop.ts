@@ -728,6 +728,10 @@ function dispatchResultText(text: string, routing: RoutingContext): void {
       scratchpadParts.push(`[dropped: unknown destination "${toName}"] ${body}`);
       continue;
     }
+    if (isSilenceNarration(body)) {
+      log(`Suppressing silence-narration in <message to="${toName}"> block: ${body}`);
+      continue;
+    }
     sendToDestination(dest, body, routing);
     sent++;
   }
