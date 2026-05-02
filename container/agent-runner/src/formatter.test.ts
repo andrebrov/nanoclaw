@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
 import { initTestSessionDb, closeSessionDb, getInboundDb } from './db/connection.js';
 import { getPendingMessages } from './db/messages-in.js';
-import { formatMessages, isSilenceNarration, stripInternalTags } from './formatter.js';
+import { formatMessages, stripInternalTags } from './formatter.js';
 import { TIMEZONE } from './timezone.js';
 
 beforeEach(() => {
@@ -203,61 +203,3 @@ describe('untrusted-input wrapping', () => {
   });
 });
 
-describe('isSilenceNarration', () => {
-  // Known keyword variants (existing SILENCE_NARRATION_RE)
-  it('matches bare keyword "silence"', () => {
-    expect(isSilenceNarration('silence')).toBe(true);
-  });
-  it('matches "[silent]"', () => {
-    expect(isSilenceNarration('[silent]')).toBe(true);
-  });
-  it('matches "*stays silent*"', () => {
-    expect(isSilenceNarration('*stays silent*')).toBe(true);
-  });
-  it('matches "[No response]"', () => {
-    expect(isSilenceNarration('[No response]')).toBe(true);
-  });
-  it('matches "(no response needed)"', () => {
-    expect(isSilenceNarration('(no response needed)')).toBe(true);
-  });
-  it('matches "not for me"', () => {
-    expect(isSilenceNarration('not for me')).toBe(true);
-  });
-  it('matches "n/a"', () => {
-    expect(isSilenceNarration('n/a')).toBe(true);
-  });
-
-  // General single-bracket pattern (new SILENT_BRACKET_RE)
-  it('matches "[Waiting for Leonid\'s fix]"', () => {
-    expect(isSilenceNarration("[Waiting for Leonid's fix]")).toBe(true);
-  });
-  it('matches "[Observer mode]"', () => {
-    expect(isSilenceNarration('[Observer mode]')).toBe(true);
-  });
-  it('matches "[Monitoring]"', () => {
-    expect(isSilenceNarration('[Monitoring]')).toBe(true);
-  });
-  it('matches "[Standing by]"', () => {
-    expect(isSilenceNarration('[Standing by]')).toBe(true);
-  });
-  it('matches "[Letting others respond]"', () => {
-    expect(isSilenceNarration('[Letting others respond]')).toBe(true);
-  });
-
-  // Should NOT match real responses
-  it('does not match a normal reply', () => {
-    expect(isSilenceNarration('Sure, I can help with that!')).toBe(false);
-  });
-  it('does not match empty string', () => {
-    expect(isSilenceNarration('')).toBe(false);
-  });
-  it('does not suppress messages longer than 80 chars', () => {
-    expect(isSilenceNarration('[' + 'a'.repeat(80) + ']')).toBe(false);
-  });
-  it('does not match nested brackets', () => {
-    expect(isSilenceNarration('[[nested]]')).toBe(false);
-  });
-  it('does not match partial-bracket text', () => {
-    expect(isSilenceNarration('Here is [some] text')).toBe(false);
-  });
-});

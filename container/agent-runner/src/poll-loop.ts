@@ -28,7 +28,6 @@ import {
   extractRouting,
   categorizeMessage,
   isClearCommand,
-  isSilenceNarration,
   stripInternalTags,
   type RoutingContext,
 } from './formatter.js';
@@ -728,10 +727,6 @@ function dispatchResultText(text: string, routing: RoutingContext): void {
       scratchpadParts.push(`[dropped: unknown destination "${toName}"] ${body}`);
       continue;
     }
-    if (isSilenceNarration(body)) {
-      log(`Suppressing silence-narration in <message to="${toName}"> block: ${body}`);
-      continue;
-    }
     sendToDestination(dest, body, routing);
     sent++;
   }
@@ -740,16 +735,6 @@ function dispatchResultText(text: string, routing: RoutingContext): void {
   }
 
   const scratchpad = stripInternalTags(scratchpadParts.join(''));
-
-  // Suppress silence-narration placeholders. Per container/CLAUDE.md the
-  // agent must output NOTHING when a message doesn't need a response. If
-  // it accidentally typed "[silence]", "*stays silent*", "no response
-  // needed", etc. as plain text (no <internal> wrapping), don't deliver
-  // it to the channel — it just makes the bot look broken.
-  if (sent === 0 && scratchpad && isSilenceNarration(scratchpad)) {
-    log(`Suppressing silence-narration placeholder: ${scratchpad}`);
-    return;
-  }
 
   // Single-destination shortcut: the agent wrote plain text — send to
   // the session's originating channel (from session_routing) if available,

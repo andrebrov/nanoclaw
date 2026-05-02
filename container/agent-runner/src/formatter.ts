@@ -285,31 +285,3 @@ export function stripInternalTags(text: string): string {
   return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
 }
 
-/**
- * Returns true when the agent output is a "silence narration" placeholder —
- * the agent decided not to respond but typed something like `[silence]`,
- * `*stays silent*`, `(no response needed)`, etc., as a plain marker. Per
- * container/CLAUDE.md the agent must produce no output at all in this case;
- * any narration leaks to the channel and looks broken to the user.
- *
- * Match is intentionally aggressive: a short message (≤80 chars after
- * trim) that consists only of common silence-narration tokens, with
- * optional brackets / asterisks / parentheses, is treated as "should not
- * have been sent" and the dispatcher will skip delivery.
- *
- * Additionally, any message whose entire content is a single [...] bracket
- * pair (e.g. "[Waiting for X’s turn]", "[Observer mode]") is treated as
- * action-narration — the agent is describing what it’s doing rather than
- * replying — and is suppressed regardless of the specific wording.
- */
-const SILENCE_NARRATION_RE =
-  /^[\s*[\]()_~`\-]*(?:silence|silent|no\s+response(?:\s+needed)?|not\s+for\s+me|no\s+action(?:\s+needed)?|skip(?:ped)?|n\/a|stays?\s+silent|i[‘’]ll\s+stay\s+silent|nothing\s+to\s+say)[\s*[\]().,_~`\-]*$/i;
-
-// Entire message is a single [bracketed phrase] with no nested brackets.
-const SILENT_BRACKET_RE = /^\[[^\[\]]+\]$/;
-
-export function isSilenceNarration(text: string): boolean {
-  const cleaned = text.trim();
-  if (!cleaned || cleaned.length > 80) return false;
-  return SILENCE_NARRATION_RE.test(cleaned) || SILENT_BRACKET_RE.test(cleaned);
-}
