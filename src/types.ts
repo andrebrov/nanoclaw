@@ -33,6 +33,12 @@ export interface MessagingGroup {
    * Scheduled tasks (written directly by host-sweep) are exempt.
    */
   inbound_rate_limit?: number | null;
+  /**
+   * Per-chat emoji policy. 'auto' = agent decides (default); 'on' = encourage
+   * emoji; 'off' = prohibit emoji and strip any from outbound text.
+   * Added by migration 016.
+   */
+  emoji_mode?: 'auto' | 'on' | 'off';
   created_at: string;
 }
 

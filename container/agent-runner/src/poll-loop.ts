@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { buildSourceChatBlock, findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
+import { buildEmojiBlock, buildSourceChatBlock, findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
@@ -256,18 +256,21 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // current trigger with task notes from an earlier conversation in a
     // different chat (e.g. routing replies to a DM destination from a
     // group-chat trigger).
-    const sourceBlock = buildSourceChatBlock(routing);
-    const turnSystemContext = sourceBlock
-      ? {
-          ...config.systemContext,
-          instructions: [config.systemContext?.instructions, sourceBlock].filter(Boolean).join('\n\n'),
-        }
-      : config.systemContext;
-
     // Extract config overrides from the triggering message (highest-priority
     // trigger=1 row in the batch, or the last message if none). The host
     // stamps resolved channel+user overrides onto each message at routing time.
     const turnOverrides = extractTurnOverrides(keep);
+
+    const sourceBlock = buildSourceChatBlock(routing);
+    const emojiBlock = buildEmojiBlock(turnOverrides?.emojiMode);
+    const perTurnBlocks = [sourceBlock, emojiBlock].filter(Boolean);
+    const turnSystemContext =
+      perTurnBlocks.length > 0
+        ? {
+            ...config.systemContext,
+            instructions: [config.systemContext?.instructions, ...perTurnBlocks].filter(Boolean).join('\n\n'),
+          }
+        : config.systemContext;
 
     const query = config.provider.query({
       prompt,
@@ -277,6 +280,8 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
       isScheduledTask: keep.every((m) => m.kind === 'task'),
       overrides: turnOverrides ?? undefined,
     });
+
+    const turnEmojiMode = turnOverrides?.emojiMode;
 
     // Process the query while concurrently polling for new messages
     const skippedSet = new Set(skipped);
@@ -290,6 +295,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
         prompt,
         config.providerName,
         onContinuationReady,
+        turnEmojiMode,
       );
       if (result.clearContinuation) {
         if (batchSeriesId !== null) {
@@ -348,6 +354,7 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
           prompt,
           config.providerName,
           onContinuationReadyRetry,
+          turnEmojiMode,
         );
         if (retryResult.clearContinuation) {
           if (batchSeriesId !== null) {
@@ -485,6 +492,7 @@ async function processQuery(
   prompt: string,
   providerName: string,
   onContinuationReady?: (id: string) => void,
+  emojiMode?: 'auto' | 'on' | 'off',
 ): Promise<QueryResult> {
   // Provider-agnostic query lifecycle signals for the host observer.
   // claude.ts also emits these from within translateEvents(), but emitting
@@ -603,7 +611,7 @@ async function processQuery(
           if (getTurnSendInvoked()) {
             log(`Suppressing result text (send already fired this turn): ${event.text.slice(0, 200)}`);
           } else {
-            dispatchResultText(event.text, routing);
+            dispatchResultText(event.text, routing, emojiMode);
           }
         }
         markCompleted(initialBatchIds);
@@ -694,6 +702,20 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
 }
 
 /**
+ * Belt-and-suspenders emoji strip. Runs when emojiMode='off' to remove any
+ * Unicode emoji the model included despite the system-prompt instruction.
+ * Handles base emoji, variation selectors, skin-tone modifiers, and ZWJ
+ * sequences. ASCII smileys (:) :P) are left intact — those are intentional.
+ */
+function maybeStripEmoji(text: string, emojiMode: 'auto' | 'on' | 'off' | undefined): string {
+  if (emojiMode !== 'off') return text;
+  // Extended pictographic covers all modern emoji codepoints.
+  // Greedily consume any following modifiers: variation selector (FE0F),
+  // keycap combiner (20E3), skin-tone (1F3FB-1F3FF), ZWJ (200D) + next emoji.
+  return text.replace(/\p{Extended_Pictographic}[️⃣\u{1F3FB}-\u{1F3FF}]*(?:‍\p{Extended_Pictographic}[️⃣\u{1F3FB}-\u{1F3FF}]*)*/gu, '').replace(/ {2,}/g, ' ');
+}
+
+/**
  * Parse the agent's final text for <message to="name">...</message> blocks
  * and dispatch each one to its resolved destination. Text outside of blocks
  * (including <internal>...</internal>) is normally scratchpad — logged but
@@ -705,7 +727,7 @@ function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
  * This preserves the simple case of one user on one channel — the agent
  * doesn't need to know about wrapping syntax at all.
  */
-function dispatchResultText(text: string, routing: RoutingContext): void {
+function dispatchResultText(text: string, routing: RoutingContext, emojiMode?: 'auto' | 'on' | 'off'): void {
   const MESSAGE_RE = /<message\s+to="([^"]+)"\s*>([\s\S]*?)<\/message>/g;
 
   let match: RegExpExecArray | null;
@@ -727,7 +749,7 @@ function dispatchResultText(text: string, routing: RoutingContext): void {
       scratchpadParts.push(`[dropped: unknown destination "${toName}"] ${body}`);
       continue;
     }
-    sendToDestination(dest, body, routing);
+    sendToDestination(dest, maybeStripEmoji(body, emojiMode), routing);
     sent++;
   }
   if (lastIndex < text.length) {
@@ -740,6 +762,7 @@ function dispatchResultText(text: string, routing: RoutingContext): void {
   // the session's originating channel (from session_routing) if available,
   // otherwise fall back to the single destination.
   if (sent === 0 && scratchpad) {
+    const cleanedScratchpad = maybeStripEmoji(scratchpad, emojiMode);
     if (routing.channelType && routing.platformId) {
       // Reply to the channel/thread the message came from
       writeMessageOut({
@@ -749,13 +772,13 @@ function dispatchResultText(text: string, routing: RoutingContext): void {
         platform_id: routing.platformId,
         channel_type: routing.channelType,
         thread_id: routing.threadId,
-        content: JSON.stringify({ text: scratchpad }),
+        content: JSON.stringify({ text: cleanedScratchpad }),
       });
       return;
     }
     const all = getAllDestinations();
     if (all.length === 1) {
-      sendToDestination(all[0], scratchpad, routing);
+      sendToDestination(all[0], cleanedScratchpad, routing);
       return;
     }
   }

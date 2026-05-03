@@ -41,6 +41,7 @@ async function start(): Promise<void> {
   if (config.isAdmin) {
     await import('./observability.js');
     await import('./channel-model.js');
+    await import('./chat-emoji.js');
   }
   await startMcpServer();
 }

@@ -100,6 +100,11 @@ export function deleteMessagingGroup(id: string): void {
   getDb().prepare('DELETE FROM messaging_groups WHERE id = ?').run(id);
 }
 
+/** Set the emoji_mode for a messaging group. */
+export function setMessagingGroupEmojiMode(id: string, emojiMode: 'auto' | 'on' | 'off'): void {
+  getDb().prepare('UPDATE messaging_groups SET emoji_mode = ? WHERE id = ?').run(emojiMode, id);
+}
+
 /**
  * Mark a messaging group as denied by the owner (channel-registration flow).
  * Future mentions on this channel silently drop until an admin explicitly

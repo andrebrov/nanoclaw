@@ -129,6 +129,26 @@ export function buildSystemPromptAddendum(
 }
 
 /**
+ * Build an emoji-policy addendum for the per-turn system context.
+ * Returns null when mode is 'auto' (no instruction needed).
+ */
+export function buildEmojiBlock(emojiMode: 'auto' | 'on' | 'off' | undefined): string | null {
+  if (!emojiMode || emojiMode === 'auto') return null;
+  if (emojiMode === 'off') {
+    return [
+      '# Emoji policy',
+      '',
+      'Do not use emoji in any of your responses for this chat. Plain text only — no Unicode emoji, no emoticons using emoji characters.',
+    ].join('\n');
+  }
+  return [
+    '# Emoji policy',
+    '',
+    'Feel free to use emoji naturally in your responses where it fits the conversational tone of this chat.',
+  ].join('\n');
+}
+
+/**
  * Per-turn block telling the agent which chat triggered the current turn.
  * Exported so the poll-loop can re-render it on every batch (the rest of
  * the addendum is stable and built once at startup).

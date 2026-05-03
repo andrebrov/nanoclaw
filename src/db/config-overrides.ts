@@ -21,6 +21,11 @@ export interface ConfigOverride {
    * group's base allowlist — cannot remove tools, only add them.
    */
   allowedTools?: string[];
+  /**
+   * Per-chat emoji policy stamped by the router from messaging_groups.emoji_mode.
+   * 'auto' = agent decides; 'on' = encourage emoji; 'off' = prohibit + strip.
+   */
+  emojiMode?: 'auto' | 'on' | 'off';
 }
 
 interface OverrideRow {

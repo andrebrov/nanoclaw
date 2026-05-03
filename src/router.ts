@@ -733,6 +733,8 @@ async function deliverToAgent(
   }
 
   const resolvedOverrides = resolveOverrides(getDb(), mg.id, userId, agent.agent_group_id);
+  const emojiMode = mg.emoji_mode ?? 'auto';
+  const effectiveOverrides = emojiMode !== 'auto' ? { ...(resolvedOverrides ?? {}), emojiMode } : resolvedOverrides;
   writeSessionMessage(session.agent_group_id, session.id, {
     id: messageIdForAgent(event.message.id, agent.agent_group_id),
     kind: event.message.kind,
@@ -742,7 +744,7 @@ async function deliverToAgent(
     threadId: deliveryAddr.threadId,
     content: event.message.content,
     trigger: wake ? 1 : 0,
-    overrides: resolvedOverrides ? JSON.stringify(resolvedOverrides) : null,
+    overrides: effectiveOverrides ? JSON.stringify(effectiveOverrides) : null,
   });
 
   log.info('Message routed', {
