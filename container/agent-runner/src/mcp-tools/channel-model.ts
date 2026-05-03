@@ -117,13 +117,13 @@ export const setGroupModel: McpToolDefinition = {
   tool: {
     name: 'set_group_model',
     description:
-      'Set the Claude model override for a target agent group. Writes to the group\'s container.json and restarts its container. Admin-only. Use list_groups to find valid folder slugs.',
+      "Set the Claude model override for a target agent group. Writes to the group's container.json and restarts its container. Admin-only. Use list_groups to find valid folder slugs.",
     inputSchema: {
       type: 'object' as const,
       properties: {
         group: {
           type: 'string',
-          description: "Target agent group folder slug (e.g. 'main', 'telegram_old-wtf'). Use list_groups to find it.",
+          description: "Target agent group folder slug (e.g. 'main'). Use list_groups to find valid slugs.",
         },
         model: {
           type: 'string',
@@ -143,6 +143,24 @@ export const setGroupModel: McpToolDefinition = {
       return err(
         `Invalid model ID "${model}". Expected a Claude model ID starting with "claude-" (e.g. claude-sonnet-4-6).`,
       );
+    }
+
+    // Validate the group exists before submitting — avoids a useless round-trip
+    // and gives the agent immediate feedback when referencing a stale/removed group.
+    const db = openCentralDb();
+    if (db) {
+      try {
+        const row = db
+          .prepare(`SELECT folder FROM agent_groups WHERE folder = ? OR LOWER(name) = LOWER(?) LIMIT 1`)
+          .get(group, group) as { folder: string } | null;
+        if (!row) {
+          const all = db.prepare('SELECT name FROM agent_groups ORDER BY name').all() as { name: string }[];
+          const list = all.map((g) => g.name).join(', ');
+          return err(`No agent group called "${group}". Available groups: ${list || '(none)'}`);
+        }
+      } finally {
+        db.close();
+      }
     }
 
     const requestId = generateId();
