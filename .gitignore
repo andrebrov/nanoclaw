@@ -64,6 +64,7 @@ container/skills/*
 !container/skills/tweet-curator/
 !container/skills/wiki-briefing/
 !container/skills/task-offload/
+!container/skills/rule-of-three/
 
 # One-off / local scripts
 scripts/.granola-auth-state.json

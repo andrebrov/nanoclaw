@@ -1,0 +1,11 @@
+{
+  "name": "nanoclaw/rule-of-three",
+  "version": "0.1.0",
+  "private": true,
+  "summary": "Detect when you are performing the same kind of action 3+ times and promote it to a reusable skill. Tracks action fingerprints across turns and sessions; surfaces existing skills before repeating; scaffolds new skill proposals on the 3rd repetition.",
+  "skills": {
+    "rule-of-three": {
+      "path": "SKILL.md"
+    }
+  }
+}
