@@ -4,7 +4,7 @@ import path from 'path';
 
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { buildToolAllowlist, isThinkingOnlyEndTurn } from './claude.js';
+import { buildToolAllowlist, isThinkingOnlyEndTurn, resolveSystemPrompt } from './claude.js';
 import { repairDanglingToolCalls } from '../hooks/dangling-tool-call-recovery.js';
 
 describe('isThinkingOnlyEndTurn', () => {
@@ -120,6 +120,56 @@ describe('buildToolAllowlist', () => {
     for (const disallowed of SDK_DISALLOWED) {
       expect(tools).not.toContain(disallowed);
     }
+  });
+});
+
+// ── resolveSystemPrompt ──
+
+describe('resolveSystemPrompt', () => {
+  const PRESET = { type: 'preset', preset: 'claude_code' } as const;
+
+  it('returns undefined when both inputs are absent', () => {
+    expect(resolveSystemPrompt(undefined, undefined)).toBeUndefined();
+  });
+
+  it('returns undefined when both inputs are empty strings', () => {
+    expect(resolveSystemPrompt('', '')).toBeUndefined();
+  });
+
+  it('returns undefined when base is empty and append is absent', () => {
+    expect(resolveSystemPrompt('', undefined)).toBeUndefined();
+  });
+
+  it('wraps base instructions alone in the preset form', () => {
+    const result = resolveSystemPrompt('be concise', undefined);
+    expect(result).toEqual({ ...PRESET, append: 'be concise' });
+  });
+
+  it('wraps append-only in the preset form when base is absent', () => {
+    const result = resolveSystemPrompt(undefined, 'extra context');
+    expect(result).toEqual({ ...PRESET, append: 'extra context' });
+  });
+
+  it('joins base and append with double newline', () => {
+    const result = resolveSystemPrompt('base', 'extra');
+    expect(result).toEqual({ ...PRESET, append: 'base\n\nextra' });
+  });
+
+  it('skips empty base when append is present', () => {
+    const result = resolveSystemPrompt('', 'extra');
+    expect(result).toEqual({ ...PRESET, append: 'extra' });
+  });
+
+  it('skips empty append when base is present', () => {
+    const result = resolveSystemPrompt('base', '');
+    expect(result).toEqual({ ...PRESET, append: 'base' });
+  });
+
+  it('append field is always a plain string — no cache_control markup', () => {
+    // cache_control is handled by the SDK/Claude Code layer, not by the caller.
+    const result = resolveSystemPrompt('instructions', 'override');
+    expect(typeof result?.append).toBe('string');
+    expect(result).not.toHaveProperty('cache_control');
   });
 });
 

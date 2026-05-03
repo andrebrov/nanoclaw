@@ -493,6 +493,26 @@ export function isThinkingOnlyEndTurn(message: unknown): boolean {
   );
 }
 
+// ── System-prompt resolution ──
+
+/**
+ * Build the `systemPrompt` option for sdkQuery from the base instructions and
+ * any per-turn append override.
+ *
+ * When instructions is a plain string the SDK receives it via the `append`
+ * field of the `preset` form — no cache_control markup is added, so prompt
+ * caching for this block is controlled by the SDK / Claude Code layer rather
+ * than by the caller.
+ */
+export function resolveSystemPrompt(
+  baseInstructions: string | undefined,
+  systemPromptAppend: string | undefined,
+): { type: 'preset'; preset: 'claude_code'; append: string } | undefined {
+  const parts = [baseInstructions, systemPromptAppend].filter((s): s is string => Boolean(s));
+  if (parts.length === 0) return undefined;
+  return { type: 'preset', preset: 'claude_code', append: parts.join('\n\n') };
+}
+
 // ── Provider ──
 
 /**
@@ -585,12 +605,6 @@ export class ClaudeProvider implements AgentProvider {
       ? [...new Set([...this.toolAllowlist, ...ov.allowedTools])]
       : this.toolAllowlist;
 
-    // Append any per-turn system prompt addendum (channel/user override).
-    const baseInstructions = input.systemContext?.instructions;
-    const instructions = ov?.systemPromptAppend
-      ? [baseInstructions, ov.systemPromptAppend].filter(Boolean).join('\n\n')
-      : baseInstructions;
-
     const sdkResult = sdkQuery({
       prompt: stream,
       options: {
@@ -598,9 +612,7 @@ export class ClaudeProvider implements AgentProvider {
         additionalDirectories: this.additionalDirectories,
         resume: input.continuation,
         pathToClaudeCodeExecutable: '/pnpm/claude',
-        systemPrompt: instructions
-          ? { type: 'preset' as const, preset: 'claude_code' as const, append: instructions }
-          : undefined,
+        systemPrompt: resolveSystemPrompt(input.systemContext?.instructions, ov?.systemPromptAppend),
         allowedTools: effectiveTools,
         disallowedTools: SDK_DISALLOWED_TOOLS,
         env: this.env,
