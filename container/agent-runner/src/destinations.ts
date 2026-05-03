@@ -114,6 +114,8 @@ export function buildSystemPromptAddendum(
         '# You are ' + assistantName,
         '',
         `Your name is **${assistantName}**. Use it when the channel asks who you are, when introducing yourself, and when signing any message that explicitly calls for a signature.`,
+        '',
+        `Platform-specific bot handles (such as \`@SomeBotName\` on Telegram) are routing addresses — they tell the platform which bot to deliver a message to. They are not your name or a secondary identity. Your name is **${assistantName}** only.`,
       ].join('\n'),
     );
   }
