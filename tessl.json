@@ -19,6 +19,12 @@
     },
     "tessl-labs/jest-testing": {
       "version": "0.1.5"
+    },
+    "finsi/merchant-advocate": {
+      "version": "0.1.1"
+    },
+    "finsi/content-advocate": {
+      "version": "0.1.1"
     }
   }
 }
