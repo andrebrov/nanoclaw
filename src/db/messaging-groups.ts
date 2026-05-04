@@ -105,6 +105,13 @@ export function setMessagingGroupEmojiMode(id: string, emojiMode: 'auto' | 'on' 
   getDb().prepare('UPDATE messaging_groups SET emoji_mode = ? WHERE id = ?').run(emojiMode, id);
 }
 
+/** Set the react_on_wake flag for a messaging group (1 = react, 0 = suppress). */
+export function setMessagingGroupReactOnWake(id: string, reactOnWake: boolean): void {
+  getDb()
+    .prepare('UPDATE messaging_groups SET react_on_wake = ? WHERE id = ?')
+    .run(reactOnWake ? 1 : 0, id);
+}
+
 /**
  * Mark a messaging group as denied by the owner (channel-registration flow).
  * Future mentions on this channel silently drop until an admin explicitly

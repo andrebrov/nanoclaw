@@ -42,6 +42,7 @@ async function start(): Promise<void> {
     await import('./observability.js');
     await import('./channel-model.js');
     await import('./chat-emoji.js');
+    await import('./chat-react.js');
   }
   await startMcpServer();
 }

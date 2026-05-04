@@ -39,6 +39,12 @@ export interface MessagingGroup {
    * Added by migration 016.
    */
   emoji_mode?: 'auto' | 'on' | 'off';
+  /**
+   * Whether the host observer should emit a 👀 reaction on wake. 1 = react
+   * (default, backward-compatible); 0 = suppress the host-driven reaction.
+   * Added by migration 017.
+   */
+  react_on_wake?: number;
   created_at: string;
 }
 

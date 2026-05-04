@@ -13,6 +13,7 @@ import { migration013 } from './013-session-name.js';
 import { migration014 } from './014-inbound-rate-limit.js';
 import { migration015 } from './015-config-overrides.js';
 import { migration016 } from './016-emoji-mode.js';
+import { migration017 } from './017-react-on-wake.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 
@@ -37,6 +38,7 @@ const migrations: Migration[] = [
   migration014,
   migration015,
   migration016,
+  migration017,
 ];
 
 export function runMigrations(db: Database.Database): void {

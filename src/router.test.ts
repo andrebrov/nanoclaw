@@ -27,6 +27,7 @@ import {
   getAgentGroupByFolder,
   getMessagingGroupByPlatform,
   getMessagingGroupAgents,
+  setMessagingGroupReactOnWake,
   getDb,
 } from './db/index.js';
 import { inboundDbPath } from './session-manager.js';
@@ -828,5 +829,108 @@ describe('threadHasBotInvolvement (issue #174)', () => {
 
   it('returns false for a different channel', () => {
     expect(threadHasBotInvolvement('slack', 'tg-cost-chat', 'thread-A')).toBe(false);
+  });
+});
+
+// ── react_on_wake toggle — host observer suppression (issue #215) ─────────────
+//
+// When react_on_wake=0 is set on a messaging group, the router must call
+// startSessionObserver with platformMsgId=null so the observer never emits a
+// 👀 reaction. When react_on_wake=1 (default), platformMsgId is the actual
+// inbound message ID so the 👀 fires normally.
+//
+// We spy on startSessionObserver directly — that's the exact gate between the
+// router's shouldReact decision and the observer's reaction cycle.
+
+vi.mock('./observer.js', () => ({
+  startSessionObserver: vi.fn(),
+  destroySessionObserver: vi.fn(),
+  notifyObserverReply: vi.fn(),
+  feedObserverLine: vi.fn(),
+}));
+
+describe('react_on_wake=off suppresses host-driven 👀 reaction (issue #215)', () => {
+  const PLATFORM_ID = 'tg-chat-1';
+
+  async function setupAdapter() {
+    const { registerChannelAdapter, initChannelAdapters } = await import('./channels/channel-registry.js');
+    registerChannelAdapter('telegram', {
+      factory: () => ({
+        name: 'telegram',
+        channelType: 'telegram',
+        supportsThreads: false,
+        async setup() {},
+        async teardown() {},
+        isConnected: () => true,
+        async deliver() {
+          return undefined;
+        },
+      }),
+    });
+    await initChannelAdapters(() => ({
+      conversations: [],
+      onInbound: () => {},
+      onInboundEvent: () => {},
+      onMetadata: () => {},
+      onAction: () => {},
+    }));
+  }
+
+  it('react_on_wake=off → startSessionObserver called with null platformMsgId (issue #215 regression)', async () => {
+    const mg = getMessagingGroupByPlatform('telegram', PLATFORM_ID);
+    expect(mg).toBeDefined();
+    setMessagingGroupReactOnWake(mg!.id, false);
+
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { startSessionObserver } = await import('./observer.js');
+    (startSessionObserver as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: PLATFORM_ID,
+      threadId: null,
+      message: {
+        id: 'react-off-msg-1',
+        kind: 'chat',
+        content: JSON.stringify({ sender: 'Alice', text: 'hello, no reactions please' }),
+        timestamp: now(),
+        isMention: true,
+      },
+    });
+
+    expect(startSessionObserver).toHaveBeenCalled();
+    const call = (startSessionObserver as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Second argument is platformMsgId — must be null when react_on_wake=0.
+    expect(call[1]).toBeNull();
+  });
+
+  it('react_on_wake=on (default) → startSessionObserver called with real platformMsgId', async () => {
+    const mg = getMessagingGroupByPlatform('telegram', PLATFORM_ID);
+    expect(mg).toBeDefined();
+    setMessagingGroupReactOnWake(mg!.id, true);
+
+    await setupAdapter();
+    const { routeInbound } = await import('./router.js');
+    const { startSessionObserver } = await import('./observer.js');
+    (startSessionObserver as ReturnType<typeof vi.fn>).mockClear();
+
+    await routeInbound({
+      channelType: 'telegram',
+      platformId: PLATFORM_ID,
+      threadId: null,
+      message: {
+        id: 'react-on-msg-1',
+        kind: 'chat',
+        content: JSON.stringify({ sender: 'Bob', text: 'reactions welcome' }),
+        timestamp: now(),
+        isMention: true,
+      },
+    });
+
+    expect(startSessionObserver).toHaveBeenCalled();
+    const call = (startSessionObserver as ReturnType<typeof vi.fn>).mock.calls[0];
+    // Second argument is platformMsgId — must be the real message ID when react_on_wake=1.
+    expect(call[1]).toBe('react-on-msg-1');
   });
 });

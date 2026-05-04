@@ -25,3 +25,4 @@ import './self-mod/index.js';
 import './shared-memory/index.js';
 import './channel-model/index.js';
 import './chat-emoji/index.js';
+import './chat-react/index.js';
