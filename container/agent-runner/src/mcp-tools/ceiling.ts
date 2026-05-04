@@ -51,7 +51,9 @@ export const extendCeiling: McpToolDefinition = {
 
     const ms = Math.round(seconds * 1000);
     setDeclaredMaxMs(ms);
-    return ok(`Ceiling extended to ${seconds}s (${Math.round(ms / 60000)} min). Host sweep will keep this container alive for up to ${seconds}s from the last heartbeat.`);
+    return ok(
+      `Ceiling extended to ${seconds}s (${Math.round(ms / 60000)} min). Host sweep will keep this container alive for up to ${seconds}s from the last heartbeat.`,
+    );
   },
 };
 

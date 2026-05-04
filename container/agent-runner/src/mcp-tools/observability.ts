@@ -133,7 +133,9 @@ export const chatStatus: McpToolDefinition = {
     try {
       const filterRaw = (args.agent_group as string | undefined)?.toLowerCase() ?? '';
 
-      const agentGroups = db.prepare('SELECT id, name, folder FROM agent_groups ORDER BY name').all() as AgentGroupRow[];
+      const agentGroups = db
+        .prepare('SELECT id, name, folder FROM agent_groups ORDER BY name')
+        .all() as AgentGroupRow[];
       const wirings = db
         .prepare('SELECT messaging_group_id, agent_group_id, engage_mode, session_mode FROM messaging_group_agents')
         .all() as WiringRow[];
@@ -170,7 +172,9 @@ export const chatStatus: McpToolDefinition = {
         } else {
           for (const w of groupWirings) {
             const mg = mgById.get(w.messaging_group_id);
-            const label = mg ? `${mg.channel_type}:${mg.platform_id}${mg.name ? ` (${mg.name})` : ''}` : w.messaging_group_id;
+            const label = mg
+              ? `${mg.channel_type}:${mg.platform_id}${mg.name ? ` (${mg.name})` : ''}`
+              : w.messaging_group_id;
             lines.push(`  Channel: ${label} [${w.engage_mode}, ${w.session_mode}]`);
           }
         }

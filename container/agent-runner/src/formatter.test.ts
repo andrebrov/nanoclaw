@@ -202,4 +202,3 @@ describe('untrusted-input wrapping', () => {
     expect(closeIdx).toBeGreaterThan(msgIdx);
   });
 });
-

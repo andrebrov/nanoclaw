@@ -49,7 +49,12 @@ function parseSkillMeta(content: string): SkillMeta | null {
   const name = nameMatch[1].trim();
 
   const descMatch = fm.match(/^description:\s*([\s\S]*?)(?=\n\S|\n*$)/m);
-  const description = descMatch ? descMatch[1].trim().replace(/^["']|["']$/g, '').trim() : '';
+  const description = descMatch
+    ? descMatch[1]
+        .trim()
+        .replace(/^["']|["']$/g, '')
+        .trim()
+    : '';
 
   return { name, description };
 }

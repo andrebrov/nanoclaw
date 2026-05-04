@@ -35,8 +35,7 @@ export const writeSharedMemory: McpToolDefinition = {
       properties: {
         filename: {
           type: 'string',
-          description:
-            'Filename in the shared pool (e.g. "skills-discovered.md"). No path separators or ".." allowed.',
+          description: 'Filename in the shared pool (e.g. "skills-discovered.md"). No path separators or ".." allowed.',
         },
         content: { type: 'string', description: 'Content to write' },
         mode: {

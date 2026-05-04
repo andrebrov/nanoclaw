@@ -49,7 +49,8 @@ export const setChatEmoji: McpToolDefinition = {
         mode: {
           type: 'string',
           enum: ['auto', 'on', 'off'],
-          description: 'Emoji mode to set: "auto" (default), "on" (encourage emoji), or "off" (no emoji, strip from output).',
+          description:
+            'Emoji mode to set: "auto" (default), "on" (encourage emoji), or "off" (no emoji, strip from output).',
         },
       },
       required: ['mode'],

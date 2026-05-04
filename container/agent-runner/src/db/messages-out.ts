@@ -151,9 +151,9 @@ export function getRoutingBySeq(
  * table, or null while the row hasn't appeared yet.
  */
 export function getDeliveryStatus(messageOutId: string): 'delivered' | 'failed' | null {
-  const row = getInboundDb()
-    .prepare('SELECT status FROM delivered WHERE message_out_id = ?')
-    .get(messageOutId) as { status: string } | undefined;
+  const row = getInboundDb().prepare('SELECT status FROM delivered WHERE message_out_id = ?').get(messageOutId) as
+    | { status: string }
+    | undefined;
   if (!row) return null;
   return row.status === 'failed' ? 'failed' : 'delivered';
 }

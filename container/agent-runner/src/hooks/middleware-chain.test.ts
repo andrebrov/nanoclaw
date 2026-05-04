@@ -67,9 +67,7 @@ describe('createMiddlewareHook', () => {
   });
 
   it('uses stdout as the block reason on non-zero exit', async () => {
-    const slots: MiddlewareSlot[] = [
-      { name: 'blocker', command: 'echo "rate limit exceeded"; exit 2' },
-    ];
+    const slots: MiddlewareSlot[] = [{ name: 'blocker', command: 'echo "rate limit exceeded"; exit 2' }];
     const hook = createMiddlewareHook(slots);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await hook(DUMMY_INPUT as any);
@@ -87,9 +85,7 @@ describe('createMiddlewareHook', () => {
   });
 
   it('passes through when slot emits JSON { decision: "continue" }', async () => {
-    const slots: MiddlewareSlot[] = [
-      { name: 'json-continue', command: 'echo \'{"decision":"continue"}\'' },
-    ];
+    const slots: MiddlewareSlot[] = [{ name: 'json-continue', command: 'echo \'{"decision":"continue"}\'' }];
     const hook = createMiddlewareHook(slots);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await hook(DUMMY_INPUT as any);
@@ -148,9 +144,7 @@ describe('createMiddlewareHook', () => {
     // causes /bin/sh to exit 127 — that is a normal (blocking) non-zero exit,
     // not a spawn error.  Fail-open only fires when /bin/sh itself cannot be
     // launched (child.on('error')), which cannot happen in a normal environment.
-    const slots: MiddlewareSlot[] = [
-      { name: 'bad', command: '/this-binary-does-not-exist-xyz-abc-123' },
-    ];
+    const slots: MiddlewareSlot[] = [{ name: 'bad', command: '/this-binary-does-not-exist-xyz-abc-123' }];
     const hook = createMiddlewareHook(slots);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await hook(DUMMY_INPUT as any);
@@ -248,11 +242,9 @@ describe('createMiddlewareHook — updatedInput (path translation)', () => {
       { name: 'translate', command: script1 },
       { name: 'block', command: script2 },
     ]);
-    const result = await hook(
-      { tool_input: { path: '/mnt/user-data/file.txt' } } as never,
-      undefined,
-      { signal: noopSignal },
-    );
+    const result = await hook({ tool_input: { path: '/mnt/user-data/file.txt' } } as never, undefined, {
+      signal: noopSignal,
+    });
     expect((result as { decision?: string }).decision).toBe('block');
   });
 });

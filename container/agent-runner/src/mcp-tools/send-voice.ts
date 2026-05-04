@@ -121,15 +121,7 @@ async function applyGenderInversion(mp3Bytes: Buffer): Promise<Buffer> {
     fs.writeFileSync(inPath, mp3Bytes);
 
     const proc = Bun.spawn(
-      [
-        'ffmpeg',
-        '-y',
-        '-i', inPath,
-        '-af', FFMPEG_FILTER,
-        '-c:a', 'libopus',
-        '-b:a', '64k',
-        outPath,
-      ],
+      ['ffmpeg', '-y', '-i', inPath, '-af', FFMPEG_FILTER, '-c:a', 'libopus', '-b:a', '64k', outPath],
       { stderr: 'pipe', stdout: 'pipe' },
     );
 

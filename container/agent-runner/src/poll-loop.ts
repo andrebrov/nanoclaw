@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 
-import { buildEmojiBlock, buildSourceChatBlock, findByName, getAllDestinations, type DestinationEntry } from './destinations.js';
+import {
+  buildEmojiBlock,
+  buildSourceChatBlock,
+  findByName,
+  getAllDestinations,
+  type DestinationEntry,
+} from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
 import { touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
@@ -712,7 +718,12 @@ function maybeStripEmoji(text: string, emojiMode: 'auto' | 'on' | 'off' | undefi
   // Extended pictographic covers all modern emoji codepoints.
   // Greedily consume any following modifiers: variation selector (FE0F),
   // keycap combiner (20E3), skin-tone (1F3FB-1F3FF), ZWJ (200D) + next emoji.
-  return text.replace(/\p{Extended_Pictographic}[️⃣\u{1F3FB}-\u{1F3FF}]*(?:‍\p{Extended_Pictographic}[️⃣\u{1F3FB}-\u{1F3FF}]*)*/gu, '').replace(/ {2,}/g, ' ');
+  return text
+    .replace(
+      /\p{Extended_Pictographic}[️⃣\u{1F3FB}-\u{1F3FF}]*(?:‍\p{Extended_Pictographic}[️⃣\u{1F3FB}-\u{1F3FF}]*)*/gu,
+      '',
+    )
+    .replace(/ {2,}/g, ' ');
 }
 
 /**

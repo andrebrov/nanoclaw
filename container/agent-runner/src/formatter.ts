@@ -284,4 +284,3 @@ function escapeXml(str: string): string {
 export function stripInternalTags(text: string): string {
   return text.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
 }
-
