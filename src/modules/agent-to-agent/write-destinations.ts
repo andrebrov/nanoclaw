@@ -40,6 +40,7 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
         channel_type: mg.channel_type,
         platform_id: mg.platform_id,
         agent_group_id: null,
+        is_group: mg.is_group === 1 ? 1 : 0,
       });
     } else if (row.target_type === 'agent') {
       const ag = getAgentGroup(row.target_id);
@@ -51,6 +52,7 @@ export function writeDestinations(agentGroupId: string, sessionId: string): void
         channel_type: null,
         platform_id: null,
         agent_group_id: ag.id,
+        is_group: 0,
       });
     }
   }

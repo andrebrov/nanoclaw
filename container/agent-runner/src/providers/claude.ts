@@ -5,6 +5,7 @@ import { query as sdkQuery, type HookCallback, type PreCompactHookInput } from '
 
 import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/connection.js';
 import { writeMessageOut } from '../db/messages-out.js';
+import { evaluateInReplyToGroupGate } from '../hooks/inreplyto-group-validator.js';
 import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
 import { createLoopDetectionGate } from '../hooks/loop-detection.js';
 import { isSubagentTool, parseSubagentLimit, SUBAGENT_TOOL, SubagentLimitTracker } from '../hooks/subagent-limit.js';
@@ -306,6 +307,16 @@ function createPreToolUseHook(options: {
           decision: 'block',
           stopReason:
             'Reading sensitive workspace paths (memory/, pending-followups/) is not permitted when responding to messages from public (untrusted) channels.',
+        } as unknown as ReturnType<HookCallback>;
+      }
+    }
+    if (toolName === 'send_message') {
+      const decision = evaluateInReplyToGroupGate(i.tool_input);
+      if (decision.block) {
+        log(`[inreplyto-group] blocking send_message to "${decision.destination.name}" — group chat without inReplyTo`);
+        return {
+          decision: 'block',
+          stopReason: decision.reason,
         } as unknown as ReturnType<HookCallback>;
       }
     }

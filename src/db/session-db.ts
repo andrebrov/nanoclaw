@@ -62,6 +62,16 @@ export function migrateSessionRoutingTable(db: Database.Database): void {
   }
 }
 
+/** Add is_group column to destinations table for DBs created before the column existed. */
+export function migrateDestinationsTable(db: Database.Database): void {
+  const cols = new Set(
+    (db.prepare("PRAGMA table_info('destinations')").all() as Array<{ name: string }>).map((c) => c.name),
+  );
+  if (!cols.has('is_group')) {
+    db.prepare('ALTER TABLE destinations ADD COLUMN is_group INTEGER NOT NULL DEFAULT 0').run();
+  }
+}
+
 export interface DestinationRow {
   name: string;
   display_name: string | null;
@@ -69,6 +79,7 @@ export interface DestinationRow {
   channel_type: string | null;
   platform_id: string | null;
   agent_group_id: string | null;
+  is_group: 0 | 1;
 }
 
 export function replaceDestinations(db: Database.Database, entries: DestinationRow[]): void {
@@ -82,8 +93,8 @@ export function replaceDestinations(db: Database.Database, entries: DestinationR
   const tx = db.transaction((rows: DestinationRow[]) => {
     db.prepare('DELETE FROM destinations').run();
     const stmt = db.prepare(
-      `INSERT INTO destinations (name, display_name, type, channel_type, platform_id, agent_group_id)
-       VALUES (@name, @display_name, @type, @channel_type, @platform_id, @agent_group_id)`,
+      `INSERT INTO destinations (name, display_name, type, channel_type, platform_id, agent_group_id, is_group)
+       VALUES (@name, @display_name, @type, @channel_type, @platform_id, @agent_group_id, @is_group)`,
     );
     for (const row of rows) {
       try {

@@ -32,6 +32,7 @@ import {
   openOutboundDb as openOutboundDbRaw,
   upsertSessionRouting,
   insertMessage,
+  migrateDestinationsTable,
   migrateMessagesInTable,
   migrateSessionRoutingTable,
 } from './db/session-db.js';
@@ -321,6 +322,7 @@ export function openInboundDb(agentGroupId: string, sessionId: string): Database
   const db = openInboundDbRaw(inboundDbPath(agentGroupId, sessionId));
   migrateMessagesInTable(db);
   migrateSessionRoutingTable(db);
+  migrateDestinationsTable(db);
   return db;
 }
 

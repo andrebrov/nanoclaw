@@ -211,7 +211,8 @@ CREATE TABLE IF NOT EXISTS destinations (
   type            TEXT NOT NULL,   -- 'channel' | 'agent'
   channel_type    TEXT,            -- for type='channel'
   platform_id     TEXT,            -- for type='channel'
-  agent_group_id  TEXT             -- for type='agent'
+  agent_group_id  TEXT,            -- for type='agent'
+  is_group        INTEGER NOT NULL DEFAULT 0  -- 1 if the destination is a group chat, 0 for DMs / agent destinations
 );
 
 -- Default reply routing for this session. Single-row table (id=1).

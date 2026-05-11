@@ -19,6 +19,8 @@ export interface DestinationEntry {
   channelType?: string;
   platformId?: string;
   agentGroupId?: string;
+  /** 1 when this channel destination is a multi-party group chat, 0 for DMs / agent destinations. */
+  isGroup: boolean;
 }
 
 interface DestRow {
@@ -28,6 +30,7 @@ interface DestRow {
   channel_type: string | null;
   platform_id: string | null;
   agent_group_id: string | null;
+  is_group: number | null;
 }
 
 function rowToEntry(row: DestRow): DestinationEntry {
@@ -38,6 +41,7 @@ function rowToEntry(row: DestRow): DestinationEntry {
     channelType: row.channel_type ?? undefined,
     platformId: row.platform_id ?? undefined,
     agentGroupId: row.agent_group_id ?? undefined,
+    isGroup: row.is_group === 1,
   };
 }
 

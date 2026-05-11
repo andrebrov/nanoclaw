@@ -216,7 +216,8 @@ export function initTestSessionDb(): { inbound: Database; outbound: Database } {
       type            TEXT NOT NULL,
       channel_type    TEXT,
       platform_id     TEXT,
-      agent_group_id  TEXT
+      agent_group_id  TEXT,
+      is_group        INTEGER NOT NULL DEFAULT 0
     );
     CREATE TABLE session_routing (
       id           INTEGER PRIMARY KEY CHECK (id = 1),
