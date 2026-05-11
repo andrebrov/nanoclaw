@@ -59,6 +59,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Chromium path for agent-browser / Playwright consumers
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+ENV AGENT_BROWSER_SCREENSHOT_FORMAT=jpeg
+ENV AGENT_BROWSER_SCREENSHOT_QUALITY=75
 # Belt-and-braces: prevent Playwright's postinstall from downloading its own
 # ~300MB Chromium. We've already installed the system one above.
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
