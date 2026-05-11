@@ -10,8 +10,19 @@
  * Inspired by DeerFlow's subagent_limit middleware (after_model phase).
  */
 
-/** Tool name that spawns sub-agents in Claude Code. */
+/** Tool name that spawns sub-agents in Claude Code (legacy, kept for transition). */
 export const SUBAGENT_TOOL = 'Task';
+
+/**
+ * All tool names that can spawn sub-agents. SDK renamed Task → Agent; both are
+ * recognised during the transition period so existing sessions keep working.
+ */
+export const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['Task', 'Agent']);
+
+/** Returns true when the given tool name spawns a sub-agent. */
+export function isSubagentTool(toolName: string): boolean {
+  return SUBAGENT_TOOLS.has(toolName);
+}
 
 /**
  * Per-turn sub-agent spawn counter. Bun's single-threaded event loop makes

@@ -1,10 +1,28 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
-import { SubagentLimitTracker, parseSubagentLimit, SUBAGENT_TOOL } from './subagent-limit.js';
+import { SubagentLimitTracker, parseSubagentLimit, SUBAGENT_TOOL, SUBAGENT_TOOLS, isSubagentTool } from './subagent-limit.js';
 
 describe('SUBAGENT_TOOL', () => {
   it('is "Task"', () => {
     expect(SUBAGENT_TOOL).toBe('Task');
+  });
+});
+
+describe('SUBAGENT_TOOLS / isSubagentTool', () => {
+  it('recognises Task', () => {
+    expect(isSubagentTool('Task')).toBe(true);
+    expect(SUBAGENT_TOOLS.has('Task')).toBe(true);
+  });
+
+  it('recognises Agent (new SDK name)', () => {
+    expect(isSubagentTool('Agent')).toBe(true);
+    expect(SUBAGENT_TOOLS.has('Agent')).toBe(true);
+  });
+
+  it('rejects unrelated tool names', () => {
+    expect(isSubagentTool('Bash')).toBe(false);
+    expect(isSubagentTool('Read')).toBe(false);
+    expect(isSubagentTool('')).toBe(false);
   });
 });
 

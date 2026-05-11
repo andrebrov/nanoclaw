@@ -7,7 +7,7 @@ import { clearContainerToolInFlight, setContainerToolInFlight } from '../db/conn
 import { writeMessageOut } from '../db/messages-out.js';
 import { gateLinkedInPostCommand } from '../hooks/linkedin-post-validator.js';
 import { createLoopDetectionGate } from '../hooks/loop-detection.js';
-import { parseSubagentLimit, SUBAGENT_TOOL, SubagentLimitTracker } from '../hooks/subagent-limit.js';
+import { isSubagentTool, parseSubagentLimit, SUBAGENT_TOOL, SubagentLimitTracker } from '../hooks/subagent-limit.js';
 import { createMiddlewareHook } from '../hooks/middleware-chain.js';
 import { repairDanglingToolCalls } from '../hooks/dangling-tool-call-recovery.js';
 import type { MiddlewareChain } from '../config.js';
@@ -88,6 +88,7 @@ const BASE_TOOLS = [
   'Glob',
   'Grep',
   'Task',
+  'Agent',
   'TaskOutput',
   'TaskStop',
   'TeamCreate',
@@ -283,10 +284,10 @@ function createPreToolUseHook(options: {
         stopReason: `Tool '${toolName}' is not available in this environment — use the nanoclaw equivalent.`,
       } as unknown as ReturnType<HookCallback>;
     }
-    if (options.subagentLimitTracker && toolName === SUBAGENT_TOOL) {
+    if (options.subagentLimitTracker && isSubagentTool(toolName)) {
       const stopReason = options.subagentLimitTracker.intercept();
       if (stopReason) {
-        log(`[subagent-limit] blocking Task call: ${stopReason}`);
+        log(`[subagent-limit] blocking ${toolName} call: ${stopReason}`);
         return { decision: 'block', stopReason } as unknown as ReturnType<HookCallback>;
       }
     }
