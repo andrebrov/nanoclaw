@@ -38,9 +38,15 @@ import {
   type RoutingContext,
 } from './formatter.js';
 import type { AgentProvider, AgentQuery, ConfigOverride, ProviderEvent } from './providers/types.js';
+import { newIdleGeneration, resetIdleTimer, clearIdleTimer } from './idle-timer.js';
 
 const POLL_INTERVAL_MS = 1000;
 const ACTIVE_POLL_INTERVAL_MS = 500;
+// How long after the last activity event or push before the idle keepalive
+// fires. Must be shorter than host-sweep's ABSOLUTE_CEILING_MS (30 min) so
+// a container doing genuine work (e.g. long Bash runs with sparse SDK events)
+// stays alive. 60 s gives plenty of headroom while keeping the gap small.
+const IDLE_KEEPALIVE_MS = 60_000;
 
 function log(msg: string): void {
   console.error(`[poll-loop] ${msg}`);
@@ -506,6 +512,10 @@ async function processQuery(
   // timestamp (before the SDK subprocess even spawns).
   process.stderr.write('observer:query_start=1\n');
 
+  // Increment the idle-timer generation so any timer left over from a
+  // previous processQuery invocation (e.g. a retry) is silently cancelled.
+  newIdleGeneration();
+
   let queryContinuation: string | undefined;
   let clearContinuation = false;
   let done = false;
@@ -531,6 +541,13 @@ async function processQuery(
   // will kill the container and messages get reset to pending.
   const pollHandle = setInterval(() => {
     if (done) return;
+
+    // Touch heartbeat on every tick while the query is active. This keeps the
+    // host sweep's heartbeat-age check honest during long tool runs (e.g. a
+    // 10-min Bash command) where the SDK may not emit any events between the
+    // tool_use call and its result — without this, the heartbeat would go
+    // stale and the sweep could kill an actively-working container.
+    touchHeartbeat();
 
     // Skip system messages (MCP tool responses) and /clear (needs fresh query).
     // Thread routing is the router's concern — if a message landed in this
@@ -561,6 +578,9 @@ async function processQuery(
         const followUp = formatMessages(newMessages);
         log(`Pushing ${newMessages.length} follow-up message(s) into active query`);
         query.push(followUp);
+        // User input arrived — reset idle timer so a burst of follow-up
+        // messages doesn't look like silence to the keepalive countdown.
+        resetIdleTimer(touchHeartbeat, IDLE_KEEPALIVE_MS);
         pushedPrompts.push(followUp);
         pushedIds.push(...newIds);
       }
@@ -577,7 +597,11 @@ async function processQuery(
       handleEvent(event, routing);
       touchHeartbeat();
 
-      if (event.type === 'init') {
+      if (event.type === 'activity') {
+        // Liveness signal from the provider — reset the idle keepalive so
+        // tool-only turns (no text result) don't look silent to the timer.
+        resetIdleTimer(touchHeartbeat, IDLE_KEEPALIVE_MS);
+      } else if (event.type === 'init') {
         queryContinuation = event.continuation;
         // Persist immediately so a mid-turn container crash still lets the
         // next wake resume the conversation. Without this, the session id
@@ -666,6 +690,7 @@ async function processQuery(
   } finally {
     done = true;
     clearInterval(pollHandle);
+    clearIdleTimer();
     process.stderr.write('observer:query_done=1\n');
     // Drain at query boundary: mark all follow-ups pushed mid-turn completed now
     // that the query has ended (normally or via exception). Deferring this from
@@ -681,6 +706,9 @@ async function processQuery(
 
 function handleEvent(event: ProviderEvent, _routing: RoutingContext): void {
   switch (event.type) {
+    case 'activity':
+      // Liveness signal — logged at debug level only; handled above the switch.
+      break;
     case 'init':
       log(`Session: ${event.continuation}`);
       break;
