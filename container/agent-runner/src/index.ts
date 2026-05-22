@@ -208,6 +208,8 @@ async function main(): Promise<void> {
     loopDetection: config.loopDetection !== false ? config.loopDetection : false,
     middlewareChain: config.middlewareChain,
     subagentLimit: config.subagentLimit,
+    model: config.model,
+    effort: config.effort,
   });
 
   await runPollLoop({

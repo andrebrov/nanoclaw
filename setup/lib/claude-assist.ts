@@ -16,15 +16,16 @@
  *
  * Skippable with NANOCLAW_SKIP_CLAUDE_ASSIST=1 for CI/scripted runs.
  */
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn, spawnSync } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import * as p from '@clack/prompts';
 import k from 'kleur';
 
 import { ensureAnswer } from './runner.js';
-import { fitToWidth } from './theme.js';
+import { brandBody, fitToWidth, fmtDuration, note } from './theme.js';
 
 export interface AssistContext {
   stepName: string;
@@ -39,7 +40,7 @@ export interface AssistContext {
  * rather than us stuffing contents into the prompt. Keys are step names as
  * they appear in fail() calls; values are repo-relative paths.
  */
-const STEP_FILES: Record<string, string[]> = {
+export const STEP_FILES: Record<string, string[]> = {
   bootstrap: ['setup.sh', 'setup/install-node.sh', 'nanoclaw.sh'],
   environment: ['setup/environment.ts'],
   container: [
@@ -73,7 +74,7 @@ const STEP_FILES: Record<string, string[]> = {
   ],
 };
 
-const BIG_PICTURE_FILES = ['README.md', 'setup/auto.ts'];
+export const BIG_PICTURE_FILES = ['README.md', 'setup/auto.ts'];
 
 /**
  * Returns `true` if the user ran a Claude-suggested fix command; callers
@@ -130,9 +131,94 @@ function isClaudeUsable(): boolean {
   } catch {
     return false;
   }
-  // Availability without auth is half the story; a real query will still
-  // fail if the token isn't registered. We try first and surface the error
-  // rather than pre-checking auth with a separate round trip.
+}
+
+function isClaudeAuthenticated(): boolean {
+  try {
+    execSync('claude auth status', { stdio: 'ignore', timeout: 5_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function ensureClaudeReady(projectRoot: string): Promise<boolean> {
+  if (!isClaudeUsable()) {
+    const install = ensureAnswer(
+      await p.confirm({
+        message:
+          'Claude CLI is needed to diagnose this. Install it now?',
+        initialValue: true,
+      }),
+    );
+    if (!install) return false;
+
+    const code = spawnSync('bash', ['setup/install-claude.sh'], {
+      cwd: projectRoot,
+      stdio: 'inherit',
+    }).status;
+    if (code !== 0 || !isClaudeUsable()) {
+      p.log.error("Couldn't install the Claude CLI.");
+      return false;
+    }
+    p.log.success('Claude CLI installed.');
+  }
+
+  if (!isClaudeAuthenticated()) {
+    const auth = ensureAnswer(
+      await p.confirm({
+        message:
+          "Claude CLI isn't signed in. Sign in now? (a browser will open)",
+        initialValue: true,
+      }),
+    );
+    if (!auth) return false;
+
+    // setup-token has an interactive TUI; reset terminal to cooked mode
+    // so its prompts render correctly after clack's raw-mode prompts.
+    spawnSync('stty', ['sane'], { stdio: 'inherit' });
+
+    // Run under script(1) to capture the OAuth token from PTY output
+    // while preserving interactive TTY for the browser OAuth flow.
+    // Same approach as register-claude-token.sh, but we set the env var
+    // instead of writing to OneCLI.
+    const tmpfile = path.join(os.tmpdir(), `claude-setup-token-${process.pid}`);
+    try {
+      const isUtilLinux = (() => {
+        try {
+          return execSync('script --version 2>&1', { encoding: 'utf-8' }).includes('util-linux');
+        } catch { return false; }
+      })();
+      const scriptArgs = isUtilLinux
+        ? ['-q', '-c', 'claude setup-token', tmpfile]
+        : ['-q', tmpfile, 'claude', 'setup-token'];
+
+      spawnSync('script', scriptArgs, {
+        cwd: projectRoot,
+        stdio: 'inherit',
+      });
+
+      if (!isClaudeAuthenticated() && fs.existsSync(tmpfile)) {
+        const raw = fs.readFileSync(tmpfile, 'utf-8');
+        const stripped = raw
+          .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+          .replace(/[\n\r]/g, '');
+        const matches = stripped.match(/(sk-ant-oat[A-Za-z0-9_-]{80,500}AA)/g);
+        if (matches) {
+          process.env.CLAUDE_CODE_OAUTH_TOKEN = matches[matches.length - 1];
+        }
+      }
+    } finally {
+      try { fs.unlinkSync(tmpfile); } catch {}
+    }
+
+    if (!isClaudeAuthenticated()) {
+      p.log.error("Couldn't complete Claude sign-in.");
+      return false;
+    }
+    p.log.success('Claude CLI signed in.');
+  }
+
   return true;
 }
 
@@ -201,9 +287,8 @@ async function queryClaudeUnderSpinner(
     // Move cursor back to the start of the block (WINDOW_SIZE + 1 = header + window).
     out.write(`\x1b[${WINDOW_SIZE + 1}A`);
 
-    const elapsed = Math.round((Date.now() - start) / 1000);
     const icon = SPINNER_FRAMES[frameIdx % SPINNER_FRAMES.length];
-    const suffix = ` (${elapsed}s)`;
+    const suffix = ` (${fmtDuration(Date.now() - start)})`;
     const header = fitToWidth('Asking Claude to diagnose…', suffix);
     out.write(`\x1b[2K${k.cyan(icon)}  ${header}${k.dim(suffix)}\n`);
 
@@ -261,8 +346,7 @@ async function queryClaudeUnderSpinner(
       clearBlock();
       out.write(SHOW_CURSOR);
       process.off('exit', restoreCursorOnExit);
-      const elapsed = Math.round((Date.now() - start) / 1000);
-      const suffix = ` (${elapsed}s)`;
+      const suffix = ` (${fmtDuration(Date.now() - start)})`;
       if (kind === 'ok') {
         p.log.success(`${fitToWidth('Claude replied.', suffix)}${k.dim(suffix)}`);
         resolve(payload);

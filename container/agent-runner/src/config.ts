@@ -122,6 +122,8 @@ export interface RunnerConfig {
    * env var. Per-group config takes precedence over the env var.
    */
   subagentLimit: number | undefined;
+  model?: string;
+  effort?: string;
 }
 
 const KNOWN_MIDDLEWARE_EVENTS = new Set(['PreToolUse', 'PostToolUse', 'PostToolUseFailure']);
@@ -216,6 +218,8 @@ export function loadConfig(): RunnerConfig {
     loopDetection: parseLoopDetection(raw.loopDetection),
     middlewareChain: parseMiddlewareChain(raw.middlewareChain),
     subagentLimit: parseContainerSubagentLimit(raw.subagentLimit),
+    model: (raw.model as string) || undefined,
+    effort: (raw.effort as string) || undefined,
   };
 
   return _config;

@@ -13,7 +13,24 @@
  */
 import { spawn } from 'child_process';
 
-export type PingResult = 'ok' | 'no_reply' | 'socket_error';
+export type PingResult = 'ok' | 'no_reply' | 'socket_error' | 'auth_error';
+
+export function classifyPingResult(exitCode: number | null, stdout: string, stderr = ''): PingResult {
+  const output = `${stdout}\n${stderr}`;
+  if (
+    /Invalid bearer token/i.test(output) ||
+    /authentication[_ ]error/i.test(output) ||
+    /Failed to authenticate/i.test(output) ||
+    /Please run \/login/i.test(output) ||
+    /Not logged in/i.test(output) ||
+    /Invalid API key/i.test(output)
+  ) {
+    return 'auth_error';
+  }
+  if (exitCode === 2) return 'socket_error';
+  if (exitCode === 0 && stdout.trim().length > 0) return 'ok';
+  return 'no_reply';
+}
 
 export function pingCliAgent(timeoutMs = 30_000): Promise<PingResult> {
   return new Promise((resolve) => {

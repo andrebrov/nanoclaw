@@ -31,10 +31,11 @@ import path from 'path';
 
 import { isSafeAttachmentName } from '../../attachment-safety.js';
 import { getAllAgentGroups, getAgentGroup } from '../../db/agent-groups.js';
+import { getInboundSourceSessionId, getMostRecentPeerSourceSessionId } from '../../db/session-db.js';
 import { getSession } from '../../db/sessions.js';
 import { wakeContainer } from '../../container-runner.js';
 import { log } from '../../log.js';
-import { resolveSession, sessionDir, writeSessionMessage } from '../../session-manager.js';
+import { openInboundDb, resolveSession, sessionDir, writeSessionMessage } from '../../session-manager.js';
 import type { Session } from '../../types.js';
 import { hasDestination } from './db/agent-destinations.js';
 
@@ -109,6 +110,61 @@ export interface RoutableAgentMessage {
   id: string;
   platform_id: string | null;
   content: string;
+  /**
+   * For replies, the id of the inbound message being replied to. The
+   * container's formatter sets this from the first inbound in the batch
+   * (`container/agent-runner/src/formatter.ts`). Used here to route the
+   * reply back to the originating session — see `resolveTargetSession`.
+   */
+  in_reply_to: string | null;
+}
+
+/**
+ * Pick which session of `targetAgentGroupId` should receive this a2a message.
+ *
+ * Three layers, highest-fidelity first:
+ *
+ * 1. **Direct return-path** (in_reply_to lookup): if the message is a reply
+ *    (`in_reply_to` set), open the source agent's inbound DB and read the
+ *    triggering row's `source_session_id`. That column was stamped when the
+ *    original outbound was routed — it's the session that started the
+ *    conversation, and replies should land there even when the target has
+ *    multiple active sessions.
+ *
+ * 2. **Peer-affinity fallback**: if (1) misses (in_reply_to is null or the
+ *    referenced row isn't an a2a inbound), look up the most recent a2a
+ *    inbound *from the target agent group* in source's inbound and use its
+ *    `source_session_id`. The intuition: the last time this peer talked to
+ *    me, which target session was driving? Route the reply there, since
+ *    that's the session most plausibly in active conversation.
+ *
+ * 3. **Newest active session**: legacy heuristic. Used when no prior a2a
+ *    has been recorded with `source_session_id` (e.g. fresh installs,
+ *    pre-migration data).
+ */
+function resolveTargetSession(msg: RoutableAgentMessage, sourceSession: Session, targetAgentGroupId: string): Session {
+  const srcDb = openInboundDb(sourceSession.agent_group_id, sourceSession.id);
+  let originSessionId: string | null = null;
+  try {
+    if (msg.in_reply_to) {
+      originSessionId = getInboundSourceSessionId(srcDb, msg.in_reply_to);
+    }
+    if (!originSessionId) {
+      // Peer-affinity fallback — covers the case where the container's
+      // outbound write didn't carry in_reply_to (e.g. legacy MCP send_message
+      // path, container running pre-fix code).
+      originSessionId = getMostRecentPeerSourceSessionId(srcDb, targetAgentGroupId);
+    }
+  } finally {
+    srcDb.close();
+  }
+  if (originSessionId) {
+    const candidate = getSession(originSessionId);
+    if (candidate && candidate.agent_group_id === targetAgentGroupId && candidate.status === 'active') {
+      return candidate;
+    }
+  }
+  return resolveSession(targetAgentGroupId, null, null, 'agent-shared').session;
 }
 
 /** Sentinel used by the synthetic broadcast destination row. */
@@ -127,7 +183,9 @@ async function deliverToAgent(
   sourceSession: Session,
   msg: RoutableAgentMessage,
 ): Promise<void> {
-  const { session: targetSession } = resolveSession(targetAgentGroupId, null, null, 'agent-shared');
+  // Upstream's return-path resolution: route replies back to the originating
+  // session (via in_reply_to / peer-affinity), falling back to newest-active.
+  const targetSession = resolveTargetSession(msg, sourceSession, targetAgentGroupId);
   const a2aMsgId = `a2a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   // If the source message references files (via `send_file`), forward the
@@ -145,6 +203,7 @@ async function deliverToAgent(
     channelType: 'agent',
     threadId: null,
     content: forwardedContent,
+    sourceSessionId: sourceSession.id,
   });
   log.info('Agent message routed', {
     from: sourceSession.agent_group_id,
@@ -188,7 +247,9 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
   // explicit agent_destinations row for this target. Synthetic peer injection
   // was removed from write-destinations.ts, so only explicitly wired routes
   // (e.g. bidirectional rows created by `create_agent`) pass this check.
-  if (!hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)) {
+  // Self-messages (an agent routing back to its own group — e.g. the return
+  // path for a2a replies) bypass the ACL; only cross-agent sends need a row.
+  if (targetAgentGroupId !== session.agent_group_id && !hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)) {
     log.warn('Unauthorized agent-to-agent send attempt blocked', {
       from: session.agent_group_id,
       to: targetAgentGroupId,

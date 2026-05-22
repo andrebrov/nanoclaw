@@ -6,10 +6,10 @@
  */
 import path from 'path';
 
+import { backfillContainerConfigs } from './backfill-container-configs.js';
 import { DATA_DIR } from './config.js';
 import { enforceStartupBackoff, resetCircuitBreaker } from './circuit-breaker.js';
 import { migrateGroupsToClaudeLocal } from './claude-md-compose.js';
-import { backfillAllowedCapabilities } from './container-config.js';
 import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
@@ -57,6 +57,12 @@ import './channels/index.js';
 // append registry-based modules. Imported for side effects (registrations).
 import './modules/index.js';
 
+// CLI command barrel — populates the `ncl` registry before the CLI server
+// accepts connections.
+import './cli/commands/index.js';
+import './cli/delivery-action.js';
+import { startCliServer, stopCliServer } from './cli/socket-server.js';
+
 import type { ChannelAdapter, ChannelSetup } from './channels/adapter.js';
 import { initChannelAdapters, teardownChannelAdapters, getChannelAdapter } from './channels/channel-registry.js';
 
@@ -75,10 +81,13 @@ async function main(): Promise<void> {
   const { initMessageStore } = await import('./message-store.js');
   initMessageStore();
 
-  // 1b. One-time filesystem cutover — idempotent, no-op after first run.
+  // 1b. Backfill container_configs from legacy container.json files (incl.
+  // fork-specific fields via the extensions column). Idempotent — skips
+  // groups that already have a config row.
+  backfillContainerConfigs();
+
+  // 1c. One-time filesystem cutover — idempotent, no-op after first run.
   migrateGroupsToClaudeLocal();
-  // 1c. Backfill allowedCapabilities for pre-#61 groups that omit the field.
-  backfillAllowedCapabilities();
 
   // 2. Container runtime
   ensureContainerRuntimeRunning();
@@ -199,6 +208,9 @@ async function main(): Promise<void> {
   startHostSweep();
   log.info('Host sweep started');
 
+  // 7. Start the `ncl` CLI socket server (data/ncl.sock).
+  await startCliServer();
+
   log.info('NanoClaw running');
 }
 
@@ -214,6 +226,7 @@ async function shutdown(signal: string): Promise<void> {
   }
   stopDeliveryPolls();
   stopHostSweep();
+  await stopCliServer();
   try {
     await teardownChannelAdapters();
   } finally {

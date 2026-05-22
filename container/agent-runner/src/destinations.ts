@@ -185,38 +185,37 @@ function buildDestinationsSection(): string {
     ].join('\n');
   }
 
-  // Single-destination shortcut: the agent just writes its response normally.
+  const lines = ['## Sending messages', ''];
   if (all.length === 1) {
     const d = all[0];
     const label = d.displayName && d.displayName !== d.name ? ` (${d.displayName})` : '';
-    return [
-      '## Sending messages',
-      '',
+    lines.push(
       'Your response is delivered to the channel where the triggering message came from. Just write your response directly — no special wrapping needed.',
       '',
       `To explicitly send to \`${d.name}\`${label} regardless of the source channel, call \`send_message(to="${d.name}", text="...")\`.`,
-      '',
-      'To mark something as scratchpad (logged but not sent), wrap it in `<internal>...</internal>`.',
-      '',
-      'To send a message mid-response (e.g., an acknowledgment before a long task), call the `send_message` MCP tool.',
-    ].join('\n');
-  }
-
-  const lines = ['## Sending messages', '', 'You can send messages to the following destinations:', ''];
-  for (const d of all) {
-    const label = d.displayName && d.displayName !== d.name ? ` (${d.displayName})` : '';
-    lines.push(`- \`${d.name}\`${label}`);
+    );
+  } else {
+    lines.push('You can send messages to the following destinations:', '');
+    for (const d of all) {
+      const label = d.displayName && d.displayName !== d.name ? ` (${d.displayName})` : '';
+      lines.push(`- \`${d.name}\`${label}`);
+    }
   }
   lines.push('');
-  lines.push('To send a message, wrap it in a `<message to="name">...</message>` block.');
-  lines.push('You can include multiple `<message>` blocks in one response to send to multiple destinations.');
   lines.push(
-    'Text outside of `<message>` blocks is delivered to the channel the triggering message came from (not to a named destination).',
+    'Wrap each delivered message in a `<message to="name">…</message>` block; include several blocks in one response to address several destinations. `<internal>…</internal>` marks thinking you don\'t want sent.',
   );
-  lines.push('Use `<internal>...</internal>` to mark something as scratchpad — logged but never delivered.');
   lines.push('');
   lines.push(
-    'To send a message mid-response (e.g., an acknowledgment before a long task), call the `send_message` MCP tool with the `to` parameter set to a destination name.',
+    'When replying to an incoming message, default to addressing the destination it came `from` (every inbound `<message>` tag carries a `from="name"` attribute). Pick a different destination when the request asks for it (e.g., "tell Laura that…").',
+  );
+  lines.push('');
+  lines.push(
+    'Text outside of `<message>` blocks is delivered to the channel the triggering message came from (not to a named destination). Use `<internal>...</internal>` to mark something as scratchpad — logged but never delivered.',
+  );
+  lines.push('');
+  lines.push(
+    'The `send_message` MCP tool is the same delivery, available mid-turn — handy for a quick acknowledgment ("on it") before a slow tool call. Each `send_message` call and each final-response `<message>` block lands as its own message in the conversation, so they read as a sequence rather than as one combined reply.',
   );
   return lines.join('\n');
 }

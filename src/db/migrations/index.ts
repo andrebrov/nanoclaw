@@ -14,6 +14,15 @@ import { migration014 } from './014-inbound-rate-limit.js';
 import { migration015 } from './015-config-overrides.js';
 import { migration016 } from './016-emoji-mode.js';
 import { migration017 } from './017-react-on-wake.js';
+// Upstream migrations. Their version numbers (14/15) collide with ours above,
+// but migrations dedupe by `name`, so the numbers are only ordering hints —
+// aliased here purely to avoid a JS symbol clash. Upstream's 013
+// (approval-render-metadata) is intentionally omitted: reverted locally in b8d7777.
+import { migration014 as migrationContainerConfigs } from './014-container-configs.js';
+import { migration015 as migrationCliScope } from './015-cli-scope.js';
+// Fork addition: JSON extensions column on container_configs for fork-specific
+// config fields (see migration file). Must run after container-configs creates the table.
+import { migration018 } from './018-container-config-extensions.js';
 import { moduleApprovalsPendingApprovals } from './module-approvals-pending-approvals.js';
 import { moduleApprovalsTitleOptions } from './module-approvals-title-options.js';
 
@@ -39,6 +48,12 @@ const migrations: Migration[] = [
   migration015,
   migration016,
   migration017,
+  // Upstream additions. container-configs must precede cli-scope, which ALTERs
+  // the table container-configs creates.
+  migrationContainerConfigs,
+  migrationCliScope,
+  // Fork addition: must follow container-configs (adds the extensions column).
+  migration018,
 ];
 
 export function runMigrations(db: Database.Database): void {

@@ -33,6 +33,9 @@ import * as p from '@clack/prompts';
 import k from 'kleur';
 
 import * as setupLog from '../logs.js';
+import { BACK_TO_CHANNEL_SELECTION, type ChannelFlowResult } from '../lib/back-nav.js';
+import { brightSelect } from '../lib/bright-select.js';
+import { getLaunchdLabel, getSystemdUnit } from '../../src/install-slug.js';
 import {
   type Block,
   type StepResult,
@@ -44,15 +47,16 @@ import {
   writeStepEntry,
 } from '../lib/runner.js';
 import { askOperatorRole } from '../lib/role-prompt.js';
-import { brandBold } from '../lib/theme.js';
+import { accentGreen, brandBody, brandBold, fmtDuration, note } from '../lib/theme.js';
 
 const DEFAULT_AGENT_NAME = 'Nano';
 const AUTH_CREDS_PATH = path.join(process.cwd(), 'store', 'auth', 'creds.json');
 
 type AuthMethod = 'qr' | 'pairing-code';
 
-export async function runWhatsAppChannel(displayName: string): Promise<void> {
+export async function runWhatsAppChannel(displayName: string): Promise<ChannelFlowResult> {
   const method = await askAuthMethod();
+  if (method === 'back') return BACK_TO_CHANNEL_SELECTION;
   const phone = method === 'pairing-code' ? await askPhoneNumber() : undefined;
 
   const install = await runQuietChild(
@@ -146,7 +150,7 @@ export async function runWhatsAppChannel(displayName: string): Promise<void> {
   }
 }
 
-async function askAuthMethod(): Promise<AuthMethod> {
+async function askAuthMethod(): Promise<AuthMethod | 'back'> {
   const choice = ensureAnswer(
     await p.select({
       message: 'How would you like to authenticate with WhatsApp?',
@@ -161,10 +165,14 @@ async function askAuthMethod(): Promise<AuthMethod> {
           label: 'Enter a pairing code on your phone',
           hint: 'no camera needed',
         },
+        {
+          value: 'back',
+          label: '← Back to channel selection',
+        },
       ],
     }),
-  ) as AuthMethod;
-  setupLog.userInput('whatsapp_auth_method', choice);
+  ) as AuthMethod | 'back';
+  if (choice !== 'back') setupLog.userInput('whatsapp_auth_method', choice);
   return choice;
 }
 
@@ -310,7 +318,7 @@ async function renderQr(qr: string): Promise<string[]> {
     const QRCode = await import('qrcode');
     const qrText = await QRCode.toString(qr, { type: 'terminal', small: true });
     const caption = k.dim(
-      '   Open WhatsApp → Settings → Linked Devices → Link a Device → scan.',
+      '   Open WhatsApp → You / Settings → Linked Devices → Link a Device → scan.',
     );
     return [...qrText.trimEnd().split('\n'), '', caption];
   } catch {
@@ -326,7 +334,7 @@ function formatPairingCard(code: string): string {
     '',
     `   ${brandBold(spaced)}`,
     '',
-    k.dim('   Open WhatsApp → Settings → Linked Devices → Link a Device'),
+    k.dim('   Open WhatsApp → You / Settings → Linked Devices → Link a Device'),
     k.dim('   → "Link with phone number instead" → enter this code.'),
     k.dim('   It expires in ~60 seconds.'),
   ].join('\n');
@@ -358,26 +366,22 @@ async function restartService(): Promise<void> {
     if (platform === 'darwin') {
       spawnSync(
         'launchctl',
-        ['kickstart', '-k', `gui/${process.getuid?.() ?? 501}/com.nanoclaw`],
+        ['kickstart', '-k', `gui/${process.getuid?.() ?? 501}/${getLaunchdLabel()}`],
         { stdio: 'ignore' },
       );
     } else if (platform === 'linux') {
-      const user = spawnSync(
-        'systemctl',
-        ['--user', 'restart', 'nanoclaw'],
-        { stdio: 'ignore' },
-      );
+      const unit = getSystemdUnit();
+      const user = spawnSync('systemctl', ['--user', 'restart', unit], {
+        stdio: 'ignore',
+      });
       if (user.status !== 0) {
-        spawnSync('sudo', ['systemctl', 'restart', 'nanoclaw'], {
-          stdio: 'ignore',
-        });
+        spawnSync('sudo', ['systemctl', 'restart', unit], { stdio: 'ignore' });
       }
     }
     // Give the adapter a moment to reconnect before init-first-agent's
     // welcome DM hits the delivery path.
     await new Promise((r) => setTimeout(r, 5000));
-    const elapsed = Math.round((Date.now() - start) / 1000);
-    s.stop(`NanoClaw restarted. ${k.dim(`(${elapsed}s)`)}`);
+    s.stop(`NanoClaw restarted. ${k.dim(`(${fmtDuration(Date.now() - start)})`)}`);
     setupLog.step('whatsapp-restart', 'success', Date.now() - start, {
       PLATFORM: platform,
     });

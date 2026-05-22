@@ -69,25 +69,103 @@ function writeEnvOnecliUrl(url: string): void {
   fs.writeFileSync(envFile, content);
 }
 
+// Last-known-good CLI release. Used only if BOTH the upstream installer
+// and the redirect-based version probe fail. Bump deliberately when a
+// new CLI release ships.
+const ONECLI_GATEWAY_VERSION = '1.23.0';
+const ONECLI_CLI_FALLBACK_VERSION = '1.3.0';
+const ONECLI_CLI_REPO = 'onecli/onecli-cli';
+
+function installOnecliCliOnly(): { stdout: string; ok: boolean } {
+  const upstream = runInstall('curl -fsSL onecli.sh/cli/install | sh');
+  if (upstream.ok) return { stdout: upstream.stdout, ok: true };
+  const fallback = installOnecliCliDirect();
+  return { stdout: upstream.stdout + (upstream.stderr ?? '') + '\n' + fallback.stdout, ok: fallback.ok };
+}
+
+// Remove containers in the "onecli" compose project whose service name isn't
+// in the v2 set. Pre-v2 OneCLI used service "app" (container onecli-app-1);
+// v2 uses "onecli". Compose flags the old container as an orphan but won't
+// stop it without --remove-orphans, leaving port 10254 bound and crashing
+// the new bring-up. Filed upstream; this is the downstream workaround.
+function removeLegacyOnecliContainers(): string {
+  const out: string[] = [];
+  let list = '';
+  try {
+    list = execSync(
+      `docker ps -a --filter "label=com.docker.compose.project=onecli" --format '{{.Names}}|{{.Label "com.docker.compose.service"}}'`,
+      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] },
+    ).trim();
+  } catch {
+    return '';
+  }
+  if (!list) return '';
+  const v2Services = new Set(['onecli', 'postgres']);
+  for (const line of list.split('\n')) {
+    const [name, service] = line.split('|');
+    if (!name || !service || v2Services.has(service)) continue;
+    out.push(`Removing legacy OneCLI container: ${name} (service=${service})`);
+    try {
+      execSync(`docker rm -f ${JSON.stringify(name)}`, { stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (err) {
+      out.push(`  rm failed (continuing): ${(err as Error).message}`);
+    }
+  }
+  return out.join('\n');
+}
+
+
 function installOnecli(): { stdout: string; ok: boolean } {
   // OneCLI's own install script handles gateway + CLI + PATH.
   // We run the two canonical installers in sequence and capture stdout so
   // we can extract the printed URL as a fallback to `onecli config get`.
   let stdout = '';
+
+  const cleanup = removeLegacyOnecliContainers();
+  if (cleanup) stdout += cleanup + '\n';
+
+  // Gateway install (docker-compose based, no rate-limit concerns).
+  const gw = runInstall(`export ONECLI_VERSION=${ONECLI_GATEWAY_VERSION} && curl -fsSL onecli.sh/install | sh`);
+  stdout += gw.stdout;
+  if (!gw.ok) {
+    log.error('OneCLI gateway install failed', { stderr: gw.stderr });
+    return { stdout: stdout + (gw.stderr ?? ''), ok: false };
+  }
+
+  // CLI install. The upstream script calls the GitHub releases API
+  // (api.github.com) to resolve the latest tag — which 403s anonymous
+  // callers after 60 requests/hour per IP. Try upstream first; on failure
+  // resolve the version ourselves (via HTTP redirect, which isn't
+  // API-throttled) and download the release archive directly.
+  const upstream = runInstall('curl -fsSL onecli.sh/cli/install | sh');
+  stdout += upstream.stdout;
+  if (upstream.ok) return { stdout, ok: true };
+
+  log.warn('Upstream CLI installer failed — falling back to direct download', {
+    stderr: upstream.stderr,
+  });
+  stdout += (upstream.stderr ?? '') + '\n';
+
+  const fallback = installOnecliCliDirect();
+  stdout += fallback.stdout;
+  if (!fallback.ok) {
+    log.error('OneCLI CLI install failed (both upstream and direct fallback)');
+    return { stdout, ok: false };
+  }
+  return { stdout, ok: true };
+}
+
+function runInstall(cmd: string): { stdout: string; stderr?: string; ok: boolean } {
   try {
-    stdout += execSync('curl -fsSL onecli.sh/install | sh', {
+    const stdout = execSync(cmd, {
       encoding: 'utf-8',
       stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    stdout += execSync('curl -fsSL onecli.sh/cli/install | sh', {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
+      env: childEnv(),
     });
     return { stdout, ok: true };
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string };
-    log.error('OneCLI install failed', { stderr: e.stderr });
-    return { stdout: stdout + (e.stdout ?? '') + (e.stderr ?? ''), ok: false };
+    return { stdout: e.stdout ?? '', stderr: e.stderr ?? '', ok: false };
   }
 }
 

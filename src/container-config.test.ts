@@ -20,7 +20,7 @@ vi.mock('./config.js', async () => {
   return { ...actual, GROUPS_DIR: '/tmp/nanoclaw-test-container-config/groups' };
 });
 
-import { readContainerConfig, initContainerConfig, backfillAllowedCapabilities } from './container-config.js';
+import { readContainerConfig } from './container-config.js';
 import { log } from './log.js';
 
 beforeEach(() => {
@@ -103,14 +103,6 @@ describe('readContainerConfig — model', () => {
   });
 });
 
-describe('initContainerConfig', () => {
-  it('new group gets permissive default', () => {
-    initContainerConfig('g2');
-    const cfg = readContainerConfig('g2');
-    expect(cfg.allowedCapabilities).toEqual(['shell_exec', 'file_write', 'network']);
-  });
-});
-
 describe('readContainerConfig — subagentLimit', () => {
   it('absent field → undefined', () => {
     writeGroupConfig('g1', { mcpServers: {} });
@@ -155,31 +147,7 @@ describe('readContainerConfig — subagentLimit', () => {
   });
 });
 
-describe('backfillAllowedCapabilities', () => {
-  it('backfills missing field and skips already-present field', () => {
-    writeGroupConfig('old', { mcpServers: {} });
-    writeGroupConfig('new', { allowedCapabilities: ['shell_exec'] });
-
-    backfillAllowedCapabilities();
-
-    const oldRaw = JSON.parse(fs.readFileSync(path.join(TEST_GROUPS_DIR, 'old', 'container.json'), 'utf8')) as {
-      allowedCapabilities: string[];
-    };
-    expect(oldRaw.allowedCapabilities).toEqual(['shell_exec', 'file_write', 'network']);
-
-    const newRaw = JSON.parse(fs.readFileSync(path.join(TEST_GROUPS_DIR, 'new', 'container.json'), 'utf8')) as {
-      allowedCapabilities: string[];
-    };
-    expect(newRaw.allowedCapabilities).toEqual(['shell_exec']);
-  });
-
-  it('is idempotent — second call does not change already-backfilled files', () => {
-    writeGroupConfig('g3', { mcpServers: {} });
-    backfillAllowedCapabilities();
-    backfillAllowedCapabilities();
-    const raw = JSON.parse(fs.readFileSync(path.join(TEST_GROUPS_DIR, 'g3', 'container.json'), 'utf8')) as {
-      allowedCapabilities: string[];
-    };
-    expect(raw.allowedCapabilities).toEqual(['shell_exec', 'file_write', 'network']);
-  });
-});
+// initContainerConfig and backfillAllowedCapabilities were removed in the
+// file→DB container-config migration (config now lives in container_configs;
+// new groups use ensureContainerConfig, and the permissive-default backfill is
+// covered by configFromDb's parseAllowedCapabilities). Their tests are dropped.

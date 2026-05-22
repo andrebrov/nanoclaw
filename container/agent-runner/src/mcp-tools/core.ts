@@ -9,6 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import { getCurrentInReplyTo } from '../current-batch.js';
 import { findByName, getAllDestinations } from '../destinations.js';
 import { getDeliveryStatus, getMessageIdBySeq, getRoutingBySeq, writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
@@ -270,6 +271,7 @@ export const sendFile: McpToolDefinition = {
 
     writeMessageOut({
       id,
+      in_reply_to: getCurrentInReplyTo(),
       kind: 'chat',
       platform_id: routing.platform_id,
       channel_type: routing.channel_type,

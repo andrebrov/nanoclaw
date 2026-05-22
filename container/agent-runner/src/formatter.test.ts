@@ -180,7 +180,8 @@ describe('untrusted-input wrapping', () => {
     insertMessage('m1', 'webhook', { source: 'github', event: 'push', payload: { ref: 'main' } });
     const result = formatMessages(getPendingMessages());
     expect(result).toContain('<untrusted-input source="web">');
-    expect(result).toContain('[WEBHOOK: github/push]');
+    expect(result).toContain('<webhook');
+    expect(result).toContain('source="github"');
     expect(result).toContain('</untrusted-input>');
   });
 
@@ -188,7 +189,7 @@ describe('untrusted-input wrapping', () => {
     insertMessage('m1', 'task', { prompt: 'do something' });
     const result = formatMessages(getPendingMessages());
     expect(result).not.toContain('<untrusted-input');
-    expect(result).toContain('[SCHEDULED TASK]');
+    expect(result).toContain('<task');
   });
 
   it('chat message body stays inside the untrusted-input wrapper', () => {

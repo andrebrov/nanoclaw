@@ -84,6 +84,10 @@ function resolveSessionTrustLevel(): 'trusted' | 'untrusted' {
 
 // Safe default tools: read-only filesystem access + agent communication.
 // These are available to every agent regardless of allowedCapabilities.
+// MCP-tool entries are derived at the call site from the registered `mcpServers`
+// map so that any server added via `add_mcp_server` (or wired in container.json
+// directly) is reachable to the agent — without this, the SDK's allowedTools
+// filter silently drops every MCP namespace not listed here.
 const BASE_TOOLS = [
   'Read',
   'Glob',
@@ -107,6 +111,13 @@ const CAPABILITY_TOOLS: Record<string, string[]> = {
   file_write: ['Write', 'Edit', 'NotebookEdit'],
   network: ['WebSearch', 'WebFetch'],
 };
+
+// MCP server names are sanitized by the SDK when forming tool prefixes:
+// any character outside [A-Za-z0-9_-] becomes '_'. Mirror that here so our
+// allowlist patterns match what the SDK actually exposes.
+function mcpAllowPattern(serverName: string): string {
+  return `mcp__${serverName.replace(/[^a-zA-Z0-9_-]/g, '_')}__*`;
+}
 
 // ── Observer side channel ──
 
@@ -153,11 +164,13 @@ function sendObserverMessage(text: string): void {
 
 /**
  * Build the tool allowlist for a given capability set.
- * Returns BASE_TOOLS plus any extra tools unlocked by the granted capabilities.
+ * Returns BASE_TOOLS plus any extra tools unlocked by the granted capabilities,
+ * plus dynamic MCP server patterns derived from the registered mcpServers map.
  */
-export function buildToolAllowlist(allowedCapabilities: string[]): string[] {
+export function buildToolAllowlist(allowedCapabilities: string[], mcpServers: Record<string, unknown> = {}): string[] {
   const extra = allowedCapabilities.flatMap((cap) => CAPABILITY_TOOLS[cap] ?? []);
-  return [...BASE_TOOLS, ...extra];
+  const mcpPatterns = Object.keys(mcpServers).map(mcpAllowPattern);
+  return [...BASE_TOOLS, ...extra, ...mcpPatterns];
 }
 
 interface SDKUserMessage {
@@ -430,9 +443,15 @@ function createPreCompactHook(assistantName?: string): HookCallback {
  * Set a large window so SDK auto-compact never fires at normal usage.
  * Threshold-based nuke (below) replaces SDK compaction with deterministic
  * checkpointing and clean container restart.
- * Configurable via AGENT_AUTO_COMPACT_WINDOW env variable.
+ * Configurable via AGENT_AUTO_COMPACT_WINDOW or CLAUDE_CODE_AUTO_COMPACT_WINDOW
+ * env variables (AGENT_AUTO_COMPACT_WINDOW takes precedence).
+ *
+ * Operator override: set CLAUDE_CODE_AUTO_COMPACT_WINDOW in the host env to
+ * raise or lower the threshold without editing source — useful when running
+ * with a 1M-context model variant or when emergency-tuning a deployment.
  */
-const CLAUDE_CODE_AUTO_COMPACT_WINDOW = process.env.AGENT_AUTO_COMPACT_WINDOW ?? '9000000';
+const CLAUDE_CODE_AUTO_COMPACT_WINDOW =
+  process.env.AGENT_AUTO_COMPACT_WINDOW ?? process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW ?? '9000000';
 
 /**
  * Context window size from env (Opus 4.7[1m] uses 1M, Sonnet 4.6 uses 200K).
@@ -543,6 +562,7 @@ export class ClaudeProvider implements AgentProvider {
   private additionalDirectories?: string[];
   private toolAllowlist: string[];
   private model: string | undefined;
+  private effort?: string;
   private preToolUseHook: HookCallback;
   private postToolBatchHook: HookCallback | undefined;
   private middlewareChain: MiddlewareChain;
@@ -551,7 +571,7 @@ export class ClaudeProvider implements AgentProvider {
     this.assistantName = options.assistantName;
     this.mcpServers = options.mcpServers ?? {};
     this.additionalDirectories = options.additionalDirectories;
-    this.toolAllowlist = buildToolAllowlist(options.allowedCapabilities ?? []);
+    this.toolAllowlist = buildToolAllowlist(options.allowedCapabilities ?? [], options.mcpServers ?? {});
     const loopDetectionOpt = options.loopDetection;
     const loopDetection: false | { windowSize?: number; repeatThreshold?: number } =
       loopDetectionOpt === true
@@ -573,6 +593,7 @@ export class ClaudeProvider implements AgentProvider {
     });
     this.postToolBatchHook = subagentLimitTracker ? createPostToolBatchHook(subagentLimitTracker) : undefined;
     this.middlewareChain = options.middlewareChain ?? {};
+    this.effort = options.effort;
     // Force-merge ANTHROPIC_API_KEY (and other auth env) explicitly. The
     // Claude Agent SDK does NOT auto-forward process.env to the claude
     // subprocess — it spawns with a filtered/sanitized env. Symptom when
@@ -630,6 +651,8 @@ export class ClaudeProvider implements AgentProvider {
         env: this.env,
         model: effectiveModel,
         ...(ov?.maxTokens !== undefined ? { maxTokens: ov.maxTokens } : {}),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...(this.effort !== undefined ? { effort: this.effort as any } : {}),
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
         settingSources: ['project', 'user'],

@@ -62,6 +62,16 @@ export interface ProviderOptions {
    * Per-group config (container.json) takes precedence over the env var.
    */
   subagentLimit?: number;
+  /**
+   * Model alias (`sonnet`, `opus`, `haiku`) or full model ID. Passed through
+   * to the underlying SDK. If omitted, the SDK default is used.
+   */
+  model?: string;
+  /**
+   * Reasoning effort (`'low' | 'medium' | 'high' | 'xhigh' | 'max'`). Passed
+   * through to the underlying SDK. If omitted, the SDK default is used.
+   */
+  effort?: string;
 }
 
 /**

@@ -13,7 +13,8 @@
  */
 import { getAllAgentGroups, getAgentGroupByFolder } from '../../db/agent-groups.js';
 import { getSessionsByAgentGroup } from '../../db/sessions.js';
-import { readContainerConfig, updateContainerConfig } from '../../container-config.js';
+import { readContainerConfig } from '../../container-config.js';
+import { ensureContainerConfig, updateContainerConfigScalars } from '../../db/container-configs.js';
 import { killContainer } from '../../container-runner.js';
 import { registerDeliveryAction } from '../../delivery.js';
 import { log } from '../../log.js';
@@ -86,13 +87,10 @@ async function applyModelChange(
   const currentConfig = readContainerConfig(targetGroup.folder);
   const previousModel = currentConfig.model ?? null;
 
-  updateContainerConfig(targetGroup.folder, (cfg) => {
-    if (newModel) {
-      cfg.model = newModel;
-    } else {
-      delete cfg.model;
-    }
-  });
+  // Persist to the DB (source of truth). null clears the override; the next
+  // spawn re-materializes container.json from this row.
+  ensureContainerConfig(targetGroup.id);
+  updateContainerConfigScalars(targetGroup.id, { model: newModel });
 
   log.info('set_group_model applied', {
     targetGroup: targetGroup.folder,

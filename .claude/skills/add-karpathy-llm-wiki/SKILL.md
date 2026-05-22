@@ -67,115 +67,22 @@ If the document is a webpage, then claude can use fetch or `agent-browser` to op
 
 Install the wiki linting script, then optionally schedule it to run weekly.
 
-### 5a. Install lint.sh
+1. **Weekly**
+2. **Monthly**
+3. **Skip** — lint manually
 
-```bash
-cp "${CLAUDE_SKILL_DIR}/scripts/lint.sh" groups/global/knowledge/scripts/lint.sh
-chmod +x groups/global/knowledge/scripts/lint.sh
-```
+If yes, ask the agent to schedule the lint task using the `schedule_task` MCP tool in conversation.
 
-The script is now available inside every agent container at `/workspace/global/knowledge/scripts/lint.sh`.
+## Step 6: Restart
 
-### 5b. Smoke test
-
-Run a quick check to confirm the script works (requires at least one compiled article in `knowledge/wiki/`):
-
-```bash
-bash groups/global/knowledge/scripts/lint.sh --knowledge-dir groups/global/knowledge
-```
-
-Reports appear in `groups/global/knowledge/lint/`.
-
-### 5c. Optional: weekly schedule
-
-AskUserQuestion: "Want lint to run automatically every week?"
-
-1. **Yes — weekly (Sundays at 2am)**
-2. **Skip — I'll run it manually**
-
-If yes, ask the wiki agent to set up the schedule. Send it a message like:
-
-> "Schedule the wiki lint to run every Sunday at 2am. Use: bash /workspace/global/knowledge/scripts/lint.sh --knowledge-dir /workspace/global/knowledge"
-
-The agent will use its `schedule` MCP tool to create the recurring task. After each run the script writes reports to `/workspace/global/knowledge/lint/` and prints a `LINT_SUMMARY:` line — the agent will relay that summary to the group chat so you can see issues at a glance.
-
-On-demand: any agent can run `bash /workspace/global/knowledge/scripts/lint.sh` directly.
-
-
-## Step 6: Set up the compilation engine
-
-Install `compile.sh` — the automated batch compiler that transforms `knowledge/raw/` documents into structured wiki articles in `knowledge/wiki/`.
-
-### 6a. Create the knowledge directory structure
-
-Create `knowledge/raw/` and `knowledge/wiki/` in the agent's global workspace host directory (`groups/global/`). This makes the knowledge base accessible to all agent groups as a read-only shared mount:
-
-```bash
-mkdir -p groups/global/knowledge/raw/processed
-mkdir -p groups/global/knowledge/wiki
-mkdir -p groups/global/knowledge/scripts
-mkdir -p groups/global/knowledge/lint
-```
-
-### 6b. Install the compilation script
-
-```bash
-cp "${CLAUDE_SKILL_DIR}/scripts/compile.sh" groups/global/knowledge/scripts/compile.sh
-chmod +x groups/global/knowledge/scripts/compile.sh
-```
-
-The script is now available inside every agent container at `/workspace/global/knowledge/scripts/compile.sh`.
-
-### 6c. Test on sample input
-
-Drop a sample file into `groups/global/knowledge/raw/` and run a quick smoke test (requires `claude` CLI on the host):
-
-```bash
-echo "Test note: Claude is an AI assistant made by Anthropic." > groups/global/knowledge/raw/test-note.txt
-bash groups/global/knowledge/scripts/compile.sh --knowledge-dir groups/global/knowledge
-```
-
-Verify `groups/global/knowledge/wiki/` contains a new `.md` file and `groups/global/knowledge/wiki/INDEX.md` has an entry.
-
-### 6d. Optional: session-end hook (auto-compile after each session)
-
-To compile automatically after every NanoClaw session, add a `SessionEnd` hook in `.claude/settings.json`:
-
-```json
-{
-  "hooks": {
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash groups/global/knowledge/scripts/compile.sh --knowledge-dir groups/global/knowledge",
-            "async": true
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-### 6e. Optional: daily 3am schedule
-
-Ask the wiki agent to set up a daily compilation schedule. Send it a message like:
-
-> "Schedule the wiki compilation to run every day at 3am. Use: bash /workspace/global/knowledge/scripts/compile.sh --knowledge-dir /workspace/global/knowledge"
-
-The agent will use its `schedule` MCP tool to create the recurring task.
-
-On-demand: any agent can run `bash /workspace/global/knowledge/scripts/compile.sh` directly.
-
-## Step 7: Build and restart
+Run from your NanoClaw project root:
 
 ```bash
 pnpm run build
 ./container/build.sh
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # macOS
-# Linux: systemctl --user restart nanoclaw
+source setup/lib/install-slug.sh
+launchctl kickstart -k gui/$(id -u)/$(launchd_label)  # macOS
+systemctl --user restart $(systemd_unit)              # Linux
 ```
 
 Tell the user to test by sending a source to the wiki group.

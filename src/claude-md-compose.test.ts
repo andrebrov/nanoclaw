@@ -21,9 +21,11 @@ vi.mock('./config.js', async () => {
   return { ...actual, GROUPS_DIR: '/tmp/nanoclaw-test-claude-md-compose/groups' };
 });
 
-// Stub readContainerConfig to avoid touching the real FS.
-vi.mock('./container-config.js', () => ({
-  readContainerConfig: vi.fn(() => ({ mcpServers: {}, skills: 'all' })),
+// composeGroupClaudeMd reads container config from the DB now; stub the
+// accessor to return null so the test needs no live central DB. The composer
+// then scans container/skills on disk (what these tests actually assert on).
+vi.mock('./db/container-configs.js', () => ({
+  getContainerConfig: vi.fn(() => null),
 }));
 
 import { composeGroupClaudeMd } from './claude-md-compose.js';

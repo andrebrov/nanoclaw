@@ -1,19 +1,25 @@
 /**
- * Per-group container config, stored as a plain JSON file at
- * `groups/<folder>/container.json`. Mounted read-only inside the container
- * at `/workspace/agent/container.json` — the runner reads it at startup but
- * cannot modify it. Config changes go through the self-mod approval flow.
+ * Container config types and materialization.
  *
- * All fields are optional — a missing file or a partial file both resolve
- * to sensible defaults. Writes are atomic-enough (write-then-rename is not
- * worth the ceremony here since there's only one writer in practice: the
- * host, from the delivery thread that processes approved system actions).
+ * Source of truth is the `container_configs` table in the central DB.
+ * This module provides:
+ *   - Type definitions for the file shape (read by the container runner)
+ *   - `configFromDb()` — builds a `ContainerConfig` from a DB row + agent group.
+ *     Fork-specific fields (allowedCapabilities, observer, costGating, …) live
+ *     in the row's `extensions` JSON column (migration 018).
+ *   - `materializeContainerJson()` — writes `groups/<folder>/container.json`
+ *     from the DB at spawn time.
+ *   - `readContainerConfig()` — reads the materialized `container.json` cache
+ *     (host modules read config from disk without a DB round-trip).
  */
 import fs from 'fs';
 import path from 'path';
 
 import { GROUPS_DIR } from './config.js';
+import { getAgentGroup } from './db/agent-groups.js';
+import { getContainerConfig } from './db/container-configs.js';
 import { log } from './log.js';
+import type { AgentGroup, ContainerConfigRow } from './types.js';
 
 /**
  * OAuth 2.0 credentials for HTTP/SSE MCP servers that require bearer-token
@@ -77,25 +83,22 @@ export interface AdditionalMountConfig {
  */
 export type AgentCapability = 'shell_exec' | 'file_write' | 'network';
 
+/** Shape of the materialized `container.json` file read by the container runner. */
 export interface ContainerConfig {
   mcpServers: Record<string, McpServerConfig>;
   packages: { apt: string[]; npm: string[] };
   imageTag?: string;
   additionalMounts: AdditionalMountConfig[];
-  /** Which skills to enable — array of skill names or "all" (default). */
   skills: string[] | 'all';
-  /** Agent provider name (e.g. "claude", "opencode"). Default: "claude". */
   provider?: string;
-  /** Agent group display name (used in transcript archiving). */
   groupName?: string;
-  /** Assistant display name (used in system prompt / responses). */
   assistantName?: string;
-  /** Agent group ID — set by the host, read by the runner. */
   agentGroupId?: string;
-  /** Max messages per prompt. Falls back to code default if unset. */
   maxMessagesPerPrompt?: number;
   /** Claude model override for this group (e.g. "claude-haiku-4-5"). Passed as AGENT_MODEL env var. */
   model?: string;
+  /** Reasoning-effort override (upstream container_configs column). */
+  effort?: string;
   /**
    * Grant this container admin observability: mounts host logs + session dirs
    * read-only at /workspace/host-logs/ and enables the chat_status MCP tool.
@@ -289,15 +292,76 @@ function parseProgressiveSkills(raw: unknown): string[] | 'all' | undefined {
   return result.length > 0 ? result : undefined;
 }
 
+function parseObserver(raw: unknown): ContainerConfig['observer'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.statusChannelId !== 'string' || typeof o.statusChannelType !== 'string') return undefined;
+  return {
+    statusChannelId: o.statusChannelId,
+    statusChannelType: o.statusChannelType,
+    statusThreadId: typeof o.statusThreadId === 'string' ? o.statusThreadId : null,
+  };
+}
+
+/** Safely parse the `extensions` JSON blob from a container_configs row. */
+function parseExtensions(raw: string | null | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const o = JSON.parse(raw) as unknown;
+    return o && typeof o === 'object' ? (o as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 function configPath(folder: string): string {
   return path.join(GROUPS_DIR, folder, 'container.json');
 }
 
 /**
- * Read the container config for a group, returning sensible defaults for
- * any missing fields (or an entirely empty config if the file is absent).
- * Never throws for missing / malformed files — corruption logs a warning
- * via console.error and falls back to empty.
+ * Build a `ContainerConfig` from a DB row + agent group identity. Standard
+ * fields come from typed columns; fork-specific fields are read out of the
+ * row's `extensions` JSON blob and normalised through the same parse helpers
+ * the file path uses.
+ */
+export function configFromDb(row: ContainerConfigRow, group: AgentGroup): ContainerConfig {
+  const ext = parseExtensions(row.extensions);
+  return {
+    mcpServers: JSON.parse(row.mcp_servers) as Record<string, McpServerConfig>,
+    packages: {
+      apt: JSON.parse(row.packages_apt) as string[],
+      npm: JSON.parse(row.packages_npm) as string[],
+    },
+    imageTag: row.image_tag ?? undefined,
+    additionalMounts: JSON.parse(row.additional_mounts) as AdditionalMountConfig[],
+    skills: JSON.parse(row.skills) as string[] | 'all',
+    provider: row.provider ?? undefined,
+    groupName: group.name,
+    assistantName: row.assistant_name ?? group.name,
+    agentGroupId: group.id,
+    maxMessagesPerPrompt: row.max_messages_per_prompt ?? undefined,
+    model: row.model ?? undefined,
+    effort: row.effort ?? undefined,
+    // Fork-specific fields (stored in the `extensions` JSON column).
+    isAdmin: ext.isAdmin === true,
+    allowedCapabilities: parseAllowedCapabilities(ext.allowedCapabilities, `db:${group.id}`),
+    linkedinPostValidator: ext.linkedinPostValidator === true,
+    loopDetection: parseLoopDetectionConfig(ext.loopDetection),
+    observer: parseObserver(ext.observer),
+    maintenanceSkillBlocklist: Array.isArray(ext.maintenanceSkillBlocklist)
+      ? (ext.maintenanceSkillBlocklist as unknown[]).filter((s): s is string => typeof s === 'string')
+      : undefined,
+    progressiveSkills: parseProgressiveSkills(ext.progressiveSkills),
+    subagentLimit: parseSubagentLimit(ext.subagentLimit),
+    costGating: parseCostGatingConfig(ext.costGating),
+  };
+}
+
+/**
+ * Read the materialized `container.json` cache for a group from disk. Returns
+ * `emptyConfig()` when the file is absent. The file is written from the DB at
+ * spawn (see materializeContainerJson); host modules read it for config
+ * without a DB round-trip.
  */
 export function readContainerConfig(folder: string): ContainerConfig {
   const p = configPath(folder);
@@ -319,6 +383,7 @@ export function readContainerConfig(folder: string): ContainerConfig {
       agentGroupId: raw.agentGroupId,
       maxMessagesPerPrompt: raw.maxMessagesPerPrompt,
       model: typeof raw.model === 'string' && raw.model.trim() ? raw.model.trim() : undefined,
+      effort: typeof raw.effort === 'string' && raw.effort.trim() ? raw.effort.trim() : undefined,
       isAdmin: raw.isAdmin,
       allowedCapabilities: parseAllowedCapabilities(raw.allowedCapabilities, p),
       linkedinPostValidator: raw.linkedinPostValidator === true,
@@ -338,77 +403,23 @@ export function readContainerConfig(folder: string): ContainerConfig {
 }
 
 /**
- * Write the container config for a group, creating the groups/<folder>/
- * directory if necessary. Pretty-printed JSON so diffs in the activation
- * flow are reviewable.
+ * Materialize `container.json` from the DB. Called at spawn time so the
+ * container always sees fresh config. Returns the `ContainerConfig` for
+ * use by the caller (buildMounts, buildContainerArgs, etc.).
  */
-export function writeContainerConfig(folder: string, config: ContainerConfig): void {
-  const p = configPath(folder);
+export function materializeContainerJson(agentGroupId: string): ContainerConfig {
+  const group = getAgentGroup(agentGroupId);
+  if (!group) throw new Error(`Agent group not found: ${agentGroupId}`);
+
+  const row = getContainerConfig(agentGroupId);
+  if (!row) throw new Error(`Container config not found for agent group: ${agentGroupId}`);
+
+  const config = configFromDb(row, group);
+
+  const p = path.join(GROUPS_DIR, group.folder, 'container.json');
   const dir = path.dirname(p);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(p, JSON.stringify(config, null, 2) + '\n');
-}
 
-/**
- * Apply a mutator function to a group's container config and persist the
- * result. Convenient for append-style changes like `install_packages` and
- * `add_mcp_server` handlers.
- */
-export function updateContainerConfig(folder: string, mutate: (config: ContainerConfig) => void): ContainerConfig {
-  const config = readContainerConfig(folder);
-  mutate(config);
-  writeContainerConfig(folder, config);
   return config;
-}
-
-/**
- * Initialize an empty container.json for a group if one doesn't already
- * exist. Idempotent — used from `group-init.ts`.
- */
-export function initContainerConfig(folder: string): boolean {
-  const p = configPath(folder);
-  if (fs.existsSync(p)) return false;
-  writeContainerConfig(folder, emptyConfig());
-  return true;
-}
-
-/**
- * One-shot startup migration: backfill allowedCapabilities into any existing
- * groups/<folder>/container.json files that pre-date PR #61 and therefore
- * omit the field. Without this, those groups would silently lose Bash /
- * Write / WebFetch on the next container restart.
- *
- * Safe to call repeatedly — skips files that already declare the field.
- */
-export function backfillAllowedCapabilities(): void {
-  if (!fs.existsSync(GROUPS_DIR)) return;
-
-  const patched: string[] = [];
-
-  for (const entry of fs.readdirSync(GROUPS_DIR, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const p = configPath(entry.name);
-    if (!fs.existsSync(p)) continue;
-
-    let raw: Record<string, unknown>;
-    try {
-      raw = JSON.parse(fs.readFileSync(p, 'utf8')) as Record<string, unknown>;
-    } catch {
-      continue;
-    }
-
-    if (raw.allowedCapabilities !== undefined) continue;
-
-    raw.allowedCapabilities = [...ALL_CAPABILITIES];
-    try {
-      fs.writeFileSync(p, JSON.stringify(raw, null, 2) + '\n');
-      patched.push(entry.name);
-    } catch (err) {
-      log.warn('[container-config] backfill failed', { folder: entry.name, err });
-    }
-  }
-
-  if (patched.length > 0) {
-    log.info('[container-config] backfilled allowedCapabilities', { groups: patched });
-  }
 }
