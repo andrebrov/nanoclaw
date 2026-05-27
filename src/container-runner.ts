@@ -46,8 +46,10 @@ import { messageDbPath } from './message-store.js';
 import { writeSessionSecrets } from './container-secrets.js';
 import {
   heartbeatPath,
+  inboundDbPath,
   markContainerRunning,
   markContainerStopped,
+  resolveMaintenanceSession,
   sessionDir,
   writeSessionRouting,
 } from './session-manager.js';
@@ -536,6 +538,28 @@ function buildMounts(
   // first-spawn-before-first-message is fine — no mount, agent skips it.
   if (fs.existsSync(messageDbPath)) {
     mounts.push({ hostPath: messageDbPath, containerPath: '/workspace/messages.db', readonly: true });
+  }
+
+  // Maintenance session's inbound.db — read-only mount so the scheduling MCP
+  // tools (list_tasks) in user-facing containers can see tasks that the host
+  // wrote into the maintenance session. The maintenance container itself
+  // owns this file as its own /workspace/inbound.db, so we skip the extra
+  // mount there.
+  //
+  // Eagerly resolved so the file exists at spawn even when no task has been
+  // scheduled yet — this guarantees the mount is in place before the agent's
+  // first schedule_task → list_tasks turn, which would otherwise miss it
+  // (the mount is fixed at container start).
+  if (!isMaintenanceSession) {
+    const { session: maintSession } = resolveMaintenanceSession(agentGroup.id);
+    const maintInboundPath = inboundDbPath(agentGroup.id, maintSession.id);
+    if (fs.existsSync(maintInboundPath)) {
+      mounts.push({
+        hostPath: maintInboundPath,
+        containerPath: '/workspace/maintenance-inbound.db',
+        readonly: true,
+      });
+    }
   }
 
   // Per-session secret files for v1-style skill scripts (composio-tool,

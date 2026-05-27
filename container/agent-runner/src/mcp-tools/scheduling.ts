@@ -5,12 +5,37 @@
  * Scheduling operations are sent as system actions via messages_out — the host
  * reads them during delivery and applies the changes to inbound.db.
  */
+import { Database } from 'bun:sqlite';
+import fs from 'fs';
+
 import { getInboundDb } from '../db/connection.js';
 import { writeMessageOut } from '../db/messages-out.js';
 import { getSessionRouting } from '../db/session-routing.js';
 import { TIMEZONE, parseZonedToUtc } from '../timezone.js';
 import { registerTools } from './server.js';
 import type { McpToolDefinition } from './types.js';
+
+/**
+ * Tasks live in the maintenance session's inbound.db. The host bind-mounts
+ * that file at /workspace/maintenance-inbound.db in every non-maintenance
+ * container of the same agent group (see src/container-runner.ts), so
+ * list_tasks can see tasks scheduled from any user-facing session. The
+ * maintenance container itself doesn't get the extra mount — its own
+ * /workspace/inbound.db is the maintenance DB, so we fall back to that.
+ */
+const MAINTENANCE_INBOUND_PATH = '/workspace/maintenance-inbound.db';
+
+function openTaskDbReadonly(): { db: Database; close: () => void } {
+  if (fs.existsSync(MAINTENANCE_INBOUND_PATH)) {
+    const db = new Database(MAINTENANCE_INBOUND_PATH, { readonly: true });
+    db.exec('PRAGMA busy_timeout = 5000');
+    db.exec('PRAGMA mmap_size = 0');
+    return { db, close: () => db.close() };
+  }
+  // Fallback: maintenance container reads its own inbound.db. The shared
+  // connection is reused, so don't close it.
+  return { db: getInboundDb(), close: () => {} };
+}
 
 function log(msg: string): void {
   console.error(`[mcp-tools] ${msg}`);
@@ -112,7 +137,7 @@ export const listTasks: McpToolDefinition = {
   },
   async handler(args) {
     const status = args.status as string | undefined;
-    const db = getInboundDb();
+    const { db, close } = openTaskDbReadonly();
     // One row per series — the live (pending or paused) occurrence. Recurring
     // tasks accumulate one completed row per firing plus one live follow-up;
     // exposing the whole pile to the agent is noisy and confuses task identity
@@ -122,26 +147,30 @@ export const listTasks: McpToolDefinition = {
     // query, the bare columns take values from the row that contains that max
     // — that's how we pick "the latest live row per series" in one pass.
     let rows;
-    if (status) {
-      rows = db
-        .prepare(
-          `SELECT series_id AS id, status, process_after, recurrence, content, MAX(seq) AS _seq
-             FROM messages_in
-            WHERE kind = 'task' AND status = ?
-            GROUP BY series_id
-            ORDER BY process_after ASC`,
-        )
-        .all(status);
-    } else {
-      rows = db
-        .prepare(
-          `SELECT series_id AS id, status, process_after, recurrence, content, MAX(seq) AS _seq
-             FROM messages_in
-            WHERE kind = 'task' AND status IN ('pending', 'paused')
-            GROUP BY series_id
-            ORDER BY process_after ASC`,
-        )
-        .all();
+    try {
+      if (status) {
+        rows = db
+          .prepare(
+            `SELECT series_id AS id, status, process_after, recurrence, content, MAX(seq) AS _seq
+               FROM messages_in
+              WHERE kind = 'task' AND status = ?
+              GROUP BY series_id
+              ORDER BY process_after ASC`,
+          )
+          .all(status);
+      } else {
+        rows = db
+          .prepare(
+            `SELECT series_id AS id, status, process_after, recurrence, content, MAX(seq) AS _seq
+               FROM messages_in
+              WHERE kind = 'task' AND status IN ('pending', 'paused')
+              GROUP BY series_id
+              ORDER BY process_after ASC`,
+          )
+          .all();
+      }
+    } finally {
+      close();
     }
 
     if ((rows as unknown[]).length === 0) return ok('No tasks found.');
