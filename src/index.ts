@@ -208,6 +208,20 @@ async function main(): Promise<void> {
   startHostSweep();
   log.info('Host sweep started');
 
+  // 6b. Notify maintenance agents about tasks missed while the host was down.
+  // Best-effort — failures inside notifyMissedTasks are already logged.
+  void (async () => {
+    try {
+      const { notifyMissedTasks } = await import('./modules/scheduling/recovery.js');
+      const notified = await notifyMissedTasks();
+      if (notified > 0) {
+        log.info('Missed-task recovery notices sent', { sessions: notified });
+      }
+    } catch (err) {
+      log.warn('Missed-task recovery scan failed', { err });
+    }
+  })();
+
   // 7. Start the `ncl` CLI socket server (data/ncl.sock).
   await startCliServer();
 

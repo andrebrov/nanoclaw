@@ -249,7 +249,10 @@ export async function routeAgentMessage(msg: RoutableAgentMessage, session: Sess
   // (e.g. bidirectional rows created by `create_agent`) pass this check.
   // Self-messages (an agent routing back to its own group — e.g. the return
   // path for a2a replies) bypass the ACL; only cross-agent sends need a row.
-  if (targetAgentGroupId !== session.agent_group_id && !hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)) {
+  if (
+    targetAgentGroupId !== session.agent_group_id &&
+    !hasDestination(session.agent_group_id, 'agent', targetAgentGroupId)
+  ) {
     log.warn('Unauthorized agent-to-agent send attempt blocked', {
       from: session.agent_group_id,
       to: targetAgentGroupId,
