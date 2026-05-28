@@ -576,6 +576,19 @@ async function processQuery(
   // will kill the container and messages get reset to pending.
   let pollInFlight = false;
   let endedForCommand = false;
+
+  // Hung-SDK diagnostic. The for-await loop below updates this on every real
+  // SDK event (init, activity, tool_use, result, threshold_*, compaction).
+  // If the inner setInterval keeps firing but nothing updates this, the SDK
+  // is stuck mid-stream — heartbeat stays fresh (we keep touching it for
+  // the long-Bash case) and the host sweep can't tell. This timestamp is
+  // the diagnostic backstop: if no events for > HUNG_SDK_LOG_THRESHOLD_MS,
+  // log a clear warning. Rate-limited via lastHungLogAtMs so we don't spam.
+  // Behavior unchanged; this is observability only.
+  let lastRealEventAtMs = Date.now();
+  let lastHungLogAtMs = 0;
+  const HUNG_SDK_LOG_THRESHOLD_MS = 5 * 60 * 1000;
+
   const pollHandle = setInterval(() => {
     if (done || pollInFlight || endedForCommand) return;
     pollInFlight = true;
@@ -586,6 +599,17 @@ async function processQuery(
     // tool_use call and its result — without this, the heartbeat would go
     // stale and the sweep could kill an actively-working container.
     touchHeartbeat();
+
+    // Hung-SDK warning. Distinct from heartbeat: heartbeat tells the host
+    // "the runner process is alive," this tells the operator "the SDK
+    // event stream has gone silent." Both can be true at once (the
+    // documented inner-setInterval failure mode behind the 2026-05-25
+    // stall). Rate-limited to one log per threshold window.
+    const sinceEvent = Date.now() - lastRealEventAtMs;
+    if (sinceEvent > HUNG_SDK_LOG_THRESHOLD_MS && Date.now() - lastHungLogAtMs > HUNG_SDK_LOG_THRESHOLD_MS) {
+      log(`WARNING: no SDK events in ${Math.round(sinceEvent / 1000)}s — possible stuck stream`);
+      lastHungLogAtMs = Date.now();
+    }
 
     void (async () => {
       try {
@@ -676,6 +700,10 @@ async function processQuery(
 
   try {
     for await (const event of query.events) {
+      // Mark every real SDK event for the hung-SDK diagnostic in the
+      // setInterval above. Touched here (one place) rather than per-case
+      // so we never miss an event type going forward.
+      lastRealEventAtMs = Date.now();
       handleEvent(event, routing);
       touchHeartbeat();
 
