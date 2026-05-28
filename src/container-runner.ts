@@ -25,7 +25,13 @@ import {
 import { materializeContainerJson } from './container-config.js';
 import { getContainerConfig } from './db/container-configs.js';
 import { updateContainerConfigScalars, updateContainerConfigJson } from './db/container-configs.js';
-import { CONTAINER_RUNTIME_BIN, hostGatewayArgs, readonlyMountArgs, stopContainer } from './container-runtime.js';
+import {
+  CONTAINER_RUNTIME_BIN,
+  hostGatewayArgs,
+  listInstallContainerNames,
+  readonlyMountArgs,
+  stopContainer,
+} from './container-runtime.js';
 import { composeGroupClaudeMd } from './claude-md-compose.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getDb, hasTable } from './db/connection.js';
@@ -123,6 +129,63 @@ export function isContainerRunning(sessionId: string): boolean {
 export function getContainerSpawnedAtMs(sessionId: string): number | null {
   const entry = activeContainers.get(sessionId);
   return entry?.spawnedAtMs ?? null;
+}
+
+/**
+ * Grace window before the audit will evict an entry. A fresh wake spawns
+ * docker via child_process.spawn; the container only appears in `docker ps`
+ * once the runtime has actually started it. On a busy host the gap between
+ * the host adding the activeContainers entry and the container being
+ * visible to `docker ps` can be a few seconds. 30s is comfortably wider
+ * than that gap.
+ */
+const AUDIT_GRACE_MS = 30_000;
+
+/**
+ * Reconcile the host's activeContainers map against what the container
+ * runtime actually has running. Any entry whose containerName is not in
+ * the runtime's listing (and that's older than AUDIT_GRACE_MS) is a
+ * "phantom" — the host believed a container was running, but no process
+ * actually exists. Evict it.
+ *
+ * Why this matters: in the 2026-05-25 stall (see
+ * incident_phantom_session_stall.md), a wake attempt left a phantom entry
+ * in activeContainers and the host never recovered. The B2 patch in
+ * 9c807c7 introduced a 5-min grace based on spawn time, which caught the
+ * phantom indirectly via the sweep's kill-ceiling path. This audit is the
+ * direct cure: catch phantoms by comparing host state to runtime state
+ * every sweep tick (~60s) instead of waiting on the grace timer.
+ *
+ * Safe to call repeatedly; returns the list of evicted session ids so the
+ * caller can log them in one place.
+ */
+export function auditActiveContainers(): string[] {
+  const live = listInstallContainerNames();
+  if (live === null) {
+    // Runtime listing failed — don't evict anything blind. The B2 grace
+    // path is still in place as a backstop.
+    return [];
+  }
+  const evicted: string[] = [];
+  const now = Date.now();
+  for (const [sessionId, entry] of activeContainers.entries()) {
+    if (live.has(entry.containerName)) continue;
+    if (now - entry.spawnedAtMs < AUDIT_GRACE_MS) continue;
+    log.warn('auditActiveContainers: evicting phantom session', {
+      sessionId,
+      containerName: entry.containerName,
+      ageMs: now - entry.spawnedAtMs,
+    });
+    activeContainers.delete(sessionId);
+    markContainerStopped(sessionId);
+    stopTypingRefresh(sessionId);
+    destroySessionObserver(sessionId);
+    evicted.push(sessionId);
+  }
+  if (evicted.length > 0) {
+    drainWakeQueue();
+  }
+  return evicted;
 }
 
 /**

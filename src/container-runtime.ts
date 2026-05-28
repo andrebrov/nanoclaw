@@ -58,6 +58,27 @@ export function ensureContainerRuntimeRunning(): void {
 }
 
 /**
+ * List the names of all currently-running containers belonging to THIS
+ * install. Scoped by label `nanoclaw-install=<slug>` so a crash-looping
+ * peer install cannot interfere. Returns `null` when the listing itself
+ * fails (runtime daemon down, command errored, etc.) so callers know to
+ * skip whatever audit they were about to do — better to do nothing than
+ * to evict everything based on an empty result.
+ */
+export function listInstallContainerNames(): Set<string> | null {
+  try {
+    const output = execSync(
+      `${CONTAINER_RUNTIME_BIN} ps --filter label=${CONTAINER_INSTALL_LABEL} --format '{{.Names}}'`,
+      { stdio: ['pipe', 'pipe', 'pipe'], encoding: 'utf-8' },
+    );
+    return new Set(output.trim().split('\n').filter(Boolean));
+  } catch (err) {
+    log.warn('listInstallContainerNames: ps failed', { err });
+    return null;
+  }
+}
+
+/**
  * Kill orphaned NanoClaw containers from THIS install's previous runs.
  *
  * Scoped by label `nanoclaw-install=<slug>` so a crash-looping peer install

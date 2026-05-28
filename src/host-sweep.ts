@@ -52,7 +52,13 @@ import {
   heartbeatPath,
   writeSessionMessage,
 } from './session-manager.js';
-import { getContainerSpawnedAtMs, isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
+import {
+  auditActiveContainers,
+  getContainerSpawnedAtMs,
+  isContainerRunning,
+  killContainer,
+  wakeContainer,
+} from './container-runner.js';
 import type { Session } from './types.js';
 
 /**
@@ -220,6 +226,17 @@ export function stopHostSweep(): void {
 
 async function sweep(): Promise<void> {
   if (!running) return;
+
+  // Reconcile activeContainers against the runtime before iterating
+  // sessions. Catches phantom entries (host believes container is running
+  // but no process exists) within one sweep tick — much faster than
+  // waiting for the 5-min B2 grace path. The evicted sessions become
+  // wake-eligible in the per-session loop below.
+  try {
+    auditActiveContainers();
+  } catch (err) {
+    log.error('Host sweep: audit failed', { err });
+  }
 
   let sessions: Session[] = [];
   try {
