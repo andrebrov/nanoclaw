@@ -256,16 +256,53 @@ export function wakeContainer(session: Session): Promise<boolean> {
   return doSpawn(session);
 }
 
+/**
+ * Hard ceiling on how long doSpawn() will wait for spawnContainer() to
+ * complete before treating it as a failure. Covers the case where a
+ * dependency mid-spawn (OneCLI gateway `ensureAgent`, vault secret
+ * assignment, DB write) hangs without throwing. Without this timeout, a
+ * single hung call could leave the wakePromise pending forever and every
+ * subsequent wakeContainer() would silently `join in-flight promise` —
+ * the prime suspect for B1 (poisoned activeContainers map; see
+ * incident_phantom_session_stall.md).
+ *
+ * 90s is comfortably wider than a normal cold spawn (~3–5s including
+ * image inspect + OneCLI ensureAgent + secrets assign) so legitimate
+ * spawns never hit it.
+ */
+const SPAWN_TIMEOUT_MS = 90_000;
+
 function doSpawn(session: Session): Promise<boolean> {
-  const promise = spawnContainer(session)
+  let timeoutHandle: NodeJS.Timeout | null = null;
+  const timeoutPromise = new Promise<boolean>((resolve) => {
+    timeoutHandle = setTimeout(() => {
+      log.error('doSpawn: spawnContainer timed out — failing the wake', {
+        sessionId: session.id,
+        timeoutMs: SPAWN_TIMEOUT_MS,
+      });
+      resolve(false);
+    }, SPAWN_TIMEOUT_MS);
+  });
+
+  // Inner spawnContainer keeps running even if we lose the race — that's
+  // the cost of not having cancellation in node's child_process API.
+  // If it eventually completes after the timeout, the resulting docker
+  // process becomes an orphan (no host tracking). The next docker-ps
+  // audit in host-sweep evicts any phantom entry; the orphan container
+  // itself gets cleaned up by `cleanupOrphans` at the next host restart.
+  const spawnPromise: Promise<boolean> = spawnContainer(session)
     .then(() => true)
     .catch((err) => {
       log.warn('wakeContainer failed — host-sweep will retry', { sessionId: session.id, err });
       return false;
     })
     .finally(() => {
-      wakePromises.delete(session.id);
+      if (timeoutHandle) clearTimeout(timeoutHandle);
     });
+
+  const promise = Promise.race([spawnPromise, timeoutPromise]).finally(() => {
+    wakePromises.delete(session.id);
+  });
   wakePromises.set(session.id, promise);
   return promise;
 }
