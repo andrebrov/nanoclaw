@@ -255,6 +255,33 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
+// Last-resort crash containment. Pre-patch, a single thrown error from
+// anywhere in the long-running host (channel adapter callback, sweep
+// async hop, delivery poll, MCP gateway response) would propagate up to
+// the event loop and exit the process. systemd's RestartLimitBurst=5/300s
+// caps that — after 5 such crashes the service goes dead until manual
+// intervention. For a personal assistant where uptime beats correctness
+// at the host layer (state lives in per-session DBs, not in memory),
+// catching here and continuing is the right trade-off. The error is
+// fully logged so we don't lose bug surface.
+//
+// The exception we deliberately do NOT catch is startup failure — that's
+// the `main().catch(...)` below. If init can't even finish, restarting
+// is the right move because the process can't be sane.
+process.on('uncaughtException', (err, origin) => {
+  log.error('uncaughtException — continuing', {
+    origin,
+    message: err.message,
+    stack: err.stack,
+  });
+});
+process.on('unhandledRejection', (reason, promise) => {
+  log.error('unhandledRejection — continuing', {
+    reason: reason instanceof Error ? { message: reason.message, stack: reason.stack } : reason,
+    promiseString: String(promise),
+  });
+});
+
 main().catch((err) => {
   log.fatal('Startup failed', { err });
   process.exit(1);
