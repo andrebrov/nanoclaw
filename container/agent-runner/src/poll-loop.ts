@@ -116,6 +116,13 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
   let pollCount = 0;
   let isFirstPoll = true;
   while (true) {
+    // Touch heartbeat at the top of every outer iteration. Without this, an
+    // idle container (no active query, just polling for new messages) never
+    // refreshes the heartbeat — only the inner SDK-active setInterval does.
+    // The host sweep then can't distinguish "idle but healthy" from "dead",
+    // and missing-heartbeat phantom sessions (host believes container is
+    // running, no actual container, never wrote .heartbeat) stay invisible.
+    touchHeartbeat();
     // Skip system messages — they're responses for MCP tools (e.g., ask_user_question)
     const messages = getPendingMessages(isFirstPoll).filter((m) => m.kind !== 'system');
     isFirstPoll = false;

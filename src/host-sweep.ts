@@ -52,7 +52,7 @@ import {
   heartbeatPath,
   writeSessionMessage,
 } from './session-manager.js';
-import { isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
+import { getContainerSpawnedAtMs, isContainerRunning, killContainer, wakeContainer } from './container-runner.js';
 import type { Session } from './types.js';
 
 /**
@@ -74,6 +74,14 @@ export const ABSOLUTE_CEILING_MS = 30 * 60 * 1000;
 // Stuck tolerance window applied per 'processing' claim — "did we see any
 // signs of life since this message was claimed?"
 export const CLAIM_STUCK_MS = 60 * 1000;
+// Startup grace for a container that hasn't yet produced a heartbeat file.
+// Past this window, "no heartbeat" is treated as stale rather than fresh —
+// catches phantom sessions where the host added an activeContainers entry
+// but the actual docker process never started (no close event fires, no
+// heartbeat ever written). 5 min is generous for normal startup
+// (image pull, MCP servers, SDK resume) but short enough to recover quickly
+// from a poisoned activeContainers map.
+export const MISSING_HEARTBEAT_GRACE_MS = 5 * 60 * 1000;
 const MAX_TRIES = 5;
 const BACKOFF_BASE_MS = 5000;
 
@@ -158,24 +166,30 @@ export function decideStuckAction(args: {
   heartbeatMtimeMs: number; // 0 when heartbeat file absent
   containerState: ContainerState | null;
   claims: Array<{ message_id: string; status_changed: string }>;
+  spawnedAtMs?: number | null; // null/undefined when host can't tell (legacy / non-tracked sessions)
 }): StuckDecision {
   const { now, heartbeatMtimeMs, containerState, claims } = args;
+  const spawnedAtMs = args.spawnedAtMs ?? null;
   const declaredBashMs = bashTimeoutMs(containerState);
   const declaredMaxMs = containerState?.declared_max_ms ?? null;
+  const ceiling = Math.max(ABSOLUTE_CEILING_MS, declaredBashMs ?? 0, declaredMaxMs ?? 0);
 
-  // Ceiling check only applies when we have an actual heartbeat timestamp.
-  // A freshly-spawned container hasn't had any SDK activity yet so no
-  // heartbeat file exists — if we treated that as infinitely stale we'd
-  // kill every container within seconds of spawn. Genuinely-dead containers
-  // that never wrote a heartbeat are caught by the separate "container
-  // process not running" cleanup path, not here. If a fresh container is
-  // hanging at the gate (claimed a message but never did anything) the
-  // claim-stuck check below handles it.
   if (heartbeatMtimeMs !== 0) {
     const heartbeatAge = now - heartbeatMtimeMs;
-    const ceiling = Math.max(ABSOLUTE_CEILING_MS, declaredBashMs ?? 0, declaredMaxMs ?? 0);
     if (heartbeatAge > ceiling) {
       return { action: 'kill-ceiling', heartbeatAgeMs: heartbeatAge, ceilingMs: ceiling };
+    }
+  } else if (spawnedAtMs !== null) {
+    // No heartbeat file. A fresh container hasn't had time to write one yet,
+    // so grant MISSING_HEARTBEAT_GRACE_MS from spawn. Past that, treat as
+    // stale: this catches phantom sessions (host believes container is
+    // running but no docker process exists, so .heartbeat never appears).
+    // Without this branch, a poisoned activeContainers entry stays invisible
+    // to the sweep forever. The 41-hour DM stall on 2026-05-25 lived
+    // exactly here.
+    const sinceSpawn = now - spawnedAtMs;
+    if (sinceSpawn > MISSING_HEARTBEAT_GRACE_MS) {
+      return { action: 'kill-ceiling', heartbeatAgeMs: sinceSpawn, ceilingMs: MISSING_HEARTBEAT_GRACE_MS };
     }
   }
 
@@ -332,6 +346,7 @@ function enforceRunningContainerSla(
     heartbeatMtimeMs: heartbeatMtimeMs(agentGroupId, session.id),
     containerState: getContainerState(outDb),
     claims: getProcessingClaims(outDb),
+    spawnedAtMs: getContainerSpawnedAtMs(session.id),
   });
 
   if (decision.action === 'ok') return false;

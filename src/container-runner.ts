@@ -61,7 +61,7 @@ export { resolveAgentModel };
 const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
 
 /** Active containers tracked by session ID. */
-const activeContainers = new Map<string, { process: ChildProcess; containerName: string }>();
+const activeContainers = new Map<string, { process: ChildProcess; containerName: string; spawnedAtMs: number }>();
 
 /**
  * In-flight wake promises, keyed by session id. Deduplicates concurrent
@@ -113,6 +113,16 @@ export function getActiveContainerCount(): number {
 
 export function isContainerRunning(sessionId: string): boolean {
   return activeContainers.has(sessionId);
+}
+
+/**
+ * When was this session's container added to the activeContainers map?
+ * Used by the host sweep to grant a startup grace window before treating a
+ * missing-heartbeat container as stale.
+ */
+export function getContainerSpawnedAtMs(sessionId: string): number | null {
+  const entry = activeContainers.get(sessionId);
+  return entry?.spawnedAtMs ?? null;
 }
 
 /**
@@ -270,7 +280,7 @@ async function spawnContainer(session: Session): Promise<void> {
 
   const container = spawn(CONTAINER_RUNTIME_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-  activeContainers.set(session.id, { process: container, containerName });
+  activeContainers.set(session.id, { process: container, containerName, spawnedAtMs: Date.now() });
   markContainerRunning(session.id);
 
   // Log stderr and forward observer: lines to the session observer.

@@ -10,6 +10,7 @@ import { deleteOrphanProcessingClaims, getProcessingClaims } from './db/session-
 import {
   ABSOLUTE_CEILING_MS,
   CLAIM_STUCK_MS,
+  MISSING_HEARTBEAT_GRACE_MS,
   _resetStuckProcessingRowsForTesting,
   decideStuckAction,
   parseSqliteUtc,
@@ -187,6 +188,59 @@ describe('decideStuckAction', () => {
     expect(res.action).toBe('kill-ceiling');
     if (res.action !== 'kill-ceiling') return;
     expect(res.ceilingMs).toBe(ABSOLUTE_CEILING_MS);
+  });
+
+  // ─── missing-heartbeat phantom-session protection ─────────────────────────
+  // Regression coverage for the 2026-05-25 DM stall: the host added a session
+  // to activeContainers but the docker process never started (or died
+  // silently before producing a heartbeat). No close event ever fired, so
+  // activeContainers kept the entry, sweep saw alive=true forever, and the
+  // ceiling-skip-when-absent rule meant no kill ever happened. Result: 41+
+  // hours of phantom session, recoverable only by manual ncl restart.
+
+  it('returns ok when heartbeat is absent and spawn happened within grace window', () => {
+    // Normal fresh-spawn path: container just came up, no heartbeat yet,
+    // but spawn was recent enough that startup isn't suspicious.
+    const res = decideStuckAction({
+      now: BASE,
+      heartbeatMtimeMs: 0,
+      containerState: null,
+      claims: [],
+      spawnedAtMs: BASE - 60_000, // 1 min ago — well inside grace
+    });
+    expect(res.action).toBe('ok');
+  });
+
+  it('kill-ceiling when heartbeat is absent and spawn predates the grace window', () => {
+    // Phantom session: host believes container is running (entry in
+    // activeContainers, hence spawnedAtMs is set), but no heartbeat file
+    // ever appeared. Past the grace window, treat as stale and kill so the
+    // map entry gets cleaned up and the next wake can spawn fresh.
+    const res = decideStuckAction({
+      now: BASE,
+      heartbeatMtimeMs: 0,
+      containerState: null,
+      claims: [],
+      spawnedAtMs: BASE - MISSING_HEARTBEAT_GRACE_MS - 1_000,
+    });
+    expect(res.action).toBe('kill-ceiling');
+    if (res.action !== 'kill-ceiling') return;
+    expect(res.ceilingMs).toBe(MISSING_HEARTBEAT_GRACE_MS);
+    expect(res.heartbeatAgeMs).toBeGreaterThan(MISSING_HEARTBEAT_GRACE_MS);
+  });
+
+  it('preserves legacy behaviour when spawnedAtMs is null and heartbeat is absent', () => {
+    // Sessions where the host can't tell when the container spawned (legacy
+    // entries, tests, etc.) fall back to the pre-patch "ok" outcome.
+    // claim-stuck still catches anything actively stuck on a claim.
+    const res = decideStuckAction({
+      now: BASE,
+      heartbeatMtimeMs: 0,
+      containerState: null,
+      claims: [],
+      spawnedAtMs: null,
+    });
+    expect(res.action).toBe('ok');
   });
 });
 
