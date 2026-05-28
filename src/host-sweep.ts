@@ -221,13 +221,29 @@ export function stopHostSweep(): void {
 async function sweep(): Promise<void> {
   if (!running) return;
 
+  let sessions: Session[] = [];
   try {
-    const sessions = getActiveSessions();
-    for (const session of sessions) {
-      await sweepSession(session);
-    }
+    sessions = getActiveSessions();
   } catch (err) {
-    log.error('Host sweep error', { err });
+    log.error('Host sweep: failed to list active sessions', { err });
+  }
+
+  // Isolate per-session failures so one bad session DB (corrupted file,
+  // missing agent group, locked SQLite, etc.) can't silence the entire
+  // sweep for this tick. Pre-patch: a single throw aborted the for loop
+  // and every later session was skipped — until the next tick, which would
+  // re-encounter the same bad session and abort again. Effectively
+  // permanent sweep starvation from a single bad row.
+  for (const session of sessions) {
+    try {
+      await sweepSession(session);
+    } catch (err) {
+      log.error('Host sweep: per-session failure', {
+        sessionId: session.id,
+        agentGroupId: session.agent_group_id,
+        err,
+      });
+    }
   }
 
   setTimeout(sweep, SWEEP_INTERVAL_MS);

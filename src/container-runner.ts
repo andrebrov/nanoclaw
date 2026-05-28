@@ -144,13 +144,24 @@ export function getContainerSpawnedAtMs(sessionId: string): number | null {
  * can branch on the boolean.
  */
 export function wakeContainer(session: Session): Promise<boolean> {
+  // These three early-exit sites used to log at debug level. Promoted to
+  // info so that when a wake call produces no "Spawning container" line
+  // we can tell which path absorbed it — this is the diagnostic data we
+  // need to find B1 (poisoned activeContainers map). See
+  // incident_phantom_session_stall.md.
   if (activeContainers.has(session.id)) {
-    log.debug('Container already running', { sessionId: session.id });
+    const entry = activeContainers.get(session.id);
+    log.info('wakeContainer: session already in activeContainers map', {
+      sessionId: session.id,
+      containerName: entry?.containerName,
+      spawnedAtMs: entry?.spawnedAtMs,
+      ageMs: entry ? Date.now() - entry.spawnedAtMs : null,
+    });
     return Promise.resolve(true);
   }
   const existing = wakePromises.get(session.id);
   if (existing) {
-    log.debug('Container wake already in-flight — joining existing promise', { sessionId: session.id });
+    log.info('wakeContainer: joining in-flight wake promise', { sessionId: session.id });
     return existing;
   }
 
@@ -163,7 +174,7 @@ export function wakeContainer(session: Session): Promise<boolean> {
   if (concurrencyAction === 'queue') {
     return new Promise<boolean>((resolve, reject) => {
       pendingWakeQueue.push({ session, resolve, reject });
-      log.debug('Wake queued — at concurrency cap', {
+      log.info('wakeContainer: queued (concurrency cap saturated)', {
         sessionId: session.id,
         queueLength: pendingWakeQueue.length,
         cap: MAX_CONCURRENT_CONTAINERS,
