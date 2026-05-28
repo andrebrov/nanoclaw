@@ -104,10 +104,12 @@ API credentials are managed by the OneCLI vault proxy (`HTTPS_PROXY`), not by en
 ```python
 import httpx
 response = httpx.get(
-    "https://backend.composio.dev/api/v1/...",
+    "https://backend.composio.dev/api/v3/connected_accounts",
     headers={"x-api-key": "test"},  # proxy replaces this
 )
 ```
+
+Composio v1 and v2 endpoints (`/api/v1/...`, `/api/v2/...`) are retired and return `HTTP 410 "endpoint no longer available"`. Always target `/api/v3/...` — for example `/api/v3/tools/execute`, `/api/v3/connected_accounts`, `/api/v3/connected_accounts/{id}`.
 
 **Why not `os.getenv("COMPOSIO_API_KEY")`** — SDK initialisation that reads env vars before making any HTTPS call will fail if the key is absent. The host injects `COMPOSIO_API_KEY=test` as a placeholder so SDK code initialises, but the proxy still controls the real credential at request time. Writing new code that depends on the env var is fragile; raw HTTP calls that let the proxy do its job are the reliable pattern.
 
