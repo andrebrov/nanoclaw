@@ -100,6 +100,12 @@ const PER_SESSION_TIMEOUT_MS = 30 * 1000;
 // flooding the log. The snapshot is cheap (one Map iteration in
 // getContainerStats, no IO) so we can afford it.
 const SNAPSHOT_EVERY_N_TICKS = 10;
+// Slow-tick threshold. A normal sweep tick processes ~18 sessions in
+// well under 100ms (open DB → quick queries → close). 5s indicates
+// something pathological: DB lock contention, slow async hop in
+// materializeContainerJson, OneCLI gateway hang during wakeContainer.
+// We log a warn so it's visible without flooding under steady-state.
+const SLOW_TICK_THRESHOLD_MS = 5_000;
 let sweepTickCount = 0;
 const MAX_TRIES = 5;
 const BACKOFF_BASE_MS = 5000;
@@ -240,6 +246,8 @@ export function stopHostSweep(): void {
 async function sweep(): Promise<void> {
   if (!running) return;
 
+  const tickStartMs = Date.now();
+
   // Reconcile activeContainers against the runtime before iterating
   // sessions. Catches phantom entries (host believes container is running
   // but no process exists) within one sweep tick — much faster than
@@ -293,6 +301,20 @@ async function sweep(): Promise<void> {
   }
 
   sweepTickCount++;
+  const tickDurationMs = Date.now() - tickStartMs;
+
+  if (tickDurationMs > SLOW_TICK_THRESHOLD_MS) {
+    // Slow tick is a leading indicator: per-session timeout (52dfdf4) bounds
+    // each session to 30s, but if multiple sessions take a few seconds each
+    // the total tick grows toward starvation. Surface it before it cascades.
+    log.warn('Host sweep: slow tick', {
+      tick: sweepTickCount,
+      durationMs: tickDurationMs,
+      sessionsConsidered: sessions.length,
+      thresholdMs: SLOW_TICK_THRESHOLD_MS,
+    });
+  }
+
   if (sweepTickCount % SNAPSHOT_EVERY_N_TICKS === 0) {
     try {
       const stats = getContainerStats();
@@ -302,6 +324,7 @@ async function sweep(): Promise<void> {
         oldestContainerAgeMs: stats.oldestAgeMs,
         pendingWakeQueueLength: stats.pendingWakeQueueLength,
         sessionsConsidered: sessions.length,
+        lastTickDurationMs: tickDurationMs,
       });
     } catch (err) {
       // Snapshot failure must not break the sweep loop — log and move on.
