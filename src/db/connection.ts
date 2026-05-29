@@ -16,6 +16,15 @@ export function initDb(dbPath: string): Database.Database {
   _db = new Database(dbPath);
   _db.pragma('journal_mode = WAL');
   _db.pragma('foreign_keys = ON');
+  // SQLITE_BUSY hardening. The central DB has multiple writers (host
+  // sweep, channel adapters, delivery, router) that occasionally try to
+  // write concurrently. better-sqlite3's default busy timeout is 5s;
+  // under brief WAL-checkpoint contention or large-write windows that
+  // can fail-fast. 30s is enough that any real-world contention waits
+  // it out rather than throwing SQLITE_BUSY into a callback that may not
+  // be retry-prepared (and propagating into the iter-5 uncaughtException
+  // handler as a noisy log).
+  _db.pragma('busy_timeout = 30000');
   log.info('Central DB initialized', { path: dbPath });
   return _db;
 }
