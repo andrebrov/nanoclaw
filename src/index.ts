@@ -14,6 +14,7 @@ import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
 import { setIsMainGroupResolver, shutdownAllContainers } from './container-runner.js';
+import { bumpResilienceMetric } from './resilience-metrics.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getMessagingGroupByPlatform, updateMessagingGroup } from './db/messaging-groups.js';
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
@@ -280,6 +281,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 // the `main().catch(...)` below. If init can't even finish, restarting
 // is the right move because the process can't be sane.
 process.on('uncaughtException', (err, origin) => {
+  bumpResilienceMetric('uncaughtExceptions');
   log.error('uncaughtException — continuing', {
     origin,
     message: err.message,
@@ -287,6 +289,7 @@ process.on('uncaughtException', (err, origin) => {
   });
 });
 process.on('unhandledRejection', (reason, promise) => {
+  bumpResilienceMetric('unhandledRejections');
   log.error('unhandledRejection — continuing', {
     reason: reason instanceof Error ? { message: reason.message, stack: reason.stack } : reason,
     promiseString: String(promise),

@@ -32,6 +32,7 @@ import {
   readonlyMountArgs,
   stopContainer,
 } from './container-runtime.js';
+import { bumpResilienceMetric } from './resilience-metrics.js';
 import { composeGroupClaudeMd } from './claude-md-compose.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getDb, hasTable } from './db/connection.js';
@@ -254,6 +255,7 @@ export function auditActiveContainers(): string[] {
     markContainerStopped(sessionId);
     stopTypingRefresh(sessionId);
     destroySessionObserver(sessionId);
+    bumpResilienceMetric('auditEvictions');
     evicted.push(sessionId);
   }
   if (evicted.length > 0) {
@@ -424,6 +426,7 @@ async function doSpawnWithBackoff(session: Session): Promise<boolean> {
       backoffMs,
       crashCount: record?.count ?? 0,
     });
+    bumpResilienceMetric('crashBackoffsApplied');
     await new Promise<void>((resolve) => setTimeout(resolve, backoffMs));
   }
 
@@ -434,6 +437,7 @@ async function doSpawnWithBackoff(session: Session): Promise<boolean> {
         sessionId: session.id,
         timeoutMs: SPAWN_TIMEOUT_MS,
       });
+      bumpResilienceMetric('spawnTimeouts');
       resolve(false);
     }, SPAWN_TIMEOUT_MS);
   });

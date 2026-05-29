@@ -45,6 +45,7 @@ import {
   type ContainerState,
 } from './db/session-db.js';
 import { log } from './log.js';
+import { bumpResilienceMetric, getResilienceMetrics } from './resilience-metrics.js';
 import {
   openInboundDb,
   openOutboundDb,
@@ -314,6 +315,8 @@ async function sweep(): Promise<void> {
         ),
       ]);
     } catch (err) {
+      const isTimeout = err instanceof Error && err.message.startsWith('sweepSession exceeded');
+      bumpResilienceMetric(isTimeout ? 'perSessionTimeouts' : 'perSessionFailures');
       log.error('Host sweep: per-session failure', {
         sessionId: session.id,
         agentGroupId: session.agent_group_id,
@@ -329,6 +332,7 @@ async function sweep(): Promise<void> {
     // Slow tick is a leading indicator: per-session timeout (52dfdf4) bounds
     // each session to 30s, but if multiple sessions take a few seconds each
     // the total tick grows toward starvation. Surface it before it cascades.
+    bumpResilienceMetric('slowTicks');
     log.warn('Host sweep: slow tick', {
       tick: sweepTickCount,
       durationMs: tickDurationMs,
@@ -349,6 +353,7 @@ async function sweep(): Promise<void> {
         sessionsConsidered: sessions.length,
         lastTickDurationMs: tickDurationMs,
         dataDirFreeMB: freeBytes === null ? null : Math.round(freeBytes / (1024 * 1024)),
+        defenseFirings: getResilienceMetrics(),
       });
       // Tiered disk pressure alarms. Logged separately from the snapshot
       // so they're easy to grep and don't get lost in steady-state info
@@ -357,11 +362,13 @@ async function sweep(): Promise<void> {
       // every session DB.
       if (freeBytes !== null) {
         if (freeBytes < DISK_LOW_ERROR_BYTES) {
+          bumpResilienceMetric('diskLowErrors');
           log.error('Disk space critically low at DATA_DIR — SQLite writes may begin failing', {
             freeMB: Math.round(freeBytes / (1024 * 1024)),
             errorThresholdMB: Math.round(DISK_LOW_ERROR_BYTES / (1024 * 1024)),
           });
         } else if (freeBytes < DISK_LOW_WARN_BYTES) {
+          bumpResilienceMetric('diskLowWarnings');
           log.warn('Disk space low at DATA_DIR', {
             freeMB: Math.round(freeBytes / (1024 * 1024)),
             warnThresholdMB: Math.round(DISK_LOW_WARN_BYTES / (1024 * 1024)),
@@ -496,6 +503,7 @@ function enforceRunningContainerSla(
   if (decision.action === 'ok') return false;
 
   if (decision.action === 'kill-ceiling') {
+    bumpResilienceMetric('ceilingKills');
     log.warn('Killing container past absolute ceiling', {
       sessionId: session.id,
       heartbeatAgeMs: decision.heartbeatAgeMs,
