@@ -88,6 +88,11 @@ export const CLAIM_STUCK_MS = 60 * 1000;
 // (image pull, MCP servers, SDK resume) but short enough to recover quickly
 // from a poisoned activeContainers map.
 export const MISSING_HEARTBEAT_GRACE_MS = 5 * 60 * 1000;
+// Hard ceiling per sweepSession() call. A normal session sweep is
+// well under 100ms (DB opens, a few queries, optional wake). 30s is
+// pathologically slow and indicates a hang we want to abandon rather
+// than let block the sweep loop.
+const PER_SESSION_TIMEOUT_MS = 30 * 1000;
 const MAX_TRIES = 5;
 const BACKOFF_BASE_MS = 5000;
 
@@ -251,9 +256,25 @@ async function sweep(): Promise<void> {
   // and every later session was skipped — until the next tick, which would
   // re-encounter the same bad session and abort again. Effectively
   // permanent sweep starvation from a single bad row.
+  //
+  // Per-session timeout (PER_SESSION_TIMEOUT_MS): wraps each sweepSession
+  // call in Promise.race against a setTimeout. If a single sweepSession
+  // call hangs — DB lock waiting forever, blocking await inside
+  // materializeContainerJson, slow async filesystem op — the sweep loop
+  // would otherwise stall on that session and never reach later sessions
+  // or re-arm `setTimeout(sweep, SWEEP_INTERVAL_MS)`. The timeout abandons
+  // the hung session for this tick; the next tick retries fresh.
   for (const session of sessions) {
     try {
-      await sweepSession(session);
+      await Promise.race([
+        sweepSession(session),
+        new Promise<void>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`sweepSession exceeded ${PER_SESSION_TIMEOUT_MS}ms`)),
+            PER_SESSION_TIMEOUT_MS,
+          ),
+        ),
+      ]);
     } catch (err) {
       log.error('Host sweep: per-session failure', {
         sessionId: session.id,
