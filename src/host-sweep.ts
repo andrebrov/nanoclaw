@@ -55,6 +55,7 @@ import {
 import {
   auditActiveContainers,
   getContainerSpawnedAtMs,
+  getContainerStats,
   isContainerRunning,
   killContainer,
   wakeContainer,
@@ -93,6 +94,13 @@ export const MISSING_HEARTBEAT_GRACE_MS = 5 * 60 * 1000;
 // pathologically slow and indicates a hang we want to abandon rather
 // than let block the sweep loop.
 const PER_SESSION_TIMEOUT_MS = 30 * 1000;
+// Emit a state snapshot every Nth sweep tick. At SWEEP_INTERVAL_MS=60s
+// and 10 ticks, that's once every 10 minutes — enough cadence to give
+// post-mortem investigators a continuous health timeline without
+// flooding the log. The snapshot is cheap (one Map iteration in
+// getContainerStats, no IO) so we can afford it.
+const SNAPSHOT_EVERY_N_TICKS = 10;
+let sweepTickCount = 0;
 const MAX_TRIES = 5;
 const BACKOFF_BASE_MS = 5000;
 
@@ -281,6 +289,23 @@ async function sweep(): Promise<void> {
         agentGroupId: session.agent_group_id,
         err,
       });
+    }
+  }
+
+  sweepTickCount++;
+  if (sweepTickCount % SNAPSHOT_EVERY_N_TICKS === 0) {
+    try {
+      const stats = getContainerStats();
+      log.info('Host state snapshot', {
+        tick: sweepTickCount,
+        activeContainers: stats.active,
+        oldestContainerAgeMs: stats.oldestAgeMs,
+        pendingWakeQueueLength: stats.pendingWakeQueueLength,
+        sessionsConsidered: sessions.length,
+      });
+    } catch (err) {
+      // Snapshot failure must not break the sweep loop — log and move on.
+      log.warn('Host state snapshot: failed', { err });
     }
   }
 

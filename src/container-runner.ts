@@ -117,6 +117,30 @@ export function getActiveContainerCount(): number {
   return activeContainers.size;
 }
 
+/**
+ * Read-only stats for the host's periodic state snapshot log. Returns the
+ * count, the oldest-container age in ms (or null when empty), and the
+ * count of pending wakes in the concurrency queue. Cheap to call —
+ * no IO, no docker shellouts.
+ */
+export function getContainerStats(): {
+  active: number;
+  oldestAgeMs: number | null;
+  pendingWakeQueueLength: number;
+} {
+  let oldestSpawnedAtMs: number | null = null;
+  for (const entry of activeContainers.values()) {
+    if (oldestSpawnedAtMs === null || entry.spawnedAtMs < oldestSpawnedAtMs) {
+      oldestSpawnedAtMs = entry.spawnedAtMs;
+    }
+  }
+  return {
+    active: activeContainers.size,
+    oldestAgeMs: oldestSpawnedAtMs === null ? null : Date.now() - oldestSpawnedAtMs,
+    pendingWakeQueueLength: pendingWakeQueue.length,
+  };
+}
+
 export function isContainerRunning(sessionId: string): boolean {
   return activeContainers.has(sessionId);
 }
