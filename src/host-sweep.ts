@@ -29,6 +29,7 @@
 import type Database from 'better-sqlite3';
 import fs from 'fs';
 
+import { DATA_DIR } from './config.js';
 import { getActiveSessions } from './db/sessions.js';
 import { findSessionByAgentGroup } from './db/sessions.js';
 import { getAgentGroup, getAgentGroupByFolder } from './db/agent-groups.js';
@@ -106,7 +107,28 @@ const SNAPSHOT_EVERY_N_TICKS = 10;
 // materializeContainerJson, OneCLI gateway hang during wakeContainer.
 // We log a warn so it's visible without flooding under steady-state.
 const SLOW_TICK_THRESHOLD_MS = 5_000;
+// Disk space thresholds at DATA_DIR. SQLITE writes fail with SQLITE_FULL
+// when the underlying filesystem runs out. Both tiers logged at the
+// snapshot cadence so operators see steady degradation, not a sudden
+// cascade. 500MB warns early enough to act; 100MB is "you have minutes."
+const DISK_LOW_WARN_BYTES = 500 * 1024 * 1024;
+const DISK_LOW_ERROR_BYTES = 100 * 1024 * 1024;
 let sweepTickCount = 0;
+
+/**
+ * Free-bytes available at DATA_DIR via fs.statfsSync. Returns null when
+ * the call throws (filesystem unmounted, permissions, etc.) so callers
+ * can skip logging rather than emit garbage data.
+ */
+function getDataDirFreeBytes(): number | null {
+  try {
+    const stat = fs.statfsSync(DATA_DIR);
+    return Number(stat.bfree) * Number(stat.bsize);
+  } catch (err) {
+    log.warn('Disk space check: statfsSync failed', { err });
+    return null;
+  }
+}
 const MAX_TRIES = 5;
 const BACKOFF_BASE_MS = 5000;
 
@@ -318,6 +340,7 @@ async function sweep(): Promise<void> {
   if (sweepTickCount % SNAPSHOT_EVERY_N_TICKS === 0) {
     try {
       const stats = getContainerStats();
+      const freeBytes = getDataDirFreeBytes();
       log.info('Host state snapshot', {
         tick: sweepTickCount,
         activeContainers: stats.active,
@@ -325,7 +348,26 @@ async function sweep(): Promise<void> {
         pendingWakeQueueLength: stats.pendingWakeQueueLength,
         sessionsConsidered: sessions.length,
         lastTickDurationMs: tickDurationMs,
+        dataDirFreeMB: freeBytes === null ? null : Math.round(freeBytes / (1024 * 1024)),
       });
+      // Tiered disk pressure alarms. Logged separately from the snapshot
+      // so they're easy to grep and don't get lost in steady-state info
+      // lines. The error tier is silent until you're genuinely close to
+      // SQLITE_FULL — at 100MB free, a few minutes of growth wedges
+      // every session DB.
+      if (freeBytes !== null) {
+        if (freeBytes < DISK_LOW_ERROR_BYTES) {
+          log.error('Disk space critically low at DATA_DIR — SQLite writes may begin failing', {
+            freeMB: Math.round(freeBytes / (1024 * 1024)),
+            errorThresholdMB: Math.round(DISK_LOW_ERROR_BYTES / (1024 * 1024)),
+          });
+        } else if (freeBytes < DISK_LOW_WARN_BYTES) {
+          log.warn('Disk space low at DATA_DIR', {
+            freeMB: Math.round(freeBytes / (1024 * 1024)),
+            warnThresholdMB: Math.round(DISK_LOW_WARN_BYTES / (1024 * 1024)),
+          });
+        }
+      }
     } catch (err) {
       // Snapshot failure must not break the sweep loop — log and move on.
       log.warn('Host state snapshot: failed', { err });
