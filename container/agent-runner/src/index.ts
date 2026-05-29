@@ -43,7 +43,54 @@ function log(msg: string): void {
 
 const CWD = '/workspace/agent';
 
+/**
+ * Pre-OOM cgroup-v2 memory watch. Runs every 30s in the background. Reads
+ * the container's own memory usage and ceiling and emits one WARNING line
+ * per minute when usage crosses 85% of the cap. Gives operators advance
+ * notice before docker OOM-kills the container (code 137 → host
+ * container-runner records crash, applies iter-10 backoff). Without this,
+ * the only signal is the exit code.
+ *
+ * cgroup v2 paths (`memory.current`, `memory.max`) — host runs
+ * Ubuntu 22.04+ kernel which is v2 by default. If the files are missing
+ * (different runtime, older kernel) the watch silently no-ops.
+ */
+const MEMORY_WATCH_INTERVAL_MS = 30_000;
+const MEMORY_WATCH_THRESHOLD = 0.85;
+const MEMORY_WATCH_LOG_COOLDOWN_MS = 60_000;
+function startMemoryWatch(): void {
+  const memCurrentPath = '/sys/fs/cgroup/memory.current';
+  const memMaxPath = '/sys/fs/cgroup/memory.max';
+  if (!fs.existsSync(memCurrentPath) || !fs.existsSync(memMaxPath)) {
+    log(`Memory watch disabled — cgroup v2 paths not found`);
+    return;
+  }
+  let lastLogAtMs = 0;
+  setInterval(() => {
+    try {
+      const max = fs.readFileSync(memMaxPath, 'utf8').trim();
+      if (max === 'max') return; // no ceiling set → nothing to warn about
+      const maxBytes = Number(max);
+      const currentBytes = Number(fs.readFileSync(memCurrentPath, 'utf8').trim());
+      if (!Number.isFinite(maxBytes) || !Number.isFinite(currentBytes) || maxBytes <= 0) return;
+      const ratio = currentBytes / maxBytes;
+      if (ratio >= MEMORY_WATCH_THRESHOLD && Date.now() - lastLogAtMs > MEMORY_WATCH_LOG_COOLDOWN_MS) {
+        const pct = Math.round(ratio * 100);
+        const curMB = Math.round(currentBytes / (1024 * 1024));
+        const maxMB = Math.round(maxBytes / (1024 * 1024));
+        log(
+          `WARNING: container memory at ${pct}% (${curMB}MB / ${maxMB}MB) — approaching OOM-kill; consider raising container_configs.memory_limit`,
+        );
+        lastLogAtMs = Date.now();
+      }
+    } catch {
+      // Best effort — never crash the runner on a stat failure.
+    }
+  }, MEMORY_WATCH_INTERVAL_MS).unref();
+}
+
 async function main(): Promise<void> {
+  startMemoryWatch();
   const config = loadConfig();
   const providerName = config.provider.toLowerCase() as ProviderName;
 

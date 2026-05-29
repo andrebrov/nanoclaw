@@ -526,6 +526,17 @@ async function spawnContainer(session: Session): Promise<void> {
       containerName,
       crashCount: crashRecords.get(session.id)?.count ?? 0,
     });
+    // Code 137 = SIGKILL. Most commonly hit when docker cgroup OOM-kills
+    // the container under the iter-9 memory cap. Surface the hint
+    // separately so operators don't have to dig — combined with the
+    // container-side pre-OOM warning (agent-runner memory watch), they
+    // get advance signal plus the postmortem pointer.
+    if (code === 137) {
+      log.warn(
+        'Container exited with code 137 (SIGKILL) — likely OOM-kill at the memory_limit cgroup ceiling; consider raising container_configs.memory_limit',
+        { sessionId: session.id, containerName },
+      );
+    }
     drainWakeQueue();
   });
 
