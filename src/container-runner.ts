@@ -296,6 +296,13 @@ export function wakeContainer(session: Session): Promise<boolean> {
  */
 const SPAWN_TIMEOUT_MS = 90_000;
 
+/**
+ * Validates docker --memory values: digit string + optional unit
+ * (b, k, m, g, t). Case-insensitive. Examples that match: "1500m",
+ * "2g", "512M". Examples that don't: "1.5g", "1500", "twogigs".
+ */
+const MEMORY_LIMIT_RE = /^\d+[bkmgt]?$/i;
+
 function doSpawn(session: Session): Promise<boolean> {
   let timeoutHandle: NodeJS.Timeout | null = null;
   const timeoutPromise = new Promise<boolean>((resolve) => {
@@ -986,6 +993,31 @@ async function buildContainerArgs(
   agentIdentifier?: string,
 ): Promise<string[]> {
   const args: string[] = ['run', '--rm', '--name', containerName, '--label', CONTAINER_INSTALL_LABEL];
+
+  // Per-container memory ceiling. Without this, a runaway agent
+  // (oversized tool output buffered in JS, accidental infinite collection
+  // growth, untyped DB result spreading) can consume all host memory
+  // and OOM-kill arbitrary processes — including the host itself. The
+  // limit comes from container.json (`memory_limit`, e.g. "1500m", "2g")
+  // when set; otherwise a safe default of 1500m. Typical agent steady
+  // state is well under 500MB, so 1500m is ~3× headroom without
+  // affecting normal workloads. Docker enforces this at the cgroup
+  // level; an over-the-limit container is OOM-killed (close handler
+  // fires with code 137, host respawns via sweep on next inbound).
+  //
+  // The MEMORY_LIMIT_RE guard rejects unparseable values so an
+  // operator typo (e.g. "1.5gb") doesn't blow up docker run silently.
+  const requestedMemoryLimit = containerConfig.memory_limit ?? '1500m';
+  if (MEMORY_LIMIT_RE.test(requestedMemoryLimit)) {
+    args.push('--memory', requestedMemoryLimit);
+  } else {
+    log.warn('Ignoring malformed container memory_limit, falling back to default', {
+      agentGroup: agentGroup.name,
+      requested: requestedMemoryLimit,
+      defaultUsed: '1500m',
+    });
+    args.push('--memory', '1500m');
+  }
 
   // Environment — only vars read by code we don't own.
   // Everything NanoClaw-specific is in container.json (read by runner at startup).

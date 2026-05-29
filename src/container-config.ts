@@ -100,6 +100,18 @@ export interface ContainerConfig {
   /** Reasoning-effort override (upstream container_configs column). */
   effort?: string;
   /**
+   * docker --memory ceiling for this group's containers (e.g. "1500m", "2g").
+   * Validated against /^\d+[bkmgt]?$/i at spawn time; invalid values fall
+   * back to the safe default (1500m) with a warning. Set higher when an
+   * agent needs to buffer large tool outputs (PDF rendering, big HTTP
+   * responses, etc.); set lower to constrain risky agents.
+   *
+   * When absent, the safe default applies (1500m) — that's enough for
+   * typical agent usage (~200-500MB observed) with ~3× headroom, and
+   * prevents a runaway from OOMing the host.
+   */
+  memory_limit?: string;
+  /**
    * Grant this container admin observability: mounts host logs + session dirs
    * read-only at /workspace/host-logs/ and enables the chat_status MCP tool.
    * Only set on designated admin agent groups.
