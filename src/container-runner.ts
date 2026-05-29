@@ -372,6 +372,19 @@ const CRASH_RESET_WINDOW_MS = 5 * 60 * 1000;
 const MAX_BACKOFF_MS = 60_000;
 const BASE_BACKOFF_MS = 5_000;
 
+// Test-only exports of the crash-backoff helpers. Exported via the `_test`
+// prefix to make the test-only intent obvious at the call site — these
+// aren't part of the module's public API; they exist so the iter-10
+// backoff progression can be regression-protected without standing up a
+// full container/docker harness.
+export const _testCrashBackoff = {
+  computeBackoffMs: (sessionId: string) => computeBackoffMs(sessionId),
+  recordCrash: (sessionId: string) => recordCrash(sessionId),
+  clearCrashRecord: (sessionId: string) => clearCrashRecord(sessionId),
+  reset: () => crashRecords.clear(),
+  constants: { BASE_BACKOFF_MS, MAX_BACKOFF_MS, CRASH_RESET_WINDOW_MS },
+};
+
 function computeBackoffMs(sessionId: string): number {
   const r = crashRecords.get(sessionId);
   if (!r) return 0;
