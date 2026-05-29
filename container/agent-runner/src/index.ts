@@ -220,6 +220,32 @@ async function main(): Promise<void> {
   });
 }
 
+// Container-side crash containment, mirroring src/index.ts on the host.
+// The agent-runner has many async hot paths the await chain doesn't cover:
+// stream 'data' listeners on the SDK subprocess, setInterval callbacks in
+// the poll loop, MCP tool handlers, observability hooks. A throw from any
+// of those would normally exit the bun process — host respawns within
+// ~60s via sweep, but messages in flight stay claimed and the user sees a
+// blank gap. Catching here keeps the poll loop alive so the next batch is
+// processed normally; the error is fully logged for diagnostics.
+//
+// Startup failure (the main().catch below) still exits — at that point
+// nothing useful can run anyway.
+process.on('uncaughtException', (err, origin) => {
+  log(
+    `uncaughtException — continuing (origin=${origin}): ${
+      err instanceof Error ? err.message : String(err)
+    }`,
+  );
+  if (err instanceof Error && err.stack) {
+    log(err.stack);
+  }
+});
+process.on('unhandledRejection', (reason) => {
+  const detail = reason instanceof Error ? `${reason.message}\n${reason.stack ?? ''}` : String(reason);
+  log(`unhandledRejection — continuing: ${detail}`);
+});
+
 main().catch((err) => {
   log(`Fatal error: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);

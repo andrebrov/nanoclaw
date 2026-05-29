@@ -577,15 +577,24 @@ async function processQuery(
   let pollInFlight = false;
   let endedForCommand = false;
 
-  // Hung-SDK diagnostic. The for-await loop below updates this on every real
-  // SDK event (init, activity, tool_use, result, threshold_*, compaction).
-  // If the inner setInterval keeps firing but nothing updates this, the SDK
-  // is stuck mid-stream — heartbeat stays fresh (we keep touching it for
-  // the long-Bash case) and the host sweep can't tell. This timestamp is
-  // the diagnostic backstop: if no events for > HUNG_SDK_LOG_THRESHOLD_MS,
-  // log a clear warning. Rate-limited via lastHungLogAtMs so we don't spam.
-  // Behavior unchanged; this is observability only.
+  // Hung-SDK diagnostic. Tracks two timestamps:
+  //   - lastRealEventAtMs: updated on every event from query.events (init,
+  //     activity, tool_use, result, threshold_*, compaction).
+  //   - lastPushAtMs: updated whenever we push input into the active query
+  //     (initial prompt at runQuery start, and each follow-up batch).
+  //
+  // Warning fires only when lastPushAtMs > lastRealEventAtMs (we've pushed
+  // input that the SDK hasn't acknowledged) AND that gap has exceeded
+  // HUNG_SDK_LOG_THRESHOLD_MS. The earlier "no events for X seconds"
+  // version was too broad: between turns the agent legitimately sits with
+  // the query held open waiting for the next push (poll-loop.ts:569–576
+  // documents this), so it logged false positives on every idle session.
+  //
+  // The gating is "did we push something the SDK still hasn't responded
+  // to" — that's the actual stuck-stream case. Rate-limited via
+  // lastHungLogAtMs so a genuinely-hung container doesn't spam.
   let lastRealEventAtMs = Date.now();
+  let lastPushAtMs = Date.now();
   let lastHungLogAtMs = 0;
   const HUNG_SDK_LOG_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -600,14 +609,19 @@ async function processQuery(
     // stale and the sweep could kill an actively-working container.
     touchHeartbeat();
 
-    // Hung-SDK warning. Distinct from heartbeat: heartbeat tells the host
-    // "the runner process is alive," this tells the operator "the SDK
-    // event stream has gone silent." Both can be true at once (the
-    // documented inner-setInterval failure mode behind the 2026-05-25
-    // stall). Rate-limited to one log per threshold window.
-    const sinceEvent = Date.now() - lastRealEventAtMs;
-    if (sinceEvent > HUNG_SDK_LOG_THRESHOLD_MS && Date.now() - lastHungLogAtMs > HUNG_SDK_LOG_THRESHOLD_MS) {
-      log(`WARNING: no SDK events in ${Math.round(sinceEvent / 1000)}s — possible stuck stream`);
+    // Hung-SDK warning. Fires only when there's outstanding input the SDK
+    // hasn't responded to. Idle between turns (no push since last event)
+    // is the normal cross-turn quiet — don't log on that.
+    const isAwaitingResponse = lastPushAtMs > lastRealEventAtMs;
+    const sincePush = Date.now() - lastPushAtMs;
+    if (
+      isAwaitingResponse &&
+      sincePush > HUNG_SDK_LOG_THRESHOLD_MS &&
+      Date.now() - lastHungLogAtMs > HUNG_SDK_LOG_THRESHOLD_MS
+    ) {
+      log(
+        `WARNING: pushed input ${Math.round(sincePush / 1000)}s ago, no SDK events since — possible stuck stream`,
+      );
       lastHungLogAtMs = Date.now();
     }
 
@@ -679,6 +693,7 @@ async function processQuery(
         log(`Pushing ${keep.length} follow-up message(s) into active query`);
         unwrappedNudged = false;
         query.push(followUp);
+        lastPushAtMs = Date.now();
         // User input arrived — reset idle timer so a burst of follow-up
         // messages doesn't look like silence to the keepalive countdown.
         resetIdleTimer(touchHeartbeat, IDLE_KEEPALIVE_MS);
