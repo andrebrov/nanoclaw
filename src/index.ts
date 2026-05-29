@@ -13,7 +13,7 @@ import { migrateGroupsToClaudeLocal } from './claude-md-compose.js';
 import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrations/index.js';
 import { ensureContainerRuntimeRunning, cleanupOrphans } from './container-runtime.js';
-import { setIsMainGroupResolver } from './container-runner.js';
+import { setIsMainGroupResolver, shutdownAllContainers } from './container-runner.js';
 import { getAgentGroup } from './db/agent-groups.js';
 import { getMessagingGroupByPlatform, updateMessagingGroup } from './db/messaging-groups.js';
 import { startActiveDeliveryPoll, startSweepDeliveryPoll, setDeliveryAdapter, stopDeliveryPolls } from './delivery.js';
@@ -244,6 +244,17 @@ async function shutdown(signal: string): Promise<void> {
   try {
     await teardownChannelAdapters();
   } finally {
+    // Send SIGTERM to every still-running container before exit. Without
+    // this, child docker processes orphan when the host exits and have
+    // to be reaped by cleanupOrphans on next startup — a small window
+    // of confused state where activeContainers disagrees with reality.
+    // Bounded to 3s so a hung container doesn't block shutdown
+    // indefinitely; the existing cleanupOrphans path catches stragglers.
+    try {
+      await shutdownAllContainers(3000);
+    } catch (err) {
+      log.error('Shutdown: container teardown threw', { err });
+    }
     // Always reset on graceful shutdown — even if teardown threw, we got here
     // via SIGTERM/SIGINT, not a crash, so the next start shouldn't be counted
     // as one.

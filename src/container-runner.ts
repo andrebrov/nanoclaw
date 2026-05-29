@@ -118,6 +118,56 @@ export function getActiveContainerCount(): number {
 }
 
 /**
+ * Send SIGTERM to every currently-tracked container's docker run process
+ * and wait up to `waitMs` for the close handlers to fire. Used by the
+ * host's graceful shutdown so child docker processes don't orphan when
+ * the host process exits. Without this, every host restart left
+ * containers running until `cleanupOrphans` reaped them at next startup
+ * — a small window of confused state where the host's activeContainers
+ * map disagreed with what was actually running.
+ *
+ * Containers that don't close within waitMs are abandoned to be
+ * SIGKILL'd by docker's own grace period (set via --stop-timeout on the
+ * docker run, default 10s). cleanupOrphans on next startup still
+ * catches anything that escapes.
+ */
+export async function shutdownAllContainers(waitMs = 3000): Promise<void> {
+  const entries = [...activeContainers.entries()];
+  if (entries.length === 0) {
+    log.info('Shutdown: no tracked containers to kill — relying on cleanupOrphans at next start');
+    return;
+  }
+  log.info('Shutdown: sending SIGTERM to all containers', { count: entries.length });
+  const waiters: Promise<void>[] = [];
+  for (const [sessionId, entry] of entries) {
+    waiters.push(
+      new Promise<void>((resolve) => {
+        const onClose = (): void => {
+          entry.process.off('close', onClose);
+          entry.process.off('exit', onClose);
+          resolve();
+        };
+        entry.process.once('close', onClose);
+        entry.process.once('exit', onClose);
+        try {
+          entry.process.kill('SIGTERM');
+        } catch (err) {
+          log.warn('Shutdown: SIGTERM throw', { sessionId, err });
+          resolve();
+        }
+      }),
+    );
+  }
+  const allClosed = Promise.all(waiters).then(() => undefined);
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+  await Promise.race([allClosed, timeout]);
+  log.info('Shutdown: container shutdown wait complete', {
+    remaining: activeContainers.size,
+    waitedMs: waitMs,
+  });
+}
+
+/**
  * Read-only stats for the host's periodic state snapshot log. Returns the
  * count, the oldest-container age in ms (or null when empty), and the
  * count of pending wakes in the concurrency queue. Cheap to call —
