@@ -303,7 +303,67 @@ const SPAWN_TIMEOUT_MS = 90_000;
  */
 const MEMORY_LIMIT_RE = /^\d+[bkmgt]?$/i;
 
-function doSpawn(session: Session): Promise<boolean> {
+/**
+ * Per-session crash tracking for the wake-time backoff. Bumped when a
+ * container's close handler fires with a non-zero code; reset on a
+ * graceful exit or after CRASH_RESET_WINDOW_MS without further crashes.
+ *
+ * Without backoff, a container that can't stay up (bad config, missing
+ * API key, immediate OOM under the iter-9 memory cap) would respawn
+ * every 60s (sweep) or on every inbound message — burning CPU, image
+ * pull bandwidth, and OneCLI quota with no chance of recovery.
+ */
+interface CrashRecord {
+  count: number;
+  lastCrashAtMs: number;
+}
+const crashRecords = new Map<string, CrashRecord>();
+const CRASH_RESET_WINDOW_MS = 5 * 60 * 1000;
+const MAX_BACKOFF_MS = 60_000;
+const BASE_BACKOFF_MS = 5_000;
+
+function computeBackoffMs(sessionId: string): number {
+  const r = crashRecords.get(sessionId);
+  if (!r) return 0;
+  // Reset stale counts so a session that's been healthy for >5 min
+  // doesn't get penalised for ancient history.
+  if (Date.now() - r.lastCrashAtMs > CRASH_RESET_WINDOW_MS) {
+    crashRecords.delete(sessionId);
+    return 0;
+  }
+  if (r.count < 2) return 0; // first crash gets a free retry
+  // 2nd→5s, 3rd→10s, 4th→20s, 5th→40s, 6th+→60s (capped).
+  const backoff = BASE_BACKOFF_MS * Math.pow(2, r.count - 2);
+  return Math.min(MAX_BACKOFF_MS, backoff);
+}
+
+function recordCrash(sessionId: string): void {
+  const existing = crashRecords.get(sessionId);
+  const now = Date.now();
+  const stale = existing && now - existing.lastCrashAtMs > CRASH_RESET_WINDOW_MS;
+  const count = !existing || stale ? 1 : existing.count + 1;
+  crashRecords.set(sessionId, { count, lastCrashAtMs: now });
+}
+
+function clearCrashRecord(sessionId: string): void {
+  crashRecords.delete(sessionId);
+}
+
+async function doSpawnWithBackoff(session: Session): Promise<boolean> {
+  // Crash-loop guard: if the session has been crashing repeatedly,
+  // delay the spawn proportionally. Reset window inside computeBackoffMs
+  // means a stable session pays nothing.
+  const backoffMs = computeBackoffMs(session.id);
+  if (backoffMs > 0) {
+    const record = crashRecords.get(session.id);
+    log.warn('doSpawn: backing off due to recent crashes', {
+      sessionId: session.id,
+      backoffMs,
+      crashCount: record?.count ?? 0,
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, backoffMs));
+  }
+
   let timeoutHandle: NodeJS.Timeout | null = null;
   const timeoutPromise = new Promise<boolean>((resolve) => {
     timeoutHandle = setTimeout(() => {
@@ -315,12 +375,6 @@ function doSpawn(session: Session): Promise<boolean> {
     }, SPAWN_TIMEOUT_MS);
   });
 
-  // Inner spawnContainer keeps running even if we lose the race — that's
-  // the cost of not having cancellation in node's child_process API.
-  // If it eventually completes after the timeout, the resulting docker
-  // process becomes an orphan (no host tracking). The next docker-ps
-  // audit in host-sweep evicts any phantom entry; the orphan container
-  // itself gets cleaned up by `cleanupOrphans` at the next host restart.
   const spawnPromise: Promise<boolean> = spawnContainer(session)
     .then(() => true)
     .catch((err) => {
@@ -331,7 +385,17 @@ function doSpawn(session: Session): Promise<boolean> {
       if (timeoutHandle) clearTimeout(timeoutHandle);
     });
 
-  const promise = Promise.race([spawnPromise, timeoutPromise]).finally(() => {
+  return Promise.race([spawnPromise, timeoutPromise]);
+}
+
+function doSpawn(session: Session): Promise<boolean> {
+  // Inner spawnContainer keeps running even if we lose the timeout race —
+  // that's the cost of not having cancellation in node's child_process API.
+  // If it eventually completes after the timeout, the resulting docker
+  // process becomes an orphan (no host tracking). The next docker-ps audit
+  // in host-sweep evicts any phantom entry; the orphan container itself
+  // gets cleaned up by `cleanupOrphans` at the next host restart.
+  const promise = doSpawnWithBackoff(session).finally(() => {
     wakePromises.delete(session.id);
   });
   wakePromises.set(session.id, promise);
@@ -448,7 +512,20 @@ async function spawnContainer(session: Session): Promise<void> {
     markContainerStopped(session.id);
     stopTypingRefresh(session.id);
     destroySessionObserver(session.id);
-    log.info('Container exited', { sessionId: session.id, code, containerName });
+    // Code 0 → clean. Code 75 → planned threshold-nuke (also clean).
+    // Anything else (137 OOM, 1 thrown, null SIGKILL/SIGTERM) counts
+    // as a crash for backoff purposes.
+    if (code === 0 || code === 75) {
+      clearCrashRecord(session.id);
+    } else {
+      recordCrash(session.id);
+    }
+    log.info('Container exited', {
+      sessionId: session.id,
+      code,
+      containerName,
+      crashCount: crashRecords.get(session.id)?.count ?? 0,
+    });
     drainWakeQueue();
   });
 
