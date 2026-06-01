@@ -119,6 +119,45 @@ describe('decideStuckAction', () => {
     expect(res.action).toBe('ok');
   });
 
+  it('kills an orphaned claim past the ceiling even when the heartbeat is fresh', () => {
+    // The masking case: a container multiplexing messages keeps the per-session
+    // heartbeat fresh from unrelated work, so heartbeatMtimeMs > claimedAt holds
+    // even though THIS claim was orphaned mid-turn. Past the 30-min absolute
+    // ceiling no single turn legitimately runs this long, so the fresh
+    // heartbeat must no longer excuse it. incident-orphaned-processing-claim-masking.
+    const claimedAgeMs = ABSOLUTE_CEILING_MS + 5 * 60 * 1000; // 35 min old claim
+    const res = decideStuckAction({
+      now: BASE,
+      heartbeatMtimeMs: BASE - 2_000, // fresh — would mask under the old rule
+      containerState: null,
+      claims: [claim('msg-orphan', claimedAgeMs)],
+    });
+    expect(res.action).toBe('kill-claim');
+    if (res.action !== 'kill-claim') return;
+    expect(res.messageId).toBe('msg-orphan');
+    expect(res.claimAgeMs).toBeGreaterThan(ABSOLUTE_CEILING_MS);
+  });
+
+  it('still excuses a long-running claim under a widened (declared) ceiling with a fresh heartbeat', () => {
+    // A genuinely long turn declares its Bash timeout, which widens `ceiling`.
+    // A 45-min claim under a 2-hour declared timeout, with a fresh heartbeat,
+    // must NOT be killed — the override only fires past the ceiling.
+    const twoHrMs = 2 * 60 * 60 * 1000;
+    const claimedAgeMs = 45 * 60 * 1000;
+    const res = decideStuckAction({
+      now: BASE,
+      heartbeatMtimeMs: BASE - 2_000, // fresh
+      containerState: {
+        current_tool: 'Bash',
+        tool_declared_timeout_ms: twoHrMs,
+        tool_started_at: new Date(BASE - claimedAgeMs).toISOString(),
+        declared_max_ms: null,
+      },
+      claims: [claim('msg-long', claimedAgeMs)],
+    });
+    expect(res.action).toBe('ok');
+  });
+
   it('does not kill when claim age is below tolerance', () => {
     const res = decideStuckAction({
       now: BASE,

@@ -247,7 +247,20 @@ export function decideStuckAction(args: {
     if (Number.isNaN(claimedAt)) continue;
     const claimAge = now - claimedAt;
     if (claimAge <= tolerance) continue;
-    if (heartbeatMtimeMs > claimedAt) continue;
+    // A fresh heartbeat normally excuses an aged claim — the container has
+    // shown life since claiming, so it's plausibly still working that turn.
+    // But a container multiplexing many messages keeps the per-session
+    // heartbeat fresh from UNRELATED work (e.g. a `*/4` meeting-prep task),
+    // masking a claim it orphaned when a prior turn died mid-flight
+    // (OOM SIGKILL 137, idle-eviction, host restart kill). That orphan is
+    // invisible to the container's getPendingMessages forever, so its still-
+    // 'pending' task never re-runs. Past the absolute ceiling, no single turn
+    // legitimately runs this long — a genuinely long turn extends `ceiling`
+    // via its declared Bash/max timeout — so a claim older than `ceiling` is
+    // treated as stuck regardless of heartbeat freshness. The kill-claim path
+    // then resets the message and clears the orphan ack so it re-runs.
+    // incident-orphaned-processing-claim-masking.
+    if (claimAge <= ceiling && heartbeatMtimeMs > claimedAt) continue;
     return { action: 'kill-claim', messageId: claim.message_id, claimAgeMs: claimAge, toleranceMs: tolerance };
   }
 
