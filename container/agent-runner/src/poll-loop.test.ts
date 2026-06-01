@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 
-import { initTestSessionDb, closeSessionDb, getInboundDb, clearStaleProcessingAcks } from './db/connection.js';
+import {
+  initTestSessionDb,
+  closeSessionDb,
+  getInboundDb,
+  getOutboundDb,
+  clearStaleProcessingAcks,
+  reclaimStaleProcessingAcks,
+} from './db/connection.js';
 import { getPendingMessages, markCompleted, markProcessing } from './db/messages-in.js';
 import { getUndeliveredMessages, writeMessageOut } from './db/messages-out.js';
 import {
@@ -51,6 +58,42 @@ function insertMessage(
       JSON.stringify(content),
     );
 }
+
+describe('stale processing-claim self-heal', () => {
+  const STALE_MS = 30 * 60_000;
+
+  /** Backdate an existing processing_ack row to N seconds ago. */
+  function backdateAck(messageId: string, offsetSeconds: number) {
+    getOutboundDb()
+      .prepare("UPDATE processing_ack SET status_changed = datetime('now', ?) WHERE message_id = ?")
+      .run(`${offsetSeconds} seconds`, messageId);
+  }
+
+  it('hides a claimed task from getPendingMessages, then re-exposes it after reclaim', () => {
+    insertMessage('task-stuck', 'task', { prompt: 'Daily agenda' });
+
+    // Claim it (as a turn would), then simulate the turn dying before
+    // markCompleted by backdating the claim past the stale window.
+    markProcessing(['task-stuck']);
+    backdateAck('task-stuck', -40 * 60);
+
+    // While the orphan ack exists, the still-pending task is invisible.
+    expect(getPendingMessages().map((m) => m.id)).not.toContain('task-stuck');
+
+    // Self-heal drops the orphan; the task becomes fetchable and re-runs.
+    expect(reclaimStaleProcessingAcks(STALE_MS)).toEqual(['task-stuck']);
+    expect(getPendingMessages().map((m) => m.id)).toContain('task-stuck');
+  });
+
+  it('does not reclaim a freshly-claimed task (protects the in-flight turn)', () => {
+    insertMessage('task-active', 'task', { prompt: 'In progress' });
+    markProcessing(['task-active']); // status_changed = now
+
+    expect(reclaimStaleProcessingAcks(STALE_MS)).toEqual([]);
+    // Still claimed, still hidden — the running turn owns it.
+    expect(getPendingMessages().map((m) => m.id)).not.toContain('task-active');
+  });
+});
 
 describe('formatter', () => {
   it('should format a single chat message', () => {

@@ -217,6 +217,39 @@ export function clearStaleProcessingAcks(): void {
   getOutboundDb().prepare("DELETE FROM processing_ack WHERE status = 'processing'").run();
 }
 
+/**
+ * Reclaim *stale* 'processing' acks on a LIVE container — the mid-run analogue
+ * of clearStaleProcessingAcks (which only runs at startup). A claim left in
+ * 'processing' past `staleMs` belongs to a turn that was interrupted before
+ * markCompleted (OOM/eviction/host-kill): getPendingMessages excludes such ids
+ * forever, so the still-`pending` task never re-runs until the orphan ack is
+ * dropped. A long-lived container kept warm by frequent cheap tasks never
+ * restarts, so the startup cleaner never re-fires — see
+ * incident-orphaned-processing-claim-masking.
+ *
+ * Call only at the top of a poll iteration (no turn in flight): at that point
+ * every 'processing' row is necessarily an orphan from a prior iteration. The
+ * `staleMs` age guard additionally protects any legitimately long turn.
+ *
+ * Returns the message ids whose claims were dropped (empty when none).
+ */
+export function reclaimStaleProcessingAcks(staleMs: number): string[] {
+  const db = getOutboundDb();
+  const cutoff = `-${Math.floor(staleMs / 1000)} seconds`;
+  const rows = db
+    .prepare(
+      "SELECT message_id FROM processing_ack WHERE status = 'processing' AND status_changed <= datetime('now', ?)",
+    )
+    .all(cutoff) as Array<{ message_id: string }>;
+  if (rows.length === 0) return [];
+  const ids = rows.map((r) => r.message_id);
+  const del = db.prepare("DELETE FROM processing_ack WHERE message_id = ? AND status = 'processing'");
+  db.transaction(() => {
+    for (const id of ids) del.run(id);
+  })();
+  return ids;
+}
+
 /** For tests — creates in-memory DBs with the session schemas. */
 export function initTestSessionDb(): { inbound: Database; outbound: Database } {
   _testMode = true;

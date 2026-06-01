@@ -10,7 +10,12 @@ import {
 } from './destinations.js';
 import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } from './db/messages-in.js';
 import { writeMessageOut } from './db/messages-out.js';
-import { getInboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
+import {
+  getInboundDb,
+  touchHeartbeat,
+  clearStaleProcessingAcks,
+  reclaimStaleProcessingAcks,
+} from './db/connection.js';
 import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
 import {
   getStoredSessionId,
@@ -49,6 +54,13 @@ const ACTIVE_POLL_INTERVAL_MS = 500;
 // a container doing genuine work (e.g. long Bash runs with sparse SDK events)
 // stays alive. 60 s gives plenty of headroom while keeping the gap small.
 const IDLE_KEEPALIVE_MS = 60_000;
+// A 'processing' ack older than this on a live container is an orphan from a
+// turn that died before markCompleted (OOM/eviction/host-kill). Matches the
+// host's absolute idle ceiling (ABSOLUTE_CEILING_MS / 30 min): a legitimately
+// long turn is expected to call extend_ceiling, and past the ceiling the host
+// would kill the container anyway — so a claim this old on a still-living
+// container is unambiguously stale. See incident-orphaned-processing-claim-masking.
+const STALE_PROCESSING_MS = 30 * 60_000;
 
 function log(msg: string): void {
   console.error(`[poll-loop] ${msg}`);
@@ -123,6 +135,19 @@ export async function runPollLoop(config: PollLoopConfig): Promise<void> {
     // and missing-heartbeat phantom sessions (host believes container is
     // running, no actual container, never wrote .heartbeat) stay invisible.
     touchHeartbeat();
+
+    // Self-heal orphaned claims: a 'processing' ack older than the host ceiling
+    // belongs to a turn that died before markCompleted (OOM/eviction/host-kill).
+    // getPendingMessages excludes such ids forever, so the still-pending task
+    // never re-runs. We're at the top of the loop with no turn in flight, so any
+    // sufficiently-old 'processing' row is provably an orphan. The startup
+    // clearStaleProcessingAcks only covers restarts; a long-lived container kept
+    // warm by frequent cheap tasks never restarts (incident-orphaned-processing-claim-masking).
+    const reclaimed = reclaimStaleProcessingAcks(STALE_PROCESSING_MS);
+    if (reclaimed.length > 0) {
+      log(`Reclaimed ${reclaimed.length} stale processing claim(s): ${reclaimed.join(', ')}`);
+    }
+
     // Skip system messages — they're responses for MCP tools (e.g., ask_user_question)
     const messages = getPendingMessages(isFirstPoll).filter((m) => m.kind !== 'system');
     isFirstPoll = false;

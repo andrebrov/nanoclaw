@@ -553,11 +553,7 @@ export interface EvictionCandidate {
  * which case the queued session waits (legitimate backpressure: every slot
  * is doing real work). Exported for unit testing.
  */
-export function selectEvictionVictim(
-  candidates: EvictionCandidate[],
-  now: number,
-  minAgeMs: number,
-): string | null {
+export function selectEvictionVictim(candidates: EvictionCandidate[], now: number, minAgeMs: number): string | null {
   let best: { sessionId: string; spawnedAtMs: number } | null = null;
   for (const c of candidates) {
     if (now - c.spawnedAtMs < minAgeMs) continue;
@@ -582,8 +578,7 @@ function pickIdleEvictionVictim(): string | null {
   const candidates: EvictionCandidate[] = [];
   for (const [sessionId, entry] of activeContainers.entries()) {
     const { session } = entry;
-    const isMainDm =
-      session.session_name === DEFAULT_SESSION_NAME && (isMainGroupResolver?.(session) ?? false);
+    const isMainDm = session.session_name === DEFAULT_SESSION_NAME && (isMainGroupResolver?.(session) ?? false);
     candidates.push({
       sessionId,
       spawnedAtMs: entry.spawnedAtMs,

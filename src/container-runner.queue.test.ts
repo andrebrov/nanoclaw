@@ -4,11 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import {
-  evaluateConcurrencyAction,
-  selectEvictionVictim,
-  type EvictionCandidate,
-} from './container-runner.js';
+import { evaluateConcurrencyAction, selectEvictionVictim, type EvictionCandidate } from './container-runner.js';
 import type { Session } from './types.js';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
@@ -145,9 +141,7 @@ describe('selectEvictionVictim', () => {
       sessionId: 'youngest-idle',
       spawnedAtMs: NOW - MIN_AGE - 1_000,
     });
-    expect(selectEvictionVictim([oldestBusy, nextIdle, youngestIdle], NOW, MIN_AGE)).toBe(
-      'next-idle',
-    );
+    expect(selectEvictionVictim([oldestBusy, nextIdle, youngestIdle], NOW, MIN_AGE)).toBe('next-idle');
   });
 
   it('returns null when every candidate is excluded (legitimate backpressure)', () => {
