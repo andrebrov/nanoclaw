@@ -4,7 +4,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { evaluateConcurrencyAction } from './container-runner.js';
+import {
+  evaluateConcurrencyAction,
+  selectEvictionVictim,
+  type EvictionCandidate,
+} from './container-runner.js';
 import type { Session } from './types.js';
 
 function makeSession(overrides: Partial<Session> = {}): Session {
@@ -65,5 +69,94 @@ describe('evaluateConcurrencyAction', () => {
   it('returns bypass when over cap for main DM (cap+1 allowed)', () => {
     const session = makeSession({ session_name: 'default', agent_group_id: 'ag-main' });
     expect(evaluateConcurrencyAction(6, 5, session, isMain)).toBe('bypass');
+  });
+});
+
+/**
+ * Idle-eviction selection policy. Guards against the 2026-06-01 spawn-queue
+ * deadlock where persistent idle containers saturated the cap and starved
+ * sessions with due work (see incident_spawn_queue_deadlock.md).
+ */
+describe('selectEvictionVictim', () => {
+  const NOW = 1_000_000;
+  const MIN_AGE = 60_000;
+
+  function makeCandidate(overrides: Partial<EvictionCandidate> = {}): EvictionCandidate {
+    return {
+      sessionId: 'sess-1',
+      // Default: comfortably older than the min-age threshold.
+      spawnedAtMs: NOW - MIN_AGE - 1,
+      isQueued: false,
+      isMainDm: false,
+      isProcessing: false,
+      ...overrides,
+    };
+  }
+
+  it('returns null when there are no candidates', () => {
+    expect(selectEvictionVictim([], NOW, MIN_AGE)).toBeNull();
+  });
+
+  it('picks the only eligible idle candidate', () => {
+    const c = makeCandidate({ sessionId: 'idle-1' });
+    expect(selectEvictionVictim([c], NOW, MIN_AGE)).toBe('idle-1');
+  });
+
+  it('picks the oldest (smallest spawnedAtMs) among eligible candidates', () => {
+    const young = makeCandidate({ sessionId: 'young', spawnedAtMs: NOW - MIN_AGE - 100 });
+    const old = makeCandidate({ sessionId: 'old', spawnedAtMs: NOW - MIN_AGE - 5_000 });
+    const mid = makeCandidate({ sessionId: 'mid', spawnedAtMs: NOW - MIN_AGE - 1_000 });
+    expect(selectEvictionVictim([young, old, mid], NOW, MIN_AGE)).toBe('old');
+  });
+
+  it('excludes containers younger than minAgeMs', () => {
+    const fresh = makeCandidate({ sessionId: 'fresh', spawnedAtMs: NOW - MIN_AGE + 1 });
+    expect(selectEvictionVictim([fresh], NOW, MIN_AGE)).toBeNull();
+  });
+
+  it('treats a container exactly at minAgeMs as eligible (boundary)', () => {
+    const atAge = makeCandidate({ sessionId: 'at-age', spawnedAtMs: NOW - MIN_AGE });
+    expect(selectEvictionVictim([atAge], NOW, MIN_AGE)).toBe('at-age');
+  });
+
+  it('excludes queued sessions', () => {
+    const queued = makeCandidate({ sessionId: 'queued', isQueued: true });
+    expect(selectEvictionVictim([queued], NOW, MIN_AGE)).toBeNull();
+  });
+
+  it('excludes the main-DM session', () => {
+    const main = makeCandidate({ sessionId: 'main', isMainDm: true });
+    expect(selectEvictionVictim([main], NOW, MIN_AGE)).toBeNull();
+  });
+
+  it('excludes containers with an active processing claim', () => {
+    const busy = makeCandidate({ sessionId: 'busy', isProcessing: true });
+    expect(selectEvictionVictim([busy], NOW, MIN_AGE)).toBeNull();
+  });
+
+  it('skips the oldest when it is excluded and picks the next-oldest eligible', () => {
+    const oldestBusy = makeCandidate({
+      sessionId: 'oldest-busy',
+      spawnedAtMs: NOW - MIN_AGE - 9_000,
+      isProcessing: true,
+    });
+    const nextIdle = makeCandidate({ sessionId: 'next-idle', spawnedAtMs: NOW - MIN_AGE - 4_000 });
+    const youngestIdle = makeCandidate({
+      sessionId: 'youngest-idle',
+      spawnedAtMs: NOW - MIN_AGE - 1_000,
+    });
+    expect(selectEvictionVictim([oldestBusy, nextIdle, youngestIdle], NOW, MIN_AGE)).toBe(
+      'next-idle',
+    );
+  });
+
+  it('returns null when every candidate is excluded (legitimate backpressure)', () => {
+    const candidates = [
+      makeCandidate({ sessionId: 'a', isProcessing: true }),
+      makeCandidate({ sessionId: 'b', isMainDm: true }),
+      makeCandidate({ sessionId: 'c', isQueued: true }),
+      makeCandidate({ sessionId: 'd', spawnedAtMs: NOW - MIN_AGE + 1 }),
+    ];
+    expect(selectEvictionVictim(candidates, NOW, MIN_AGE)).toBeNull();
   });
 });

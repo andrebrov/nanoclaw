@@ -56,10 +56,12 @@ import {
   inboundDbPath,
   markContainerRunning,
   markContainerStopped,
+  openOutboundDb,
   resolveMaintenanceSession,
   sessionDir,
   writeSessionRouting,
 } from './session-manager.js';
+import { getProcessingClaims } from './db/session-db.js';
 import type { AgentGroup, Session } from './types.js';
 import { resolveAgentModel } from './agent-model.js';
 
@@ -68,7 +70,10 @@ export { resolveAgentModel };
 const onecli = new OneCLI({ url: ONECLI_URL, apiKey: ONECLI_API_KEY });
 
 /** Active containers tracked by session ID. */
-const activeContainers = new Map<string, { process: ChildProcess; containerName: string; spawnedAtMs: number }>();
+const activeContainers = new Map<
+  string,
+  { process: ChildProcess; containerName: string; spawnedAtMs: number; session: Session }
+>();
 
 /**
  * In-flight wake promises, keyed by session id. Deduplicates concurrent
@@ -80,13 +85,24 @@ const activeContainers = new Map<string, { process: ChildProcess; containerName:
  */
 const wakePromises = new Map<string, Promise<boolean>>();
 
-/** Wake requests waiting for a free container slot. */
-interface PendingWake {
-  session: Session;
-  resolve: (spawned: boolean) => void;
-  reject: (err: unknown) => void;
-}
-const pendingWakeQueue: PendingWake[] = [];
+/**
+ * Sessions waiting for a free container slot. Holds the Session (not a
+ * caller promise) so a queued wake is fire-and-forget: the caller is told
+ * "not spawned right now" immediately and the host sweep / drain spawns it
+ * once a slot opens. `queuedSessionIds` dedups — the host sweep re-calls
+ * wakeContainer every tick for the same starved session, and without the
+ * dedup the queue grew unbounded (1359 duplicate entries in the
+ * 2026-06-01 deadlock; see incident_spawn_queue_deadlock.md).
+ */
+const pendingWakeQueue: Session[] = [];
+const queuedSessionIds = new Set<string>();
+
+/**
+ * Minimum container age before it's eligible for idle eviction. Protects a
+ * just-spawned container from being killed before it has had a chance to
+ * claim its first message (which is how we'd detect it as "busy").
+ */
+const EVICT_MIN_AGE_MS = 60_000;
 
 /**
  * Resolver that returns true when a session belongs to the owner's main DM
@@ -311,14 +327,26 @@ export function wakeContainer(session: Session): Promise<boolean> {
     isMainGroupResolver,
   );
   if (concurrencyAction === 'queue') {
-    return new Promise<boolean>((resolve, reject) => {
-      pendingWakeQueue.push({ session, resolve, reject });
+    if (!queuedSessionIds.has(session.id)) {
+      queuedSessionIds.add(session.id);
+      pendingWakeQueue.push(session);
       log.info('wakeContainer: queued (concurrency cap saturated)', {
         sessionId: session.id,
         queueLength: pendingWakeQueue.length,
         cap: MAX_CONCURRENT_CONTAINERS,
       });
-    });
+    }
+    // The cap is meant to bound how many containers run at once, but the
+    // agent-runner poll loop is persistent (while(true) + idle keepalive),
+    // so idle pollers hold slots forever and a session with due work would
+    // otherwise starve behind them. Free a slot by evicting an idle,
+    // non-main container. Re-attempted on every queued wake (i.e. every
+    // sweep tick) until an idle victim appears or a slot opens naturally.
+    tryEvictIdleForWaiters();
+    // Fire-and-forget: don't make the caller (host sweep) await a slot that
+    // may not open for many ticks. Returning false here means "not spawned
+    // right now"; the drain spawns it once a slot frees.
+    return Promise.resolve(false);
   }
   if (concurrencyAction === 'bypass') {
     const holders = [...activeContainers.keys()];
@@ -472,21 +500,131 @@ function doSpawn(session: Session): Promise<boolean> {
 /** Drain the pending wake queue after a container slot opens. */
 function drainWakeQueue(): void {
   while (pendingWakeQueue.length > 0 && activeContainers.size < MAX_CONCURRENT_CONTAINERS) {
-    const item = pendingWakeQueue.shift()!;
-    const { session, resolve, reject } = item;
+    const session = pendingWakeQueue.shift()!;
+    queuedSessionIds.delete(session.id);
 
-    if (activeContainers.has(session.id)) {
-      resolve(true);
-      continue;
-    }
-    const existing = wakePromises.get(session.id);
-    if (existing) {
-      existing.then(resolve, reject);
-      continue;
-    }
+    if (activeContainers.has(session.id)) continue;
+    if (wakePromises.has(session.id)) continue;
 
-    doSpawn(session).then(resolve, reject);
+    void doSpawn(session);
   }
+}
+
+/**
+ * True when the session's container currently holds a 'processing' claim —
+ * i.e. it's mid-turn on a message and must not be evicted. Reads the
+ * session's outbound.db read-only (the same surface host-sweep uses). On any
+ * error (db missing, locked) we err toward "busy" so we never kill a
+ * container we can't prove is idle.
+ */
+function hasActiveProcessingClaims(session: Session): boolean {
+  let outDb: ReturnType<typeof openOutboundDb> | null = null;
+  try {
+    outDb = openOutboundDb(session.agent_group_id, session.id);
+    return getProcessingClaims(outDb).length > 0;
+  } catch {
+    return true;
+  } finally {
+    outDb?.close();
+  }
+}
+
+/**
+ * A running container considered for idle eviction. The flags are resolved
+ * once by the caller so the selection policy itself stays pure (and unit
+ * testable without DB / Docker mocking — see container-runner.queue.test.ts).
+ */
+export interface EvictionCandidate {
+  sessionId: string;
+  spawnedAtMs: number;
+  /** Already in the wake queue — evicting it would be self-defeating. */
+  isQueued: boolean;
+  /** Owner main-DM default session — bypasses the cap, must stay up. */
+  isMainDm: boolean;
+  /** Holds an active 'processing' claim — mid-turn, not safe to kill. */
+  isProcessing: boolean;
+}
+
+/**
+ * Pure selection policy: pick the oldest idle container that can safely
+ * yield its slot to a queued wake. Excludes candidates younger than
+ * `minAgeMs`, queued sessions, the main-DM session, and any with an active
+ * processing claim. Returns null when nothing is safely evictable — in
+ * which case the queued session waits (legitimate backpressure: every slot
+ * is doing real work). Exported for unit testing.
+ */
+export function selectEvictionVictim(
+  candidates: EvictionCandidate[],
+  now: number,
+  minAgeMs: number,
+): string | null {
+  let best: { sessionId: string; spawnedAtMs: number } | null = null;
+  for (const c of candidates) {
+    if (now - c.spawnedAtMs < minAgeMs) continue;
+    if (c.isQueued) continue;
+    if (c.isMainDm) continue;
+    if (c.isProcessing) continue;
+    if (best === null || c.spawnedAtMs < best.spawnedAtMs) {
+      best = { sessionId: c.sessionId, spawnedAtMs: c.spawnedAtMs };
+    }
+  }
+  return best?.sessionId ?? null;
+}
+
+/**
+ * Gather live container state into eviction candidates and apply the
+ * selection policy. The DB read (`hasActiveProcessingClaims`) and resolver
+ * lookup happen here; the ordering/exclusion logic lives in the pure
+ * `selectEvictionVictim`.
+ */
+function pickIdleEvictionVictim(): string | null {
+  const now = Date.now();
+  const candidates: EvictionCandidate[] = [];
+  for (const [sessionId, entry] of activeContainers.entries()) {
+    const { session } = entry;
+    const isMainDm =
+      session.session_name === DEFAULT_SESSION_NAME && (isMainGroupResolver?.(session) ?? false);
+    candidates.push({
+      sessionId,
+      spawnedAtMs: entry.spawnedAtMs,
+      isQueued: queuedSessionIds.has(sessionId),
+      isMainDm,
+      // Only pay for the DB read on otherwise-eligible candidates; the pure
+      // policy would exclude these anyway, and the read errs toward "busy".
+      isProcessing:
+        now - entry.spawnedAtMs >= EVICT_MIN_AGE_MS &&
+        !isMainDm &&
+        !queuedSessionIds.has(sessionId) &&
+        hasActiveProcessingClaims(session),
+    });
+  }
+  return selectEvictionVictim(candidates, now, EVICT_MIN_AGE_MS);
+}
+
+/**
+ * When the cap is saturated and sessions are waiting, evict one idle
+ * container so the queued work can spawn. One eviction per call keeps the
+ * action gentle — across successive sweep ticks the queue converges without
+ * mass-killing healthy idle containers. The killed container's close handler
+ * runs drainWakeQueue, which spawns the next queued session once the count
+ * drops below the cap.
+ */
+function tryEvictIdleForWaiters(): void {
+  if (pendingWakeQueue.length === 0) return;
+  if (activeContainers.size < MAX_CONCURRENT_CONTAINERS) {
+    drainWakeQueue();
+    return;
+  }
+  const victim = pickIdleEvictionVictim();
+  if (victim === null) return;
+  log.info('Evicting idle container to free a slot for queued wake', {
+    sessionId: victim,
+    queueLength: pendingWakeQueue.length,
+    activeContainers: activeContainers.size,
+    cap: MAX_CONCURRENT_CONTAINERS,
+  });
+  bumpResilienceMetric('idleEvictions');
+  killContainer(victim, 'evicted-for-queued-wake');
 }
 
 async function spawnContainer(session: Session): Promise<void> {
@@ -553,7 +691,12 @@ async function spawnContainer(session: Session): Promise<void> {
 
   const container = spawn(CONTAINER_RUNTIME_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
-  activeContainers.set(session.id, { process: container, containerName, spawnedAtMs: Date.now() });
+  activeContainers.set(session.id, {
+    process: container,
+    containerName,
+    spawnedAtMs: Date.now(),
+    session,
+  });
   markContainerRunning(session.id);
 
   // Log stderr and forward observer: lines to the session observer.

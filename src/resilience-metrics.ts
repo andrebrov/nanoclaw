@@ -33,6 +33,13 @@ export interface ResilienceMetrics {
   uncaughtExceptions: number;
   /** iter 5 — process.on('unhandledRejection') swallowed a rejection. */
   unhandledRejections: number;
+  /**
+   * Idle container evicted to free a cap slot for a queued wake. Non-zero
+   * means persistent idle containers were saturating MAX_CONCURRENT_CONTAINERS
+   * and a session with due work had to displace one (see
+   * incident_spawn_queue_deadlock.md).
+   */
+  idleEvictions: number;
 }
 
 const metrics: ResilienceMetrics = {
@@ -47,6 +54,7 @@ const metrics: ResilienceMetrics = {
   ceilingKills: 0,
   uncaughtExceptions: 0,
   unhandledRejections: 0,
+  idleEvictions: 0,
 };
 
 export function bumpResilienceMetric(name: keyof ResilienceMetrics, by = 1): void {
